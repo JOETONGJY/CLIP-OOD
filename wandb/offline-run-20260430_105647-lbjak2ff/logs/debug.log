@@ -1,0 +1,30 @@
+2026-04-30 10:56:47,222 INFO    MainThread:66428 [wandb_setup.py:_flush():81] Current SDK version is 0.25.1
+2026-04-30 10:56:47,222 INFO    MainThread:66428 [wandb_setup.py:_flush():81] Configure stats pid to 66428
+2026-04-30 10:56:47,222 INFO    MainThread:66428 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-04-30 10:56:47,223 INFO    MainThread:66428 [wandb_init.py:setup_run_log_directory():717] Logging user logs to F:\LanCE-main\wandb\offline-run-20260430_105647-lbjak2ff\logs\debug.log
+2026-04-30 10:56:47,223 INFO    MainThread:66428 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to F:\LanCE-main\wandb\offline-run-20260430_105647-lbjak2ff\logs\debug-internal.log
+2026-04-30 10:56:47,223 INFO    MainThread:66428 [wandb_init.py:init():844] calling init triggers
+2026-04-30 10:56:47,223 INFO    MainThread:66428 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'seed': 0, 'wandb': True, 'batch_size': 256, 'alpha': 1.0, 'beta': 0, 'lr': 0.0001, 'weight_decay': 0.0001, 'epochs': 100, 'class_avg_concept': True, 'dataset': 'CUB', 'data_dir': './data', 'CLIP_type': 'ViT-L/14', 'CBM_type': 'clip_cbm', 'model_save_path': 'logs', 'prompt_type': 'origin', 'save_model': True, 'device': device(type='cuda', index=0), '_wandb': {}}
+2026-04-30 10:56:47,223 INFO    MainThread:66428 [wandb_init.py:init():892] starting backend
+2026-04-30 10:56:49,515 WARNING MainThread:66428 [wandb_init.py:init():1587] [no run ID] interrupted
+Traceback (most recent call last):
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\wandb_init.py", line 1578, in init
+    run = wi.init(run_settings, run_config, run_printer)
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\wandb_init.py", line 894, in init
+    service = self._wl.ensure_service()
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\wandb_setup.py", line 387, in ensure_service
+    self._connection = service_connection.connect_to_service(
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\lib\service\service_connection.py", line 51, in connect_to_service
+    return _start_and_connect_service(asyncer, settings)
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\lib\service\service_connection.py", line 66, in _start_and_connect_service
+    client = proc.token.connect(asyncer=asyncer)
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\lib\service\service_token.py", line 151, in connect
+    reader, writer = asyncer.run(
+  File "D:\anaconda3\envs\trl4060\lib\site-packages\wandb\sdk\lib\asyncio_manager.py", line 137, in run
+    return future.result()
+  File "D:\anaconda3\envs\trl4060\lib\concurrent\futures\_base.py", line 453, in result
+    self._condition.wait(timeout)
+  File "D:\anaconda3\envs\trl4060\lib\threading.py", line 320, in wait
+    waiter.acquire()
+KeyboardInterrupt
