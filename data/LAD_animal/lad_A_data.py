@@ -9,6 +9,7 @@ import os
 from tqdm import tqdm
 from utils import *
 from args import get_args
+from reliability import attach_domain_reliability
 
 class CUBDataset(Dataset):
     """
@@ -95,20 +96,15 @@ class Processed_LADA(Dataset):
         else:
             self.path2attribute = None
         if src_dm_texts is not None and tgt_dm_texts is not None:
-            self.domain_diffs = []
-            print("----------Computing Domain Differences----------")
-            for src_prompts, tgt_prompts in tqdm(zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)):
-                tqdm.write(tgt_prompts+" - "+src_prompts)
-                source_embeddings, target_embeddings = get_domain_text_embs(self.clip_model, [src_prompts], [tgt_prompts],
-                                                                            list(self.classname2id.keys()),device)
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-                diffs = target_embeddings.float() - source_embeddings.float()
-                if diffs.norm() == 0:
-                    print(diffs)
-                diffs /= diffs.norm(dim=-1, keepdim=True)
-                self.domain_diffs.append(diffs)
-            self.domain_diffs = torch.stack(self.domain_diffs, dim=0).to(device)
+            attach_domain_reliability(
+                self,
+                clip_model=self.clip_model,
+                src_dm_texts=src_dm_texts,
+                tgt_dm_texts=tgt_dm_texts,
+                class_names=list(self.classname2id.keys()),
+                device=device,
+                weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
+            )
         self.clip_model = None
 
     def __len__(self):
@@ -180,20 +176,15 @@ class Processed_LADA_Labo(Dataset):
             self.concept2id = {x.rstrip():c_id for c_id, x in enumerate(f.readlines())}
 
         if src_dm_texts is not None and tgt_dm_texts is not None:
-            self.domain_diffs = []
-            print("----------Computing Domain Differences----------")
-            for src_prompts, tgt_prompts in tqdm(zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)):
-                tqdm.write(tgt_prompts+" - "+src_prompts)
-                source_embeddings, target_embeddings = get_domain_text_embs(self.clip_model, [src_prompts], [tgt_prompts],
-                                                                            list(self.classname2id.keys()),device)
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-                diffs = target_embeddings.float() - source_embeddings.float()
-                if diffs.norm() == 0:
-                    print(diffs)
-                diffs /= diffs.norm(dim=-1, keepdim=True)
-                self.domain_diffs.append(diffs)
-            self.domain_diffs = torch.stack(self.domain_diffs, dim=0).to(device)
+            attach_domain_reliability(
+                self,
+                clip_model=self.clip_model,
+                src_dm_texts=src_dm_texts,
+                tgt_dm_texts=tgt_dm_texts,
+                class_names=list(self.classname2id.keys()),
+                device=device,
+                weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
+            )
         self.clip_model = None
 
     def __len__(self):

@@ -9,6 +9,7 @@ import os
 from tqdm import tqdm
 from utils import *
 from args import get_args
+from reliability import attach_domain_reliability
 
 class Processed_awa2(Dataset):
     def __init__(self, args, data_root, split, meta_root=None,attr_name=None,src_dm_texts=None,tgt_dm_texts =None):
@@ -40,40 +41,14 @@ class Processed_awa2(Dataset):
         else:
             self.path2attribute = None
         if src_dm_texts is not None and tgt_dm_texts is not None:
-            self.domain_diffs = []
-            self.domain_weights = []
-            print("----------Computing Domain Differences----------")
-            for src_prompts, tgt_prompts in tqdm(zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)):
-                tqdm.write(tgt_prompts + " - " + src_prompts)
-                source_embeddings, target_embeddings = get_domain_text_embs(
-                    self.clip_model,
-                    [src_prompts],
-                    [tgt_prompts],
-                    list(self.classname2id.keys()),
-                    device
-                )
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-                raw_diffs = target_embeddings.float() - source_embeddings.float()
-                if raw_diffs.norm() == 0:
-                    print(raw_diffs)
-                normed_diffs = raw_diffs / (raw_diffs.norm(dim=-1, keepdim=True) + 1e-8)
-
-                # reliability score: 平均类别间 cosine similarity
-                cos_sim = torch.matmul(normed_diffs, normed_diffs.T)
-                mask = ~torch.eye(cos_sim.size(0), dtype=torch.bool, device=cos_sim.device)
-                reliability_score = cos_sim[mask].mean()
-
-                self.domain_diffs.append(normed_diffs)
-                self.domain_weights.append(reliability_score)
-
-            self.domain_diffs = torch.stack(self.domain_diffs, dim=0).to(device)
-            scores = torch.stack(self.domain_weights).to(device)
-            threshold = scores.median()
-            self.domain_weights = torch.where(
-                scores >= threshold,
-                torch.tensor(1.8, device=device),
-                torch.tensor(0.75, device=device)
+            attach_domain_reliability(
+                self,
+                clip_model=self.clip_model,
+                src_dm_texts=src_dm_texts,
+                tgt_dm_texts=tgt_dm_texts,
+                class_names=list(self.classname2id.keys()),
+                device=device,
+                weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
             )
         self.clip_model = None
 
@@ -164,40 +139,14 @@ class Processed_awa2_Labo(Dataset):
             self.concept2id = {x.rstrip():c_id for c_id, x in enumerate(f.readlines())}
 
         if src_dm_texts is not None and tgt_dm_texts is not None:
-            self.domain_diffs = []
-            self.domain_weights = []
-            print("----------Computing Domain Differences----------")
-            for src_prompts, tgt_prompts in tqdm(zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)):
-                tqdm.write(tgt_prompts + " - " + src_prompts)
-                source_embeddings, target_embeddings = get_domain_text_embs(
-                    self.clip_model,
-                    [src_prompts],
-                    [tgt_prompts],
-                    list(self.classname2id.keys()),
-                    device
-                )
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-                raw_diffs = target_embeddings.float() - source_embeddings.float()
-                if raw_diffs.norm() == 0:
-                    print(raw_diffs)
-                normed_diffs = raw_diffs / (raw_diffs.norm(dim=-1, keepdim=True) + 1e-8)
-
-                # reliability score: 平均类别间 cosine similarity
-                cos_sim = torch.matmul(normed_diffs, normed_diffs.T)
-                mask = ~torch.eye(cos_sim.size(0), dtype=torch.bool, device=cos_sim.device)
-                reliability_score = cos_sim[mask].mean()
-
-                self.domain_diffs.append(normed_diffs)
-                self.domain_weights.append(reliability_score)
-
-            self.domain_diffs = torch.stack(self.domain_diffs, dim=0).to(device)
-            scores = torch.stack(self.domain_weights).to(device)
-            threshold = scores.median()
-            self.domain_weights = torch.where(
-                scores >= threshold,
-                torch.tensor(1.25, device=device),
-                torch.tensor(0.75, device=device)
+            attach_domain_reliability(
+                self,
+                clip_model=self.clip_model,
+                src_dm_texts=src_dm_texts,
+                tgt_dm_texts=tgt_dm_texts,
+                class_names=list(self.classname2id.keys()),
+                device=device,
+                weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
             )
         self.clip_model = None
 

@@ -9,6 +9,7 @@ import os
 from tqdm import tqdm
 from utils import *
 from args import get_args
+from reliability import attach_domain_reliability
 
 
 class Processed_CUB_Dataset(Dataset):
@@ -53,73 +54,20 @@ class Processed_CUB_Dataset(Dataset):
                 x.rstrip(): c_id for c_id, x in enumerate(f.readlines())
             }
 
-        # ===== 4. domain diffs + weights =====
+        # ===== 4. domain diffs + weights (统一调用 reliability 模块) =====
         self.domain_diffs = None
         self.domain_weights = None
+        self.reliability_scores = None
 
-        if src_dm_texts is not None and tgt_dm_texts is not None:
-            print("----------Computing Domain Differences + Weights----------")
-
-            diffs_list = []
-            weight_list = []
-
-            for src_prompts, tgt_prompts in tqdm(
-                zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)
-            ):
-                tqdm.write(f"{tgt_prompts} - {src_prompts}")
-
-                source_embeddings, target_embeddings = get_domain_text_embs(
-                    self.clip_model,
-                    [src_prompts],
-                    [tgt_prompts],
-                    list(self.classname2id.keys()),
-                    device
-                )
-
-                # normalize
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-
-                # raw diff
-                raw_diffs = target_embeddings.float() - source_embeddings.float()
-
-                if raw_diffs.norm() == 0:
-                    print("Warning: zero diff detected")
-
-                # normalized diff
-                normed_diffs = raw_diffs / (raw_diffs.norm(dim=-1, keepdim=True) + 1e-8)
-
-                # ===== reliability score =====
-                cos_sim = torch.matmul(normed_diffs, normed_diffs.T)
-
-                mask = ~torch.eye(
-                    cos_sim.size(0),
-                    dtype=torch.bool,
-                    device=cos_sim.device
-                )
-
-                reliability_score = cos_sim[mask].mean()
-
-                diffs_list.append(normed_diffs)
-                weight_list.append(reliability_score)
-
-            # ===== stack =====
-            self.domain_diffs = torch.stack(diffs_list, dim=0).to(device)
-
-            scores = torch.stack(weight_list).to(device)
-
-            # ===== 二值化权重 =====
-            threshold = scores.median()
-
-            self.domain_weights = torch.where(
-                scores >= threshold,
-                torch.tensor(1.8, device=device),
-                torch.tensor(0.75, device=device)
-            )
-
-            # print("domain_diffs shape:", self.domain_diffs.shape)
-            # print("domain_weights shape:", self.domain_weights.shape)
-            # print("domain_weights sample:", self.domain_weights[:5])
+        attach_domain_reliability(
+            self,
+            clip_model=self.clip_model,
+            src_dm_texts=src_dm_texts,
+            tgt_dm_texts=tgt_dm_texts,
+            class_names=list(self.classname2id.keys()),
+            device=device,
+            weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
+        )
 
         # 释放 CLIP（节省显存）
         self.clip_model = None
@@ -189,61 +137,15 @@ class Processed_CUB_Dataset_Labo(Dataset):
         with open(os.path.join(meta_root,"cub_conceptNet_concepts.txt"),"r") as f:
             self.concept2id = {x.rstrip():c_id for c_id, x in enumerate(f.readlines())}
         # 改动时间26.4.29-----------------------------------
-        if src_dm_texts is not None and tgt_dm_texts is not None:
-            self.domain_diffs = []
-            self.domain_weights = []
-
-            print("----------Computing Domain Differences----------")
-
-            for src_prompts, tgt_prompts in tqdm(zip(src_dm_texts * len(tgt_dm_texts), tgt_dm_texts)):
-                tqdm.write(tgt_prompts + " - " + src_prompts)
-
-                source_embeddings, target_embeddings = get_domain_text_embs(
-                    self.clip_model,
-                    [src_prompts],
-                    [tgt_prompts],
-                    list(self.classname2id.keys()),
-                    device
-                )
-
-                source_embeddings /= source_embeddings.norm(dim=-1, keepdim=True)
-                target_embeddings /= target_embeddings.norm(dim=-1, keepdim=True)
-
-                raw_diffs = target_embeddings.float() - source_embeddings.float()
-
-                if raw_diffs.norm() == 0:
-                    print(raw_diffs)
-
-                normed_diffs = raw_diffs / (raw_diffs.norm(dim=-1, keepdim=True) + 1e-8)
-
-                # reliability score:
-                # 用不同类别之间 domain shift 方向的平均 cosine similarity 衡量可靠性。
-                # 如果同一个 prompt 在不同类别上产生的偏移方向越一致，
-                # reliability_score 越大，说明这个 prompt 越可靠。
-                cos_sim = torch.matmul(normed_diffs, normed_diffs.T)
-
-                # 去掉对角线，因为每个类别和自己的 cosine similarity 恒为 1
-                mask = ~torch.eye(
-                    cos_sim.size(0),
-                    dtype=torch.bool,
-                    device=cos_sim.device
-                )
-
-                reliability_score = cos_sim[mask].mean()
-
-                self.domain_diffs.append(normed_diffs)
-                self.domain_weights.append(reliability_score)
-
-            self.domain_diffs = torch.stack(self.domain_diffs, dim=0).to(device)
-
-            scores = torch.stack(self.domain_weights).to(device)
-            threshold = scores.median()
-
-            self.domain_weights = torch.where(
-                scores >= threshold,
-                torch.tensor(1.5, device=device),
-                torch.tensor(0.5, device=device)
-            )
+        attach_domain_reliability(
+            self,
+            clip_model=self.clip_model,
+            src_dm_texts=src_dm_texts,
+            tgt_dm_texts=tgt_dm_texts,
+            class_names=list(self.classname2id.keys()),
+            device=device,
+            weight_strategy="prior_residual",   # 主方法: Prior + Residual + KL 正则 (专家建议)
+        )
         # 改动时间26.4.29-----------------------------------
         #
         # if src_dm_texts is not None and tgt_dm_texts is not None:
