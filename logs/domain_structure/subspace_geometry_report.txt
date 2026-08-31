@@ -1,0 +1,86 @@
+======================================================================
+A. 跨数据集 Domain Subspace 几何一致性 (CUB vs AWA2, τ=0.8)
+======================================================================
+CUB subspace: m=32 (768→32)
+AWA2 subspace: m=34 (768→34)
+
+Principal angles (cos, 前 10 个): [0.9901 0.9892 0.988  0.9872 0.984  0.9832 0.9818 0.9811 0.9802 0.979 ]
+mean cos(principal angle) = 0.9464
+min  cos(principal angle) = 0.7447
+subspace overlap ‖B1ᵀB2‖²_F/m = 0.8989
+
+解读: mean cos ≈ 1 表示两个数据集的 domain subspace 几何高度一致
+
+不同 τ 下的跨数据集一致性:
+τ     m(CUB)  m(AWA2)  mean cos  overlap  
+0.6   10      11       0.9432    0.8918   
+0.7   18      20       0.9430    0.8929   
+0.8   32      34       0.9464    0.8989   
+0.9   59      63       0.9482    0.9028   
+0.95  87      91       0.9455    0.9003   
+
+======================================================================
+B. Prompt Reconstruction Analysis (explained ratio r_i = ‖Bᵀd_i‖²/‖d_i‖²)
+======================================================================
+
+[CUB] 不同 τ 下的平均 prompt-level explained ratio:
+  τ=0.6: mean r_i = 0.6005
+  τ=0.7: mean r_i = 0.7020
+  τ=0.8: mean r_i = 0.8028
+  τ=0.9: mean r_i = 0.9005
+  τ=0.95: mean r_i = 0.9511
+
+[CUB] Top-10 (被 subspace 表达最好的 prompt, τ=0.8):
+  r=0.9253  rel=0.8240  an illustrated diagram of a {}.
+  r=0.9220  rel=0.8686  a stained glass panel of a {}.
+  r=0.9205  rel=0.8199  a sculpture of a {}.
+  r=0.9186  rel=0.8788  a linocut of a {}.
+  r=0.9158  rel=0.8740  a linocut print of a {}.
+  r=0.9145  rel=0.8799  a painting of a {}.
+  r=0.9129  rel=0.8850  a sketch of a {}.
+  r=0.9128  rel=0.8718  a retro poster of a {}.
+  r=0.9115  rel=0.8865  a silhouette of a {}.
+  r=0.9112  rel=0.9246  a collage of a {}.
+[CUB] Bottom-10 (表达最差的 prompt, τ=0.8):
+  r=0.5098  rel=0.7853  a carved pumpkin in the shape of a {}.
+  r=0.5511  rel=0.8814  an aerial view photo of a {}.
+  r=0.6038  rel=0.7974  an astrological chart with a {}.
+  r=0.6091  rel=0.8084  a totem pole with a {}.
+  r=0.6197  rel=0.8181  a cookie cutter shape of a {}.
+  r=0.6253  rel=0.8371  a tarot card featuring a {}.
+  r=0.6289  rel=0.8333  a Gothic architecture detail of a {}.
+  r=0.6319  rel=0.8158  a safety sign of a {}.
+  r=0.6362  rel=0.7578  a constellation resembling a {}.
+  r=0.6364  rel=0.8218  a scrimshaw of a {}.
+[CUB] corr(r_i, reliability_i) = 0.3730 (低相关 => reconstruction 与 reliability 是互补的两种 prompt 视角)
+
+[AWA2] 不同 τ 下的平均 prompt-level explained ratio:
+  τ=0.6: mean r_i = 0.6057
+  τ=0.7: mean r_i = 0.7086
+  τ=0.8: mean r_i = 0.8012
+  τ=0.9: mean r_i = 0.9012
+  τ=0.95: mean r_i = 0.9501
+
+[AWA2] Top-10 (被 subspace 表达最好的 prompt, τ=0.8):
+  r=0.9235  rel=0.9186  a photo collage of a {}.
+  r=0.9223  rel=0.9106  a collage of a {}.
+  r=0.9217  rel=0.8950  a retro poster of a {}.
+  r=0.9161  rel=0.8994  a steampunk mechanical drawing of a {}.
+  r=0.9157  rel=0.9053  a stained glass panel of a {}.
+  r=0.9139  rel=0.8895  a silhouette of a {}.
+  r=0.9137  rel=0.8745  a sketch of a {}.
+  r=0.9122  rel=0.8281  an illustrated diagram of a {}.
+  r=0.9106  rel=0.9093  a linocut print of a {}.
+  r=0.9106  rel=0.8997  a glass etching of a {}.
+[AWA2] Bottom-10 (表达最差的 prompt, τ=0.8):
+  r=0.5658  rel=0.8671  a carved pumpkin in the shape of a {}.
+  r=0.5845  rel=0.8459  a Gothic architecture detail of a {}.
+  r=0.5935  rel=0.8190  an astrological chart with a {}.
+  r=0.6002  rel=0.7983  a constellation resembling a {}.
+  r=0.6088  rel=0.8954  an aerial view photo of a {}.
+  r=0.6159  rel=0.8064  a safety sign of a {}.
+  r=0.6161  rel=0.8515  a street photography shot of a {}.
+  r=0.6210  rel=0.8721  a cookie cutter shape of a {}.
+  r=0.6372  rel=0.8460  a totem pole with a {}.
+  r=0.6380  rel=0.8918  a scrimshaw of a {}.
+[AWA2] corr(r_i, reliability_i) = 0.3229 (低相关 => reconstruction 与 reliability 是互补的两种 prompt 视角)

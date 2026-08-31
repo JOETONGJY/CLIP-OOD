@@ -1,0 +1,23 @@
+Top-10 (most reliable):
+  0.9281  a photo collage of a {}.
+  0.9246  a collage of a {}.
+  0.9062  a gouache painting of a {}.
+  0.9024  a watercolor of a {}.
+  0.8981  a silhouette photo of a {}.
+  0.8975  a pastel drawing of a {}.
+  0.8964  a pastel artwork of a {}.
+  0.8894  a pencil drawing of a {}.
+  0.8865  a silhouette of a {}.
+  0.8858  a crayon drawing of a {}.
+
+Bottom-10 (least reliable):
+  0.6972  a visual novel character of a {}.
+  0.7388  a futuristic concept art of a {}.
+  0.7399  a medieval manuscript of a {}.
+  0.7516  an ancient rune of a {}.
+  0.7550  a flower arrangement resembling a {}.
+  0.7568  a retro style of a {}.
+  0.7578  a constellation resembling a {}.
+  0.7699  a comic character of a {}.
+  0.7724  an album cover with a {}.
+  0.7756  an anime style of a {}.

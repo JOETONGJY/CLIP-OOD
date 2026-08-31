@@ -1,0 +1,23 @@
+Top-10 (most reliable):
+  0.9225  a chalk pavement art of a {}.
+  0.9222  a gouache painting of a {}.
+  0.9199  a pastel drawing of a {}.
+  0.9190  a silhouette photo of a {}.
+  0.9186  a photo collage of a {}.
+  0.9176  a charcoal sketch of a {}.
+  0.9168  a pastel artwork of a {}.
+  0.9162  a sepia photo of a {}.
+  0.9160  a chalkboard sketch of a {}.
+  0.9157  a painting on driftwood of a {}.
+
+Bottom-10 (least reliable):
+  0.7810  a visual novel character of a {}.
+  0.7908  a retro style of a {}.
+  0.7950  an abstract representation of a {}.
+  0.7969  an anime style of a {}.
+  0.7983  a constellation resembling a {}.
+  0.7988  an Egyptian hieroglyph of a {}.
+  0.8040  an album cover with a {}.
+  0.8064  a safety sign of a {}.
+  0.8076  a Renaissance painting of a {}.
+  0.8093  an ancient rune of a {}.

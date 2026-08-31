@@ -1,0 +1,61 @@
+===== PC Top-10 Loading Prompts (CUB) =====
+
+--- PC1  (EV = 34.47%) ---
+  [-] 0.7742  a cut-paper art of a {}.
+  [-] 0.7280  a pastel drawing of a {}.
+  [-] 0.7268  a botanical illustration of a {}.
+  [-] 0.7253  an Art Nouveau illustration of a {}.
+  [-] 0.7240  a map illustration with a {}.
+  [-] 0.7240  a manga style drawing of a {}.
+  [-] 0.7228  an icon design of a {}.
+  [-] 0.7221  a pastel artwork of a {}.
+  [-] 0.7202  a needlepoint design of a {}.
+  [-] 0.7164  a clipart illustration of a {}.
+
+--- PC2  (EV = 4.53%) ---
+  [-] 0.6033  a scientific model of a {}.
+  [-] 0.4602  a kinetic sculpture of a {}.
+  [-] 0.4462  a visual novel character of a {}.
+  [-] 0.4375  a scientific diagram of a {}.
+  [-] 0.4304  a kinetic art piece of a {}.
+  [+] 0.4112  a vintage postcard of a {}.
+  [-] 0.4034  a sculpture of a {}.
+  [-] 0.4001  a VR model of a {}.
+  [-] 0.3919  an abstract representation of a {}.
+  [+] 0.3912  a Victorian engraving of a {}.
+
+--- PC3  (EV = 4.12%) ---
+  [-] 0.4744  an illustrated diagram of a {}.
+  [+] 0.4720  a clay sculpture of a {}.
+  [-] 0.4640  a scientific diagram of a {}.
+  [+] 0.4485  a glass sculpture of a {}.
+  [-] 0.4433  a technical illustration of a {}.
+  [-] 0.4239  a conceptual sketch of a {}.
+  [+] 0.4150  a wire sculpture of a {}.
+  [+] 0.4089  a crystal carving of a {}.
+  [+] 0.4045  a bronze statue of a {}.
+  [+] 0.3981  a sculpture of a {}.
+
+--- PC4  (EV = 3.32%) ---
+  [+] 0.5233  a surrealist painting of a {}.
+  [+] 0.5207  a photorealistic painting of a {}.
+  [+] 0.5191  an oil painting of a {}.
+  [+] 0.4978  a painting of a {}.
+  [+] 0.4340  an impressionist painting of a {}.
+  [+] 0.4142  an acrylic painting of a {}.
+  [+] 0.3965  a fantasy art of a {}.
+  [+] 0.3921  a mixed media art of a {}.
+  [+] 0.3687  a baroque painting of a {}.
+  [+] 0.3490  a Renaissance painting of a {}.
+
+--- PC5  (EV = 2.99%) ---
+  [-] 0.4259  a tapestry featuring a {}.
+  [-] 0.4186  an advertising posters of a {}.
+  [-] 0.4071  a street poster with a {}.
+  [-] 0.3855  a classic movie poster featuring a {}.
+  [-] 0.3797  a banner featuring a {}.
+  [-] 0.3775  a retro poster of a {}.
+  [+] 0.3657  a pencil drawing of a {}.
+  [+] 0.3427  a 3D model of a {}.
+  [-] 0.3390  a pop art of a {}.
+  [+] 0.3364  a clay sculpture of a {}.
