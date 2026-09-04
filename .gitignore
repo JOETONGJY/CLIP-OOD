@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 运行产物 / 大文件（不入库）
+logs/
+wandb/
+mock_data/
+clip_weights/
+*.pth
+*.log
+training.log
+best_*.pth
+
+# 数据集（只保留标注与元数据，图片不入库）
+data/CUB/CUB_200_2011/
+data/CUB/CUB-200-Painting/
+data/awa2/AwA2-data/
+data/awa2/AwA2_clipart/
+data/LAD_animal/animals/
+data/LAD_animal/sculpture-animals/
+data/LAD_vehicle/vehicles/
+data/LAD_vehicle/CAD-vehicles/
+data/RIVAL10/
+data/RIVAL10-Sketch/
+
+# 系统 / IDE
+.DS_Store
+.idea/

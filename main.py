@@ -160,8 +160,14 @@ class TrainingSession:
         用途: (1) Δw 分析找 "高 reliability 被下调 / 低 reliability 被上调" 案例
               (2) KL 防退化的实证 (entropy 是否维持)
         """
-        if not hasattr(self.model, 'get_domain_weights'):
-            # 第四章模型: 记录 gamma (机制证据: 学到的抑制强度)
+        weights, residual_softmax = (
+            self.model.get_domain_weights()
+            if hasattr(self.model, 'get_domain_weights') else (None, None)
+        )
+        if weights is None:
+            # 纯第四章 (无 C3 权重) 或无权重机制: 记录 gamma (机制证据: 学到的抑制强度)
+            # 注: clip_cbm_subspace 也定义了 get_domain_weights (纯C4时返回 None,None),
+            #     因此不能只靠 hasattr 判断, 否则 gamma 永远不会被记录
             diagnostics = {}
             if hasattr(self.model, 'get_gamma'):
                 gamma = self.model.get_gamma()
@@ -169,9 +175,6 @@ class TrainingSession:
                 diagnostics['gamma'] = g
                 logger.info(f"[Ch4] gamma={g:.4f} (subspace_dim={getattr(self.model, 'subspace_dim', '?')})")
             return diagnostics
-        weights, residual_softmax = self.model.get_domain_weights()
-        if weights is None:
-            return {}
 
         diagnostics = {}
         with torch.no_grad():

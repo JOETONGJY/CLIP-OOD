@@ -13,7 +13,8 @@ import numpy as np
 random.seed(42)
 np.random.seed(42)
 
-MOCK_ROOT = "/home/llms/CLIP-OOD-main/mock_data"
+# 相对脚本所在目录(仓库根), Linux/Windows 通用
+MOCK_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock_data")
 SRC_IMG_DIR = os.path.join(MOCK_ROOT, "CUB_200_2011", "images")
 # 注意: 原版 CUB-200-Painting 的图片直接在根目录下 (无 images/ 层)
 TGT_IMG_DIR = os.path.join(MOCK_ROOT, "CUB-200-Painting")

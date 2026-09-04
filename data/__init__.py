@@ -44,7 +44,7 @@ def get_dataset_classes(args):
 
 
     elif args.dataset == "RIVAL10":
-        train_dataset = CBM_RIVAL10(args,data_root=os.path.join(args.data_dir,"/RIVAL10"), split="train",meta_root="data/RIVAL10",
+        train_dataset = CBM_RIVAL10(args,data_root=os.path.join(args.data_dir,"RIVAL10"), split="train",meta_root="data/RIVAL10",
                                     src_dm_texts = source_text_prompts, tgt_dm_texts = target_text_prompts)
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
         test_dataset = CBM_RIVAL10(args,data_root=os.path.join(args.data_dir,"RIVAL10"), split="test",meta_root="data/RIVAL10")
