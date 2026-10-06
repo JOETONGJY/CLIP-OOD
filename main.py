@@ -275,12 +275,36 @@ class TrainingSession:
                 entropy = -(residual_softmax * (residual_softmax + 1e-8).log()).sum()
                 kl_loss = torch.log(torch.tensor(float(N), device=images.device)) - entropy
 
+            # Graph Laplacian: 相关描述符的残差修正应一致 (pr_graph)
+            graph_loss = torch.tensor(0.0, device=images.device)
+            if getattr(self.model, 'desc_laplacian', None) is not None and self.args.lambda_graph > 0:
+                d_ = self.model.domain_residual
+                graph_loss = d_ @ self.model.desc_laplacian @ d_
+
+            # 算法 C (full_align): 投影差锚定 + 视觉校准
+            align_terms = self.model.get_alignment_losses() if hasattr(self.model, 'get_alignment_losses') else None
+            align_loss = torch.tensor(0.0, device=images.device)
+            if align_terms is not None:
+                anchor_l, visual_l = align_terms
+                align_loss = self.args.lambda_anchor * anchor_l + self.args.lambda_visual * visual_l
+
             total_loss = (
                     cls_loss
                     + self.args.alpha * orth_loss
                     + self.args.beta * concept_loss
                     + self.args.lambda_kl * kl_loss
+                    + self.args.lambda_graph * graph_loss
+                    + align_loss
             )
+
+            # 双头一致性: KL(p_inv || p_orig), full_mc 默认 0.1, 亦可 --cons_weight 指定
+            cons_w = self.args.cons_weight
+            if cons_w > 0 and isinstance(cls_preds, tuple):
+                logits_ori, logits_inv = cls_preds
+                p_o = torch.softmax(logits_ori, dim=-1)
+                log_p_i = torch.log_softmax(logits_inv, dim=-1)
+                cons = (p_o * (p_o.log() - log_p_i)).sum(-1).mean()
+                total_loss = total_loss + cons_w * cons
 
             total_loss.backward()
             self.optimizer.step()
@@ -346,7 +370,11 @@ class TrainingSession:
                     entropy = -(residual_softmax * (residual_softmax + 1e-8).log()).sum()
                     kl_loss = torch.log(torch.tensor(float(N), device=images.device)) - entropy
 
-                total_loss = cls_loss + self.args.alpha * orth_loss + self.args.beta * concept_loss + self.args.lambda_kl * kl_loss
+                graph_loss = torch.tensor(0.0, device=images.device)
+                if getattr(self.model, 'desc_laplacian', None) is not None and self.args.lambda_graph > 0:
+                    d_ = self.model.domain_residual
+                    graph_loss = d_ @ self.model.desc_laplacian @ d_
+                total_loss = cls_loss + self.args.alpha * orth_loss + self.args.beta * concept_loss + self.args.lambda_kl * kl_loss + self.args.lambda_graph * graph_loss
 
                 batch_size = images.size(0)
                 total += batch_size
@@ -382,6 +410,8 @@ class TrainingSession:
                 method_tag = f"c3+{method_tag}"      # 2×2 联合实验: C3+C4
         else:
             method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
+        if getattr(self.args, 'run_tag', ''):
+            method_tag = self.args.run_tag            # tau 扫描等: 同模式多取值需区分文件
         self.run_name = f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
 
         if self.args.wandb:
@@ -458,6 +488,8 @@ class TrainingSession:
                     method_tag = f"c3+{method_tag}"
             else:
                 method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
+            if getattr(self.args, 'run_tag', ''):
+                method_tag = self.args.run_tag
             result = {
                 'dataset': self.args.dataset,
                 'model_type': self.args.CBM_type,

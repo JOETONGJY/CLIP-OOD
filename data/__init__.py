@@ -43,6 +43,55 @@ def get_dataset_classes(args):
         target_test_loader = DataLoader(target_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
 
+    elif args.dataset == "PACS" or args.dataset == "OfficeHome":
+        from data.pacs.pacs_data import PACSDomainDataset
+        subdir = "PACS" if args.dataset == "PACS" else "OfficeHome"
+        anno_dir = os.path.join(args.data_dir, "pacs")
+        data_root = os.path.join(args.data_dir, "pacs", subdir)
+        cls_file = "classes.txt" if args.dataset == "PACS" else "officehome_classes.txt"
+        con_file = "pacs_concepts.txt" if args.dataset == "PACS" else "officehome_concepts.txt"
+        classname2id = {}
+        for line_ in open(os.path.join(anno_dir, cls_file), encoding="utf-8"):
+            i_, n_ = line_.strip().split(" ")
+            classname2id[n_] = int(i_)
+        concept2id = {c.strip(): i_ for i_, c in
+                      enumerate(open(os.path.join(anno_dir, con_file), encoding="utf-8").read().splitlines())}
+        if args.dataset == "OfficeHome":
+            # Real_World -> Art 域对（划分文件按同样格式放置）
+            train_f, test_f, tgt_f = "real_train.txt", "real_test.txt", "oh_art_test.txt"
+        else:
+            train_f, test_f, tgt_f = "photo_train.txt", "photo_test.txt", "art_test.txt"
+        train_dataset = PACSDomainDataset(args, data_root, train_f, classname2id, concept2id,
+                                          src_dm_texts=source_text_prompts, tgt_dm_texts=target_text_prompts,
+                                          need_reliability=True)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+        test_dataset = PACSDomainDataset(args, data_root, test_f, classname2id, concept2id)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+        target_test_dataset = PACSDomainDataset(args, data_root, tgt_f, classname2id, concept2id)
+        target_test_loader = DataLoader(target_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+
+    elif args.dataset == "DomainNet":
+        from data.pacs.pacs_data import PACSDomainDataset
+        anno_dir = os.path.join(args.data_dir, "domainnet")
+        data_root = os.path.join(args.data_dir, "domainnet", "images")
+        classname2id = {}
+        for line_ in open(os.path.join(anno_dir, "dn_classes.txt"), encoding="utf-8"):
+            i_, n_ = line_.strip().split(" ")
+            classname2id[n_] = int(i_)
+        concept2id = {c.strip(): i_ for i_, c in
+                      enumerate(open(os.path.join(anno_dir, "dn_concepts.txt"), encoding="utf-8").read().splitlines())}
+        train_dataset = PACSDomainDataset(args, data_root, os.path.join(anno_dir, "dn_real_train.txt"),
+                                          classname2id, concept2id,
+                                          src_dm_texts=source_text_prompts, tgt_dm_texts=target_text_prompts,
+                                          need_reliability=True)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0)
+        test_dataset = PACSDomainDataset(args, data_root, os.path.join(anno_dir, "dn_real_test.txt"),
+                                         classname2id, concept2id)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+        target_test_dataset = PACSDomainDataset(args, data_root, os.path.join(anno_dir, "dn_painting_test.txt"),
+                                                classname2id, concept2id)
+        target_test_loader = DataLoader(target_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
+
     elif args.dataset == "RIVAL10":
         train_dataset = CBM_RIVAL10(args,data_root=os.path.join(args.data_dir,"RIVAL10"), split="train",meta_root="data/RIVAL10",
                                     src_dm_texts = source_text_prompts, tgt_dm_texts = target_text_prompts)

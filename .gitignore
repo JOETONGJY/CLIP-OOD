@@ -28,3 +28,16 @@ data/RIVAL10-Sketch/
 # 系统 / IDE
 .DS_Store
 .idea/
+
+# 本机缓存与下载产物 (2026-10-05)
+cache/
+downloads/
+logs/metrics/
+nul1.png
+*.bin
+# 数据集目录 (图片不入库, 划分txt与概念集在 data/*/ 内已有)
+data/domainnet/images/
+data/pacs/PACS/
+data/pacs/OfficeHome/
+# 实验产物
+experiment_results/02_单run指标/

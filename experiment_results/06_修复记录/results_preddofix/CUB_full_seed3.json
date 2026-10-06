@@ -1,0 +1,12 @@
+{
+  "dataset": "CUB",
+  "model_type": "clip_cbm_subspace",
+  "weight_mode": "full",
+  "seed": 3,
+  "alpha": 1.0,
+  "beta": 0.0,
+  "lambda_kl": 0.01,
+  "source_acc": 78.5146804835924,
+  "target_acc": 55.30029537249754,
+  "epoch": 92
+}

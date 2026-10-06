@@ -170,9 +170,36 @@ def attach_domain_reliability(
     if src_dm_texts is None or tgt_dm_texts is None:
         return
 
-    domain_diffs, reliability_scores = compute_domain_diffs_and_scores(
-        clip_model, src_dm_texts, tgt_dm_texts, class_names, device, verbose=verbose
-    )
+    # ---- 缓存: 大类数数据集 (如 DomainNet 345 类) 需 ~3 小时, 必须缓存 ----
+    import hashlib, os
+    cache_key = hashlib.md5(
+        ("\u0000".join(sorted(class_names)) + "\u0000" + "\u0000".join(tgt_dm_texts)
+         ).encode("utf-8")
+    ).hexdigest()[:16]
+    cache_dir = "cache/reliability"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_path = os.path.join(cache_dir, f"reliability_{cache_key}.pt")
+
+    if os.path.exists(cache_path):
+        if verbose:
+            print(f"[reliability cache] hit: {cache_path}")
+        cached = torch.load(cache_path, map_location=device)
+        domain_diffs = cached["diffs"].to(device)
+        reliability_scores = cached["scores"].to(device)
+    else:
+        if verbose:
+            print(f"[reliability cache] miss, computing... ({len(class_names)} classes)")
+        domain_diffs, reliability_scores = compute_domain_diffs_and_scores(
+            clip_model, src_dm_texts, tgt_dm_texts, class_names, device, verbose=verbose
+        )
+        torch.save(
+            {"diffs": domain_diffs.cpu(), "scores": reliability_scores.cpu()},
+            cache_path,
+        )
+        if verbose:
+            print(f"[reliability cache] saved: {cache_path}")
+        domain_diffs = domain_diffs.to(device)
+        reliability_scores = reliability_scores.to(device)
 
     dataset.domain_diffs = domain_diffs
     dataset.reliability_scores = reliability_scores

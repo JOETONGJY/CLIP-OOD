@@ -206,7 +206,7 @@ class clip_cbm_orth(nn.Module):
             self.fixed_weights = fixed_w
             self.domain_residual = None
         else:
-            # "prior_residual" 或 "residual"
+            # "prior_residual" / "residual" / "pr_graph"
             scores = domain_weights.clone().float().to(self.device).detach()
             if weight_mode == "residual":
                 scores = torch.zeros_like(scores)  # Residual Only: 先验置零
@@ -216,6 +216,16 @@ class clip_cbm_orth(nn.Module):
             self.domain_residual = nn.Parameter(
                 torch.zeros_like(scores)
             )
+            # --- Graph Laplacian (pr_graph): 描述符关系结构约束残差修正一致性 ---
+            # A_ij = max(0, cos(d_i, d_j)), d_i 为类平均域方向 (与第四章共享同一 D)
+            with torch.no_grad():
+                dirs = self.diffs.mean(dim=1).float()
+                dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+                A = (dirs @ dirs.T).clamp(min=0)
+                A.fill_diagonal_(0)
+                deg = A.sum(1)
+                L_G = torch.diag(deg) - A
+                self.register_buffer('desc_laplacian', L_G)
 
         self.class_names = class_names
         self.concept_names = concept_names
@@ -393,7 +403,7 @@ class clip_cbm_subspace(nn.Module):
 
         # ===== ① Domain Structure Discovery + ② Adaptive Subspace =====
         # 类平均 prompt 方向 → SVD → m = m(τ) → B = V[:, :m]
-        if ch4_mode in ("hardproj", "softproj", "full"):
+        if ch4_mode in ("hardproj", "softproj", "full", "full_e", "full_m", "full_m7", "full_mc", "full_align"):
             with torch.no_grad():
                 dirs = self.diffs.mean(dim=1).float()               # (N, D) 类平均
                 dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
@@ -412,12 +422,36 @@ class clip_cbm_subspace(nn.Module):
 
         # ===== ③ Soft suppression: γ =====
         # hardproj: γ≡1; softproj/full: γ=σ(a) learnable (初始 σ(0)=0.5); 其余 γ≡0
+        self.gate_type = {"full_e": "energy", "full_m": "mlp", "full_m7": "mlp_zd", "full_mc": "mlp"}.get(ch4_mode, "scalar")
         if ch4_mode == "hardproj":
             self.gamma_logit = None
             self.fixed_gamma = 1.0
-        elif ch4_mode == "softproj" or ch4_mode == "full":
+        elif ch4_mode in ("softproj", "full", "full_align"):
             self.gamma_logit = nn.Parameter(torch.zeros(1))
             self.fixed_gamma = None
+        elif ch4_mode in ("full_e", "full_m", "full_m7", "full_mc", "full_align"):
+            # 样本自适应域抑制门控 (SADS): gamma(x) = sigma(gate([B^T z; e]))
+            self.gamma_logit = None
+            self.fixed_gamma = None
+            self.last_gamma_mean = None
+            if self.gate_type == "energy":
+                # C4-B: 仅由域能量比 e 决定 gamma(x), 初始 w=0,b=0 => gamma=0.5
+                self.gate_w = nn.Parameter(torch.zeros(1))
+                self.gate_b = nn.Parameter(torch.zeros(1))
+            elif self.gate_type == "mlp_zd":
+                # 探索变体 full_m7: 门控输入为完整域分量 z_d (768 维)
+                self.gate_mlp = nn.Sequential(
+                    nn.Linear(self.clip_model.visual.output_dim, 128), nn.GELU(),
+                    nn.Linear(128, 1))
+                nn.init.zeros_(self.gate_mlp[-1].weight)
+                nn.init.zeros_(self.gate_mlp[-1].bias)
+            else:
+                # C4-C: 轻量 MLP 门控 [B^T z; e] -> gamma(x), 末层零初始化 => 初始 0.5
+                self.gate_mlp = nn.Sequential(
+                    nn.Linear(self.subspace_dim + 1, 128), nn.GELU(),
+                    nn.Linear(128, 1))
+                nn.init.zeros_(self.gate_mlp[-1].weight)
+                nn.init.zeros_(self.gate_mlp[-1].bias)
         else:
             self.gamma_logit = None
             self.fixed_gamma = 0.0
@@ -430,10 +464,22 @@ class clip_cbm_subspace(nn.Module):
                 nn.Linear(len(concept_names), len(class_names)))
 
         self.classifier = make_classifier()          # 原始头 (辅助)
-        if ch4_mode in ("headonly", "full"):
+        if ch4_mode in ("headonly", "full", "full_e", "full_m", "full_m7", "full_mc", "full_align"):
             self.inv_classifier = make_classifier()  # invariant 头 (测试主输出)
         else:
             self.inv_classifier = None
+
+        # ===== 算法 C (full_align): 语言锚定 + 视觉校准的残差子空间 =====
+        # B_adapt = orth(B_text + ΔB);  ΔB 零初始化 ⇒ 初始 B_adapt = B_text
+        if ch4_mode == "full_align":
+            import os
+            aug_path = f"cache/aug_subspace_{args.dataset}.pt"
+            assert os.path.exists(aug_path), (
+                f"full_align 需要 {aug_path}, 请先运行 precompute_aug_subspace.py {args.dataset}")
+            aug = torch.load(aug_path, map_location="cpu")
+            B_aug = aug["B_aug"].float().to(self.device)          # (768, m_aug) 列正交
+            self.register_buffer("aug_basis", B_aug)
+            self.delta_B = nn.Parameter(torch.zeros_like(self.domain_basis))  # (768, m_text)
 
         # DDO 等权正交正则的投影 (与 clip_cbm_orth weight_mode="none" 一致)
         self.domain_concept_projection = self.diffs @ self.concept_embeddings.T
@@ -447,10 +493,25 @@ class clip_cbm_subspace(nn.Module):
                     class_embeddings @ self.concept_embeddings.T)
 
     def get_gamma(self):
-        """当前抑制强度 γ"""
+        """当前抑制强度 γ (自适应门控返回最近一个 batch 的样本均值)"""
         if self.gamma_logit is not None:
             return torch.sigmoid(self.gamma_logit)
+        if self.gate_type != "scalar" and getattr(self, "last_gamma_mean", None) is not None:
+            return self.last_gamma_mean
         return self.fixed_gamma
+
+    def suppress_adaptive(self, z):
+        """样本自适应域抑制 (SADS): q=B^T z, e=||q||/||z||, gamma(x)=sigma(gate([q;e]))"""
+        q = z @ self.domain_basis                               # (bs, m)
+        e = q.norm(dim=-1) / (z.norm(dim=-1) + 1e-8)            # 域能量比 (bs,)
+        if self.gate_type == "energy":
+            gamma = torch.sigmoid(self.gate_w * e.unsqueeze(-1) + self.gate_b)   # (bs,1)
+        elif self.gate_type == "mlp_zd":
+            gamma = torch.sigmoid(self.gate_mlp(q @ self.domain_basis.T))        # (bs,1)
+        else:
+            gamma = torch.sigmoid(self.gate_mlp(torch.cat([q, e.unsqueeze(-1)], dim=-1)))
+        self.last_gamma_mean = gamma.detach().mean()
+        return z - gamma * q @ self.domain_basis.T
 
     def get_domain_weights(self):
         """第三章 importance 加权 (2×2 联合实验用, 机制同 clip_cbm_orth):
@@ -469,6 +530,12 @@ class clip_cbm_subspace(nn.Module):
             return None
         return torch.softmax(self.reliability_prior, dim=0) * self.num_prompts
 
+    def get_alignment_losses(self):
+        """full_align 的两个投影差正则 (anchor / visual); 其他模式返回 None"""
+        if self.ch4_mode != "full_align":
+            return None
+        return self._anchor_loss, self._visual_loss
+
     def suppress(self, z):
         """z_inv = z − γ·BBᵀz (无 subspace 或 γ=0 时原样返回)"""
         if self.domain_basis is None:
@@ -482,7 +549,23 @@ class clip_cbm_subspace(nn.Module):
         visual_features = self.clip_model.encode_image(images).float()
         z = visual_features / visual_features.norm(dim=-1, keepdim=True)
 
-        z_inv = self.suppress(z)
+        if self.ch4_mode == "full_align":
+            B_adapt = torch.linalg.qr(self.domain_basis + self.delta_B)[0]   # (768, m) 列正交
+            gamma = self.get_gamma()
+            z_inv = z - gamma * (z @ B_adapt) @ B_adapt.T
+            # 两个投影差正则 (带梯度, 供 main.py 取用)
+            P_a = B_adapt @ B_adapt.T
+            with torch.no_grad():
+                P_t = self.domain_basis @ self.domain_basis.T
+                P_v = self.aug_basis @ self.aug_basis.T
+                self._align_anchor_ref = P_t
+                self._align_visual_ref = P_v
+            self._anchor_loss = torch.norm(P_a - self._align_anchor_ref, p="fro") ** 2
+            self._visual_loss = torch.norm(P_a - self._align_visual_ref, p="fro") ** 2
+        elif self.gate_type != "scalar":
+            z_inv = self.suppress_adaptive(z)
+        else:
+            z_inv = self.suppress(z)
 
         # concept bottleneck
         concept_activations = z @ self.concept_embeddings.T
@@ -498,16 +581,13 @@ class clip_cbm_subspace(nn.Module):
             cls_preds = self.classifier(concept_activations_inv)  # 单头在 z_inv 上
             main_concept = concept_activations_inv
 
-        # DDO 等权正交正则: 两头都约束 (专家第五轮检查点)
-        # 测试头是 inv_classifier, DDO 必须至少直接约束它, 否则训练目标与测试头逻辑断裂。
-        # 双头模式: L_DDO = ‖h_o[1:](proj)‖ + eta_ddo_inv · ‖h_inv[1:](proj)‖
-        # 单头模式 (ddo/hardproj/softproj): 唯一头即测试头, 直接过它 (原实现已一致)
-        # 注: CLIP frozen 的 CBM 中两头无共享可学习参数, original head 的梯度不流向
-        #     测试路径; 其作用是 (a) headonly 消融的结构基础 (b) 无投影参照分类器
-        #     (source acc 对比可作为 "投影代价" 的分析素材)。
-        regularizer = self.classifier[1:](self.domain_concept_projection)
+        # DDO 等权正交正则: 两头分别约束 (按设计公式 ‖h_o[1:](proj)‖ + eta·‖h_inv[1:](proj)‖)
+        # 注意 abs 在求和之前逐头施加 —— 若先求和再取 abs (|A+B|), 两头域响应可互相抵消
+        # (h_o=-h_inv 时损失为 0 但两头都未被正交约束), 这是 2026-09-11 排查发现的实现偏差,
+        # 修复后 headonly/full 重新实验 (修复前结果存于 logs/results_preddofix/)。
+        regularizer = torch.abs(self.classifier[1:](self.domain_concept_projection))
         if self.inv_classifier is not None:
-            reg_inv = self.inv_classifier[1:](self.domain_concept_projection)
+            reg_inv = torch.abs(self.inv_classifier[1:](self.domain_concept_projection))
             regularizer = regularizer + self.eta_ddo_inv * reg_inv
 
         # 2×2 联合实验: 第三章 importance 加权 (C3+C4 组合时启用)
