@@ -359,7 +359,8 @@ class clip_cbm_subspace(nn.Module):
             eta_ddo_inv=1.0,
             domain_weights=None,
             weight_mode="none",
-            init_with_class_embedding=False
+            init_with_class_embedding=False,
+            cal_rank=0
     ):
         super(clip_cbm_subspace, self).__init__()
         self.diffs = domain_diffs.clone()
@@ -367,6 +368,8 @@ class clip_cbm_subspace(nn.Module):
         self.num_prompts = domain_diffs.size(0)
         self.ch4_mode = ch4_mode
         self.tau = tau
+        # P4: 低秩概念校准 E' = E + U Vᵀ (V 零初始化 ⇒ 初始行为与冻结 E 逐位一致)
+        self.cal_rank = int(cal_rank)
         # DDO 正则对 invariant head 的约束权重 (专家第五轮: 测试头必须被 DDO 约束)
         # L_DDO = ‖h_o[1:](proj)‖ + eta_ddo_inv · ‖h_inv[1:](proj)‖, 默认 1.0 对称
         self.eta_ddo_inv = eta_ddo_inv
@@ -401,7 +404,13 @@ class clip_cbm_subspace(nn.Module):
         self.concept_embeddings = self.clip_model.encode_text(attr_texts).float()
         self.concept_embeddings /= self.concept_embeddings.norm(dim=-1, keepdim=True)
 
-        # ===== ① Domain Structure Discovery + ② Adaptive Subspace =====
+        # ===== P4: 低秩概念校准参数 (E' = E + U Vᵀ, cal_rank>0 时启用) =====
+        # V 零初始化 ⇒ ΔE=0 ⇒ 初始行为与冻结 E 逐位一致 (不伤基线起步)
+        if self.cal_rank > 0:
+            K = self.concept_embeddings.size(0)
+            self.cal_U = nn.Parameter(0.02 * torch.randn(K, self.cal_rank, device=self.device))
+            self.cal_V = nn.Parameter(torch.zeros(self.cal_rank, self.concept_embeddings.size(1),
+                                                  device=self.device))
         # 类平均 prompt 方向 → SVD → m = m(τ) → B = V[:, :m]
         if ch4_mode in ("hardproj", "softproj", "full", "full_e", "full_m", "full_m7", "full_mc", "full_align"):
             with torch.no_grad():
@@ -500,6 +509,20 @@ class clip_cbm_subspace(nn.Module):
             return self.last_gamma_mean
         return self.fixed_gamma
 
+    def _effective_E(self):
+        """P4 低秩概念校准: 返回 E' = E + U Vᵀ 并缓存锚定范数; cal_rank=0 时原样返回冻结 E"""
+        if self.cal_rank > 0:
+            dE = self.cal_U @ self.cal_V
+            self._cal_norm = torch.norm(dE, p="fro")
+            return self.concept_embeddings + dE
+        return self.concept_embeddings
+
+    def _domain_projection(self, E):
+        """DDO 正则的域-概念投影: 校准开启时随 E' 动态计算, 否则用 init 预计算的冻结投影"""
+        if self.cal_rank > 0:
+            return self.diffs @ E.T
+        return self.domain_concept_projection
+
     def suppress_adaptive(self, z):
         """样本自适应域抑制 (SADS): q=B^T z, e=||q||/||z||, gamma(x)=sigma(gate([q;e]))"""
         q = z @ self.domain_basis                               # (bs, m)
@@ -567,9 +590,10 @@ class clip_cbm_subspace(nn.Module):
         else:
             z_inv = self.suppress(z)
 
-        # concept bottleneck
-        concept_activations = z @ self.concept_embeddings.T
-        concept_activations_inv = z_inv @ self.concept_embeddings.T
+        # concept bottleneck (P4: 校准开启时投影走 E')
+        E_eff = self._effective_E()
+        concept_activations = z @ E_eff.T
+        concept_activations_inv = z_inv @ E_eff.T
 
         logits_ori = self.classifier(concept_activations)
 
@@ -585,9 +609,10 @@ class clip_cbm_subspace(nn.Module):
         # 注意 abs 在求和之前逐头施加 —— 若先求和再取 abs (|A+B|), 两头域响应可互相抵消
         # (h_o=-h_inv 时损失为 0 但两头都未被正交约束), 这是 2026-09-11 排查发现的实现偏差,
         # 修复后 headonly/full 重新实验 (修复前结果存于 logs/results_preddofix/)。
-        regularizer = torch.abs(self.classifier[1:](self.domain_concept_projection))
+        ddo_proj = self._domain_projection(E_eff)
+        regularizer = torch.abs(self.classifier[1:](ddo_proj))
         if self.inv_classifier is not None:
-            reg_inv = torch.abs(self.inv_classifier[1:](self.domain_concept_projection))
+            reg_inv = torch.abs(self.inv_classifier[1:](ddo_proj))
             regularizer = regularizer + self.eta_ddo_inv * reg_inv
 
         # 2×2 联合实验: 第三章 importance 加权 (C3+C4 组合时启用)

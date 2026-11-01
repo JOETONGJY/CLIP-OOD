@@ -4,8 +4,9 @@ Dataset    Weight Mode        #Seeds   Target Acc (mean±std)    Source Acc (mea
 AWA2       none               3        85.73 ± 0.10          97.00 ± 0.02
 AWA2       prior_residual     3        86.34 ± 0.15          97.10 ± 0.01
 AWA2       full               3        85.66 ± 0.11          96.99 ± 0.06
+AWA2       align001           3        85.94 ± 0.07          97.04 ± 0.05
 AWA2       c3+full            3        86.13 ± 0.09          97.11 ± 0.03
-AWA2       full_align         3        86.04 ± 0.12          97.02 ± 0.05
+AWA2       full_align         3        86.04 ± 0.13          97.02 ± 0.05
 AWA2       full_e             3        85.64 ± 0.09          96.99 ± 0.07
 AWA2       full_m7            3        85.36 ± 0.02          96.95 ± 0.03
 AWA2       full_m             3        85.40 ± 0.07          96.96 ± 0.00

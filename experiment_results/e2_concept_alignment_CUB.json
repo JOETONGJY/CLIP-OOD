@@ -1,0 +1,24 @@
+{
+  "dataset": "CUB",
+  "weights": "best_CUB.pth",
+  "delta_E_fro": 4.918338298797607,
+  "n_concepts_eval": 312,
+  "pearson_frozen": {
+    "mean": 0.09952706843614578,
+    "median": 0.07898405194282532
+  },
+  "pearson_calib": {
+    "mean": 0.08541089296340942,
+    "median": 0.06569155305624008
+  },
+  "auroc_frozen": {
+    "mean": -0.06881598525629395,
+    "median": -0.018920786526063417
+  },
+  "auroc_calib": {
+    "mean": -0.06890642496534448,
+    "median": -0.019213494232349516
+  },
+  "improved_ratio_pearson": 0.32371795177459717,
+  "improved_ratio_auroc": 0.3493589758872986
+}

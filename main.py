@@ -91,6 +91,7 @@ class TrainingSession:
                                 if getattr(self.args, 'use_c3_weights', False) else None),
                 weight_mode=(getattr(self.args, 'weight_mode', 'prior_residual')
                              if getattr(self.args, 'use_c3_weights', False) else "none"),
+                cal_rank=getattr(self.args, 'cal_rank', 0),
             ).to(self.device)
         else:
             # 改动时间26.4.29-----------------------------------
@@ -288,6 +289,11 @@ class TrainingSession:
                 anchor_l, visual_l = align_terms
                 align_loss = self.args.lambda_anchor * anchor_l + self.args.lambda_visual * visual_l
 
+            # P4 低秩概念校准锚定: lambda_cal * ||ΔE||_F² (概念语义不漂移约束)
+            cal_loss = torch.tensor(0.0, device=images.device)
+            if getattr(self.model, 'cal_rank', 0) > 0:
+                cal_loss = self.args.lambda_cal * self.model._cal_norm ** 2
+
             total_loss = (
                     cls_loss
                     + self.args.alpha * orth_loss
@@ -295,6 +301,7 @@ class TrainingSession:
                     + self.args.lambda_kl * kl_loss
                     + self.args.lambda_graph * graph_loss
                     + align_loss
+                    + cal_loss
             )
 
             # 双头一致性: KL(p_inv || p_orig), full_mc 默认 0.1, 亦可 --cons_weight 指定
@@ -408,6 +415,8 @@ class TrainingSession:
             method_tag = getattr(self.args, 'ch4_mode', 'full')
             if getattr(self.args, 'use_c3_weights', False):
                 method_tag = f"c3+{method_tag}"      # 2×2 联合实验: C3+C4
+            if getattr(self.args, 'cal_rank', 0) > 0:
+                method_tag += f"_cal{self.args.cal_rank}"   # P4 概念校准变体
         else:
             method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
         if getattr(self.args, 'run_tag', ''):
@@ -486,6 +495,8 @@ class TrainingSession:
                 method_tag = getattr(self.args, 'ch4_mode', 'full')
                 if getattr(self.args, 'use_c3_weights', False):
                     method_tag = f"c3+{method_tag}"
+                if getattr(self.args, 'cal_rank', 0) > 0:
+                    method_tag += f"_cal{self.args.cal_rank}"
             else:
                 method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
             if getattr(self.args, 'run_tag', ''):

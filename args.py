@@ -16,6 +16,16 @@ def get_args():
                         help='projector-diff anchor weight: ||P_adapt-P_text||_F^2 (full_align)')
     parser.add_argument('--lambda_visual', type=float, default=0.1,
                         help='visual calibration weight: ||P_adapt-P_aug||_F^2 (full_align)')
+    parser.add_argument('--protect_k', type=int, default=0,
+                        help='SPDA: 类别判别子空间维数; 0=按 tau_c 能量阈值自适应')
+    parser.add_argument('--cal_rank', type=int, default=0,
+                        help='P4 低秩概念校准: ΔE=U Vᵀ 的秩 r; 0=关闭 (冻结 E)')
+    parser.add_argument('--lambda_cal', type=float, default=0.01,
+                        help='P4 概念校准锚定权重: lambda_cal * ||ΔE||_F^2')
+    parser.add_argument('--cls_rank', type=int, default=16,
+                        help='M2 class-conditional selection: low-rank correction rank r')
+    parser.add_argument('--lambda_cls_sparse', type=float, default=0.01,
+                        help='M2 concept selection sparsity reg weight')
     parser.add_argument('--lambda_graph', type=float, default=0.1,
                         help='graph Laplacian reg weight on residual (pr_graph mode)')
     parser.add_argument('--weight_mode', type=str, default='prior_residual',
