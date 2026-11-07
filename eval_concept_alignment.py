@@ -1,132 +1,152 @@
-"""E2: P4 机制证据——校对前后概念得分与人工标注的相关性对比
+"""E2-R: 概念保真度评估 (2026-11-07 修正版, 回应专家意见)
 
-对比同一模型内部两个投影矩阵读出的概念得分与人工属性标注的一致性:
-  E_frozen : 文本构建的冻结词典 (训练前)
-  E_calib  : E + cal_U @ cal_V  (训练后, 来自 checkpoint)
+对比冻结词典 E 与校准词典 E' = E + cal_U@cal_V 读出的概念得分与人工属性标注的一致性。
 
-指标: 逐概念 Pearson 相关 (概念得分 vs 二值标注), 汇总均值/中位数/正比例;
-      另报 AUROC (标注为正的概念上, 得分区分正负样本的能力)。
+相对旧版 (作废) 的修正:
+  1. AUROC 改用 sklearn.metrics.roc_auc_score (旧手写秩公式有误, 输出负值作废);
+  2. 特征 L2 归一化 (与模型前向一致: model.forward 中 z = z/||z||);
+  3. 标注来源改为 cub_train.txt 自带的逐样本属性列 (与 cache 特征顺序严格一致;
+     旧版用 CUBtrain.pkl 截断对齐——已证实 720 行起错位, 旧结论作废);
+  4. checkpoint 参数化 (--weights), 不再依赖固定名 best_{DS}.pth;
+  5. 同时报告"raw 特征×E"(P4 单独影响) 与可选"z_inv×E'"(完整模型路径)——
+     当前版本先做 raw 特征对照, 完整模型路径在 E4 干预实验中覆盖。
 
-用法: python eval_concept_alignment.py --dataset CUB --weights best_CUB.pth
-输出: experiment_results/e2_concept_alignment_{DS}.json
+用法:
+  python eval_concept_alignment.py --dataset CUB --weights best_CUB_sel.pth \
+      --rank 16 --seed 1
+输出: experiment_results/e2r_align_{DS}_r{rank}_s{seed}.json
 """
 import os
+import sys
+import json
 import argparse
-import pickle
 import numpy as np
 import torch
+import torch.nn.functional as F
+from sklearn.metrics import roc_auc_score
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+CONCEPT_FILES = {
+    'CUB': 'data/CUB/cub_concepts.txt',
+    'AWA2': 'data/awa2/awa2_conceptNet_concepts.txt',
+}
+
+
+def load_alignment(dataset):
+    """返回 (feats_norm, labels, attrs) —— 标注与 cache 特征逐行对齐"""
+    d = torch.load(f'cache/{dataset}_train.pt', map_location='cpu', weights_only=False)
+    feats = F.normalize(d['feats'].float(), dim=-1)          # 修正2: 与前向一致
+    labels = d['labels'].long()
+    if dataset == 'CUB':
+        rows = [x.strip().split(',') for x in open('data/CUB/cub_train.txt').readlines()]
+        # txt: path, cls(1-based), bbox×4, attrs×312
+        assert len(rows) == feats.size(0), f'txt {len(rows)} != cache {feats.size(0)}'
+        lab_txt = torch.tensor([int(r[1]) for r in rows]) - 1
+        assert (lab_txt == labels).all(), 'txt 与 cache 顺序不一致!'
+        attrs = torch.tensor([list(map(float, r[6:6 + 312])) for r in rows])
+    else:
+        raise NotImplementedError(f'{dataset} 的逐样本属性对齐待补 (AWA2 用 predicate-matrix 为类级, 不可逐样本)')
+    return feats, labels, attrs
+
+
+def build_E(dataset):
+    """现场重建冻结词典 E (概念短语 → CLIP text encoder)"""
+    import clip as clip_pkg
+    with open(CONCEPT_FILES[dataset], 'r', encoding='utf-8') as f:
+        names = [x.rstrip('\n') for x in f.readlines() if x.strip()]
+    clip_model, _ = clip_pkg.load('F:/CLIP-OOD/clip_weights/ViT-L-14.pt', device='cpu')
+    with torch.no_grad():
+        E = clip_model.encode_text(clip_pkg.tokenize(names)).float()
+        E = E / E.norm(dim=-1, keepdim=True)
+    return E
+
+
+def eval_E(scores, attrs, min_pos=5):
+    """逐概念 Pearson + AUROC (sklearn); 返回 (per_pearson, per_auroc, valid_mask)"""
+    a = attrs.numpy()
+    n_concept = attrs.shape[1]
+    per_p, per_a, mask = [], [], []
+    for j in range(n_concept):
+        y = (a[:, j] > 0).astype(int)
+        if y.sum() < min_pos or (1 - y).sum() < min_pos or a[:, j].std() == 0:
+            mask.append(False)
+            continue
+        mask.append(True)
+        per_p.append(float(np.corrcoef(scores[:, j], a[:, j])[0, 1]))
+        per_a.append(float(roc_auc_score(y, scores[:, j])))   # 修正1: sklearn
+    return np.array(per_p), np.array(per_a), np.array(mask)
+
+
+def summarize(per_p, per_a, mask):
+    return {
+        'n_valid_concepts': int(mask.sum()),
+        'pearson_mean': float(np.mean(per_p)),
+        'pearson_median': float(np.median(per_p)),
+        'pearson_frac_positive': float((per_p > 0).mean()),
+        'auroc_mean': float(np.mean(per_a)),
+        'auroc_median': float(np.median(per_a)),
+        'auroc_frac_above_0.5': float((per_a > 0.5).mean()),
+    }
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dataset', default='CUB')
-    ap.add_argument('--weights', default='best_CUB.pth')
+    ap.add_argument('--weights', required=True, help='含 cal_U/cal_V 的 checkpoint')
+    ap.add_argument('--rank', type=int, required=True)
+    ap.add_argument('--seed', type=int, required=True)
+    ap.add_argument('--model_tag', default='c3+spda_cal', help='记录训练模式')
     ap.add_argument('--out_dir', default='experiment_results')
     args = ap.parse_args()
 
-    # ---- 1. 人工标注 (pkl 顺序 = 缓存特征顺序, pkl 多出的 4 张是读取失败图) ----
-    pkl_path = f'data/{args.dataset}/{args.dataset}train.pkl'
-    meta = pickle.load(open(pkl_path, 'rb'))
-    attrs = np.array([x['attribute_label'] for x in meta], dtype=np.float32)
+    feats, labels, attrs = load_alignment(args.dataset)
+    E_frozen = build_E(args.dataset)
 
-    cache = torch.load(f'cache/{args.dataset}_train.pt', map_location='cpu',
-                       weights_only=False)
-    feats = cache['feats'].float()                       # (N, 768)
-    n = min(len(attrs), feats.size(0))                   # 对齐 (5990 vs 5994)
-    attrs, feats = attrs[:n], feats[:n]
-    labels = cache['labels'].long()[:n]
-    # 丢弃 pkl 尾部多出的样本对不齐时的行 (保险: 以 cache 长度为准)
-    print(f'[{args.dataset}] 样本 {n}, 概念 {attrs.shape[1]}, '
-          f'标注正例比 {(attrs > 0).mean():.4f}')
-
-    # ---- 2. 两个投影矩阵 ----
     sd = torch.load(args.weights, map_location='cpu', weights_only=False)
-    if 'cal_U' not in sd or 'cal_V' not in sd:
-        raise RuntimeError(f'{args.weights} 中没有 cal_U/cal_V (不是 cal 模式的权重)')
+    assert 'cal_U' in sd and 'cal_V' in sd, f'{args.weights} 缺 cal_U/cal_V'
     dE = sd['cal_U'].float() @ sd['cal_V'].float()
-    print(f'校对量 ‖ΔE‖_F = {torch.norm(dE):.4f}')
+    E_calib = E_frozen + dE
 
-    # 冻结 E 不在 state_dict (它是 buffer 性质的常量) —— 现场用 CLIP 文本编码器重建,
-    # 与模型构建路径一致 (概念名列表来自数据管线的概念表文本文件, 顺序即标注列顺序)
-    import sys
-    sys.path.insert(0, os.getcwd())
-    import clip as clip_pkg
-
-    concept_files = {
-        'CUB': 'data/CUB/cub_concepts.txt',
-        'AWA2': 'data/awa2/awa2_conceptNet_concepts.txt',
-    }
-    with open(concept_files[args.dataset], 'r', encoding='utf-8') as f:
-        concept_names = [x.rstrip('\n') for x in f.readlines() if x.strip()]
-    assert len(concept_names) == attrs.shape[1], \
-        f'概念数 {len(concept_names)} != 标注列数 {attrs.shape[1]}'
-
-    clip_model, _ = clip_pkg.load('F:/CLIP-OOD/clip_weights/ViT-L-14.pt', device='cpu')
     with torch.no_grad():
-        tokens = clip_pkg.tokenize(concept_names)
-        E_frozen = clip_model.encode_text(tokens).float()
-        E_frozen = E_frozen / E_frozen.norm(dim=-1, keepdim=True)
-    print(f'重建冻结词典: {tuple(E_frozen.shape)}')
+        s_frozen = (feats @ E_frozen.T).numpy()
+        s_calib = (feats @ E_calib.T).numpy()
 
-    # ---- 3. 概念得分 ----
-    with torch.no_grad():
-        s_frozen = feats @ E_frozen.T                    # (N, K)
-        s_calib = feats @ (E_frozen + dE).T
+    p_f, a_f, mask = eval_E(s_frozen, attrs)
+    p_c, a_c, _ = eval_E(s_calib, attrs)
 
-    # ---- 3. 逐概念 Pearson + AUROC ----
-    a_t = torch.from_numpy(attrs)
-    a_c = a_t - a_t.mean(0, keepdim=True)
-    std = a_c.std(0)
-    valid = std > 1e-6                                   # 常数列(全0概念)无相关可言
-
-    def pearson(s):
-        sc = s - s.mean(0, keepdim=True)
-        num = (a_c * sc).sum(0)
-        den = a_c.norm(dim=0) * sc.norm(dim=0) + 1e-8
-        return (num / den)[valid]
-
-    def auroc(s):
-        """逐概念 AUROC (正例得分应高于负例), rank 实现"""
-        out = []
-        for j in torch.nonzero(valid).flatten().tolist():
-            y = attrs[:, j] > 0
-            if y.sum() < 5 or (~y).sum() < 5:
-                continue
-            x = s[:, j].numpy()
-            order = np.argsort(x)
-            ranks = np.empty_like(order, dtype=np.float64)
-            ranks[order] = np.arange(1, len(x) + 1)
-            # 并列平均秩 (粗略: 得分连续, 影响极小)
-            r_pos = ranks[y].mean()
-            n_pos, n_neg = y.sum(), (~y).sum()
-            out.append((r_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
-        return torch.tensor(out)
-
-    r_frozen, r_calib = pearson(s_frozen), pearson(s_calib)
-    auc_frozen, auc_calib = auroc(s_frozen), auroc(s_calib)
-
-    report = {
+    rep = {
         'dataset': args.dataset,
+        'model_tag': args.model_tag,
+        'rank': args.rank,
+        'seed': args.seed,
         'weights': args.weights,
+        'protocol': 'final-selection checkpoint' if 'sel' in args.weights else 'legacy checkpoint',
         'delta_E_fro': float(torch.norm(dE)),
-        'n_concepts_eval': int(valid.sum()),
-        'pearson_frozen': {'mean': float(r_frozen.mean()), 'median': float(r_frozen.median())},
-        'pearson_calib': {'mean': float(r_calib.mean()), 'median': float(r_calib.median())},
-        'auroc_frozen': {'mean': float(auc_frozen.mean()), 'median': float(auc_frozen.median())},
-        'auroc_calib': {'mean': float(auc_calib.mean()), 'median': float(auc_calib.median())},
-        'improved_ratio_pearson': float((r_calib > r_frozen).float().mean()),
-        'improved_ratio_auroc': float((auc_calib > auc_frozen).float().mean()),
+        'E_fro': float(torch.norm(E_frozen)),
+        'rel_shift': float(torch.norm(dE) / torch.norm(E_frozen)),
+        'frozen': summarize(p_f, a_f, mask),
+        'calib': summarize(p_c, a_c, mask),
+        'improved_frac_pearson': float((p_c > p_f).mean()),
+        'improved_frac_auroc': float((a_c > a_f).mean()),
+        'per_concept_pearson_frozen': p_f.tolist(),
+        'per_concept_pearson_calib': p_c.tolist(),
+        'per_concept_auroc_frozen': a_f.tolist(),
+        'per_concept_auroc_calib': a_c.tolist(),
     }
 
     os.makedirs(args.out_dir, exist_ok=True)
-    out = os.path.join(args.out_dir, f'e2_concept_alignment_{args.dataset}.json')
-    import json
-    json.dump(report, open(out, 'w'), indent=2)
-    print(f'Pearson  冻结 {report["pearson_frozen"]["mean"]:.4f} → 校准 {report["pearson_calib"]["mean"]:.4f}'
-          f'  (提升概念比例 {report["improved_ratio_pearson"]:.2%})')
-    print(f'AUROC    冻结 {report["auroc_frozen"]["mean"]:.4f} → 校准 {report["auroc_calib"]["mean"]:.4f}'
-          f'  (提升概念比例 {report["improved_ratio_auroc"]:.2%})')
-    print(f'→ {out}')
+    out = os.path.join(args.out_dir, f"e2r_align_{args.dataset}_r{args.rank}_s{args.seed}.json")
+    with open(out, 'w') as f:
+        json.dump(rep, f, indent=2)
+
+    print(f"[{args.dataset}] r={args.rank} seed={args.seed} ({args.weights})")
+    print(f"  ‖ΔE‖/‖E‖ = {rep['rel_shift']:.3f}")
+    print(f"  Pearson  冻结 {rep['frozen']['pearson_mean']:.4f} → 校准 {rep['calib']['pearson_mean']:.4f}"
+          f"  (改善概念 {rep['improved_frac_pearson']:.1%})")
+    print(f"  AUROC    冻结 {rep['frozen']['auroc_mean']:.4f} → 校准 {rep['calib']['auroc_mean']:.4f}"
+          f"  (改善概念 {rep['improved_frac_auroc']:.1%})")
+    print(f"  有效概念 {rep['frozen']['n_valid_concepts']}/312 → {out}")
 
 
 if __name__ == '__main__':

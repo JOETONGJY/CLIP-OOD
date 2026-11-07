@@ -65,6 +65,9 @@ def get_args():
     parser.add_argument('--model_save_path', type=str, default=r'logs')
     parser.add_argument('--prompt_type', type=str, default=r'origin') # origin, others
     parser.add_argument("--save_model", action="store_true", default=True)
+    parser.add_argument("--model_selection", type=str, default='final',
+                        choices=['final', 'target'],
+                        help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')
     args = parser.parse_args()
 
     return args

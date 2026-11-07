@@ -40,6 +40,13 @@ class TrainingSession:
             'target_acc': 0.0,
             'epoch': -1
         }
+        # F1 严格 DG 选模: 训练结束时模型的指标 (目标域不参与选模)
+        self.selected_metrics = None
+
+    @staticmethod
+    def _selection_epoch(epoch, total_epochs):
+        """model_selection=final 时, 仅在最后一个 epoch 触发选模保存"""
+        return epoch == total_epochs - 1
 
     def _setup_device(self):
         device = torch.device(
@@ -399,6 +406,8 @@ class TrainingSession:
     def run(self):
         logger.info("\n" + "=" * 60)
         logger.info(f"Starting Training for {self.args.epochs} epochs")
+        logger.info(f"Model selection protocol: {getattr(self.args, 'model_selection', 'final')} "
+                    f"({'严格DG: 目标域不参与选模' if getattr(self.args, 'model_selection', 'final') == 'final' else '历史对照: 按target选模'})")
         logger.info(f"Dataset: {self.args.dataset}")
         logger.info(f"Model: {self.args.CBM_type}")
         logger.info(f"Alpha: {self.args.alpha}, Beta: {self.args.beta}, Lambda_KL: {self.args.lambda_kl}")
@@ -421,6 +430,10 @@ class TrainingSession:
             method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
         if getattr(self.args, 'run_tag', ''):
             method_tag = self.args.run_tag            # tau 扫描等: 同模式多取值需区分文件
+        # F1: 严格 DG 协议 (final) 的 run 命名加 _sel, 与历史 target-选模结果文件隔离
+        if getattr(self.args, 'model_selection', 'final') == 'final' \
+                and not getattr(self.args, 'run_tag', '') and not method_tag.endswith('_sel'):
+            method_tag += '_sel'
         self.run_name = f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
 
         if self.args.wandb:
@@ -452,6 +465,20 @@ class TrainingSession:
                     # self._save_concept_logs()
                     if self.args.save_model:
                         torch.save(self.model.state_dict(), f"best_{self.args.dataset}.pth")
+
+                # ===== F1 选模协议 (2026-11-07, 专家意见): 严格 DG 下目标域不参与选模 =====
+                # model_selection=final  : 固定 epoch (训练结束时的模型), 目标域仅测试 —— 默认
+                # model_selection=target : 旧行为 (按 target_acc 选 best), 仅历史对照用
+                if self._selection_epoch(epoch, self.args.epochs):
+                    self.selected_metrics = {
+                        'source_acc': source_metrics['source_acc'],
+                        'target_acc': target_metrics['target_acc'],
+                        'epoch': epoch,
+                        'protocol': self.args.model_selection,
+                    }
+                    if self.args.save_model:
+                        torch.save(self.model.state_dict(),
+                                   f"best_{self.args.dataset}_sel{self.args.model_selection}.pth")
 
                 epoch_time = time.time() - epoch_start
                 log_data = {
@@ -501,6 +528,12 @@ class TrainingSession:
                 method_tag = getattr(self.args, 'weight_mode', 'prior_residual')
             if getattr(self.args, 'run_tag', ''):
                 method_tag = self.args.run_tag
+            # F1: 严格 DG 协议 (final) 时结果文件加 sel 后缀, 与历史 target-选模结果隔离
+            sel_mode = getattr(self.args, 'model_selection', 'final')
+            if sel_mode == 'final' and not getattr(self.args, 'run_tag', '') \
+                    and not method_tag.endswith('_sel'):
+                method_tag += '_sel'
+            sel = self.selected_metrics or {}
             result = {
                 'dataset': self.args.dataset,
                 'model_type': self.args.CBM_type,
@@ -509,7 +542,21 @@ class TrainingSession:
                 'alpha': self.args.alpha,
                 'beta': self.args.beta,
                 'lambda_kl': self.args.lambda_kl,
+                'model_selection': sel_mode,
+                # 外审要求: 记录实际生效的损失配置 (graph 泄漏事件的防护)
+                'loss_config': {
+                    'lambda_graph': getattr(self.args, 'lambda_graph', 0.0),
+                    'graph_active': bool(getattr(self.model, 'desc_laplacian', None) is not None
+                                         and getattr(self.args, 'lambda_graph', 0) > 0),
+                    'cal_rank': getattr(self.args, 'cal_rank', 0),
+                    'lambda_cal': getattr(self.args, 'lambda_cal', 0.01),
+                    'protect_k': getattr(self.args, 'protect_k', 0),
+                },
                 **self.best_metrics,
+                # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
+                **{f'sel_{k}': v for k, v in sel.items()},
+                'target_acc': (sel.get('target_acc', self.best_metrics['target_acc'])
+                               if sel_mode == 'final' else self.best_metrics['target_acc']),
             }
             result_path = f"logs/results/{self.run_name}.json"
             with open(result_path, 'w') as f:
@@ -518,8 +565,12 @@ class TrainingSession:
 
             logger.info("\n" + "=" * 60)
             logger.info("Training Completed")
-            logger.info(f"Best Source Accuracy: {self.best_metrics['source_acc']:.2f}%")
-            logger.info(f"Best Target Accuracy: {self.best_metrics['target_acc']:.2f}%")
+            logger.info(f"Protocol: {sel_mode}")
+            if sel_mode == 'final' and sel:
+                logger.info(f"[selected@final] Source {sel['source_acc']:.2f}% | "
+                            f"Target {sel['target_acc']:.2f}% (严格DG主指标)")
+            logger.info(f"Best(Source-or-target监视) Source {self.best_metrics['source_acc']:.2f}% | "
+                        f"Target {self.best_metrics['target_acc']:.2f}% (仅对照)")
             logger.info("=" * 60)
 
 
