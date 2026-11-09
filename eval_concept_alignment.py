@@ -136,7 +136,8 @@ def main():
     }
 
     os.makedirs(args.out_dir, exist_ok=True)
-    out = os.path.join(args.out_dir, f"e2r_align_{args.dataset}_r{args.rank}_s{args.seed}.json")
+    tag_clean = args.model_tag.replace('+', 'p')
+    out = os.path.join(args.out_dir, f"e2r_align_{args.dataset}_{tag_clean}_r{args.rank}_s{args.seed}.json")
     with open(out, 'w') as f:
         json.dump(rep, f, indent=2)
 

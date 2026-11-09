@@ -128,6 +128,15 @@ class TrainingSession:
         logger.info(f"Total parameters: {total_params:,}")
         logger.info(f"Trainable parameters: {trainable_params:,}")
 
+        # A1 语义锚定: cal_rank>0 且 lambda_rel>0 时挂载 (无新参数, 纯损失约束)
+        if getattr(self.args, 'cal_rank', 0) > 0 and getattr(self.args, 'lambda_rel', 0.0) > 0:
+            from model.semantic_anchor import SemanticAnchor
+            self.sem_anchor = SemanticAnchor(self.model.concept_embeddings,
+                                             topk=getattr(self.args, 'anchor_topk', 5)
+                                             ).to(self.model.device)
+            logger.info(f"[A1] SemanticAnchor 挂载: topk={getattr(self.args, 'anchor_topk', 5)}, "
+                        f"lambda_rel={self.args.lambda_rel}")
+
     def _init_optimizer(self):
         """init optimizer"""
         self.optimizer = torch.optim.AdamW(
@@ -301,6 +310,11 @@ class TrainingSession:
             if getattr(self.model, 'cal_rank', 0) > 0:
                 cal_loss = self.args.lambda_cal * self.model._cal_norm ** 2
 
+            # A1 语义锚定: 局部语义关系矩阵约束 (top-k 邻域 Gram 结构保持)
+            rel_loss = torch.tensor(0.0, device=images.device)
+            if getattr(self, 'sem_anchor', None) is not None:
+                rel_loss = self.sem_anchor(self.model._effective_E())
+
             total_loss = (
                     cls_loss
                     + self.args.alpha * orth_loss
@@ -309,6 +323,7 @@ class TrainingSession:
                     + self.args.lambda_graph * graph_loss
                     + align_loss
                     + cal_loss
+                    + getattr(self.args, 'lambda_rel', 0.0) * rel_loss
             )
 
             # 双头一致性: KL(p_inv || p_orig), full_mc 默认 0.1, 亦可 --cons_weight 指定

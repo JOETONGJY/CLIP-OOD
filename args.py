@@ -22,6 +22,10 @@ def get_args():
                         help='P4 低秩概念校准: ΔE=U Vᵀ 的秩 r; 0=关闭 (冻结 E)')
     parser.add_argument('--lambda_cal', type=float, default=0.01,
                         help='P4 概念校准锚定权重: lambda_cal * ||ΔE||_F^2')
+    parser.add_argument('--lambda_rel', type=float, default=0.0,
+                        help='A1 语义关系约束权重: top-k 邻域 Gram 结构保持; 0=关闭')
+    parser.add_argument('--anchor_topk', type=int, default=5,
+                        help='A1: 语义邻域 top-k')
     parser.add_argument('--cls_rank', type=int, default=16,
                         help='M2 class-conditional selection: low-rank correction rank r')
     parser.add_argument('--lambda_cls_sparse', type=float, default=0.01,
