@@ -141,6 +141,7 @@ make_weights_learnable_init = make_weights_prior_residual
 def compute_descriptor_redundancy(
     domain_diffs: torch.Tensor,
     topk: int = 0,
+    relative: bool = True,
 ) -> torch.Tensor:
     """
     描述符冗余度 c_j: 方向 j 与全部其他方向的方向相似度之和。
@@ -151,10 +152,15 @@ def compute_descriptor_redundancy(
     domain_diffs : (N, C, D) 域迁移方向 (已逐类归一化)
     topk : int, 0=全矩阵求和; >0 时每行只累加相似度最高的 k 个方向
            (外审建议: 避免大量弱相关方向累积成过大的冗余惩罚)
+    relative : bool, True (2026-11-12 修正) 时 c_j 除以中位数, 得到相对冗余度
+           —— 旧版(绝对量)的缺陷: CLIP 文本方向天然挤在一起, 绝对 c 基数 ~72,
+              注入一个重复描述符仅增加 1/72 的惩罚, 公式对真重复钝化。
+           相对量下天然数据 c̃≈1 (惩罚≈0, 严格退化回 RW-DDO),
+           注入重复时重复对 c̃ 明显上升, 惩罚具有分辨力。
 
     Returns
     -------
-    redundancy : (N,) c_j ∈ [1, N] (全正交时恒为 1)
+    redundancy : (N,) relative=True 时 c̃_j 以中位数为 1; False 时绝对量 ∈ [1, N]
     """
     with torch.no_grad():
         dirs = domain_diffs.mean(dim=1).float()               # (N, D) 类平均方向
@@ -166,7 +172,10 @@ def compute_descriptor_redundancy(
             # 保留每行 top-k (含自身), 其余置 0 —— 稀疏化冗余统计
             kth = A.topk(min(topk, A.size(0)), dim=1).values[:, -1:]
             A = torch.where(A >= kth, A, torch.zeros_like(A))
-        return A.sum(dim=1).clamp_min(1e-8)
+        c = A.sum(dim=1).clamp_min(1e-8)
+        if relative:
+            c = c / c.median().clamp_min(1e-8)
+        return c
 
 
 # ============================================================

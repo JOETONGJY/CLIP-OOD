@@ -371,3 +371,33 @@ SemanticAnchor（top-5 邻域 Gram 结构保持，model/semantic_anchor.py，单
 ### 遗留
 - graph 泄漏：clip_cbm_orth 的 desc_laplacian 现仅 pr_graph 模式构造（assert 守卫）；第三章历史数字标"RW-DDO+Graph"待 C-4 干净对照（--lambda_graph 0，12 runs）
 - checkpoint 独立目录改造未做（F3 后 best_{DS}_selfinal.pth 仍覆盖式，每数据集仅留末配置权重）
+
+## §2g. C 系列：graph 干净对照 + 去冗余 RW-DDO（2026-11-07 ~ 11-12）
+
+### C-4 graph 正则干净对照（12 runs）
+早期版本 clip_cbm_orth 在 prior_residual 模式也无条件构造图拉普拉斯（lambda_graph 默认 0.1），第三章历史数字实为 "RW-DDO+Graph"。干净对照（--lambda_graph 0，3 seeds）：CUB 56.67±0.37（历史 56.30，Δ+0.37）、AwA2 86.34（与历史一致）、LADA 80.39±0.10（与历史完全一致）、LADV 67.89±0.01——**graph 影响≈0，第三章历史数字无污染**。防护：desc_laplacian 构造加 pr_graph 断言守卫；结果 JSON 记录 loss_config。
+
+### C-1 去冗余 RW-DDO
+动机：诊断发现 204 个描述符在 CLIP 文本空间方向天然拥挤（绝对冗余基数 c≈72），表达同一方向的多个描述符会拿到重复话语权——原 DDO 与 RW-DDO 均未处理。
+
+公式：w = softmax(r + δ − log(c̃)) × N，c̃ = (Σ_i|cos(d_i,d_j)|)/median，top-k 稀疏化可选（试金石用全矩阵）。全描述符互不相干时 c̃=1，惩罚严格为零，公式退化回 RW-DDO。
+
+实现：reliability.py compute_descriptor_redundancy（相对量 + topk 参数，缓存路径同样挂载）；clip_cbm_orth 与 clip_cbm_subspace 双类支持（--redundancy / --redundancy_topk）。单测四项通过：正交退化 / 重复对压权 / 总量守恒（Σw=204）/ topk 上限。
+
+### C-2 训练级扰动实验（CUB，3 seeds，注入 25 个近似重复描述符 cos≈0.99）
+
+| 组 | 描述符集 | 方法 | acc |
+|---|---|---|---|
+| A | 干净 204 | 原 RW-DDO | 56.67±0.37 |
+| B | 扰动 229 | 原 RW-DDO | 56.76±0.36 |
+| C | 干净 204 | C-1 | 56.76±0.26 |
+| D | 扰动 229 | C-1 | 56.82±0.34 |
+
+天然数据：C-1 增益 CUB +0.09 / LADV +0.10（小幅正）。扰动代价：原方法 +0.09，C-1 +0.07——差异 +0.02 在噪声内。
+
+离线机制验证（注入重复场景）：C-1 将复制方向权重份额膨胀从 ×2.000 压至 ×1.874（topk=5），其余方向分布畸变（KL）降低 8 倍。
+
+**结论与定位**：C-1 机制有效（离线份额压制+分布保护），但精度无法外化——CLIP 文本方向天然拥挤使注入重复被环境吸收，防御价值显示不出来。定位为第三章**鲁棒性组件**：设计合理（严格退化性质）+ 离线机制证据 + 精度无损（+0.07~+0.10），不作为精度贡献主张。第三章最终形态：RW-DDO（主精度贡献）+ 去冗余加权（鲁棒性组件）。
+
+### 工程记录
+C-1 首轮试金石作废一次：--redundancy 未接入 clip_cbm_subspace 分支（两组结果逐 seed 相同暴露），补 subspace 构造函数与 get_domain_weights 后重跑。C-2 首轮作废一次：扰动发生在 _init_model 之后（模型已用干净 diffs 构建），拆开 __init__ 手动插入后重跑。两处均以"逐 seed 数值完全相同"为信号发现。
