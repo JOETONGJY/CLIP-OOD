@@ -178,12 +178,19 @@ class clip_cbm_orth(nn.Module):
             domain_diffs,
             domain_weights=None,
             weight_mode="prior_residual",
-            init_with_class_embedding=False
+            init_with_class_embedding=False,
+            descriptor_redundancy=None,
+            use_redundancy=False
     ):
         # def __init__(self, args, class_names, concept_names, domain_diffs,init_with_class_embedding=False):
         super(clip_cbm_orth, self).__init__()
         self.diffs = domain_diffs.clone()
         self.device = args.device
+        # C-1: 去冗余开关与冗余度向量 (buffer, 不参与梯度)
+        self.use_redundancy = bool(use_redundancy)
+        if descriptor_redundancy is not None:
+            self.register_buffer('descriptor_redundancy',
+                                 descriptor_redundancy.clone().float().detach())
         self.num_prompts = domain_diffs.size(0)
 
         # ===== 权重设计 (专家建议: Prior + Residual) =====
@@ -276,6 +283,11 @@ class clip_cbm_orth(nn.Module):
 
         logits = self.reliability_prior + self.domain_residual
         weights = torch.softmax(logits, dim=0) * self.num_prompts  # 均值=1, 保量级
+        # C-1 (方案 C): 去重复计权 —— logits 减 log(c_j), 冗余方向降话语权
+        # 全正交时 c_j=1, log(c_j)=0, 严格退化回 RW-DDO; 开关由 args.redundancy 控制
+        if getattr(self, 'use_redundancy', False) and getattr(self, 'descriptor_redundancy', None) is not None:
+            logits = logits - torch.log(self.descriptor_redundancy.clamp_min(1e-8))
+            weights = torch.softmax(logits, dim=0) * self.num_prompts
         # residual 的 softmax q, 用于 KL 正则: D_KL(q ‖ uniform) = log N - H(q)
         # 注意方向: q 在前 (正向 KL), 即 "q 到 uniform 的距离", 约束 residual 不偏离 uniform 太远
         residual_softmax = torch.softmax(self.domain_residual, dim=0)
@@ -365,7 +377,9 @@ class clip_cbm_subspace(nn.Module):
             domain_weights=None,
             weight_mode="none",
             init_with_class_embedding=False,
-            cal_rank=0
+            cal_rank=0,
+            descriptor_redundancy=None,
+            use_redundancy=False
     ):
         super(clip_cbm_subspace, self).__init__()
         self.diffs = domain_diffs.clone()
@@ -375,6 +389,11 @@ class clip_cbm_subspace(nn.Module):
         self.tau = tau
         # P4: 低秩概念校准 E' = E + U Vᵀ (V 零初始化 ⇒ 初始行为与冻结 E 逐位一致)
         self.cal_rank = int(cal_rank)
+        # C-1: 去冗余开关与冗余度向量 (buffer, 不参与梯度)
+        self.use_redundancy = bool(use_redundancy)
+        if descriptor_redundancy is not None:
+            self.register_buffer('descriptor_redundancy',
+                                 descriptor_redundancy.clone().float().detach())
         # DDO 正则对 invariant head 的约束权重 (专家第五轮: 测试头必须被 DDO 约束)
         # L_DDO = ‖h_o[1:](proj)‖ + eta_ddo_inv · ‖h_inv[1:](proj)‖, 默认 1.0 对称
         self.eta_ddo_inv = eta_ddo_inv
@@ -549,6 +568,9 @@ class clip_cbm_subspace(nn.Module):
         if self.c3_weight_mode == "fixed":
             return self.fixed_weights, None
         logits = self.reliability_prior + self.domain_residual
+        # C-1 (方案 C): 去重复计权 —— 与 clip_cbm_orth 同一机制
+        if getattr(self, 'use_redundancy', False) and getattr(self, 'descriptor_redundancy', None) is not None:
+            logits = logits - torch.log(self.descriptor_redundancy.clamp_min(1e-8))
         weights = torch.softmax(logits, dim=0) * self.num_prompts
         return weights, torch.softmax(self.domain_residual, dim=0)
 

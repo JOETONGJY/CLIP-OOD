@@ -136,6 +136,40 @@ make_weights_learnable_init = make_weights_prior_residual
 
 
 # ============================================================
+# 2b. C-1 描述符冗余度 (2026-11-09, 方案 C: 去重复计权)
+# ============================================================
+def compute_descriptor_redundancy(
+    domain_diffs: torch.Tensor,
+    topk: int = 0,
+) -> torch.Tensor:
+    """
+    描述符冗余度 c_j: 方向 j 与全部其他方向的方向相似度之和。
+    冗余度高 = 该方向的表达被很多其他描述符重复 → 在 DDO 中应降低单独话语权。
+
+    Parameters
+    ----------
+    domain_diffs : (N, C, D) 域迁移方向 (已逐类归一化)
+    topk : int, 0=全矩阵求和; >0 时每行只累加相似度最高的 k 个方向
+           (外审建议: 避免大量弱相关方向累积成过大的冗余惩罚)
+
+    Returns
+    -------
+    redundancy : (N,) c_j ∈ [1, N] (全正交时恒为 1)
+    """
+    with torch.no_grad():
+        dirs = domain_diffs.mean(dim=1).float()               # (N, D) 类平均方向
+        dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+        # 绝对余弦: DDO 正交约束中 d 与 -d 是同一一维子空间
+        A = (dirs @ dirs.T).abs()
+        A.fill_diagonal_(1.0)
+        if topk and topk > 0:
+            # 保留每行 top-k (含自身), 其余置 0 —— 稀疏化冗余统计
+            kth = A.topk(min(topk, A.size(0)), dim=1).values[:, -1:]
+            A = torch.where(A >= kth, A, torch.zeros_like(A))
+        return A.sum(dim=1).clamp_min(1e-8)
+
+
+# ============================================================
 # 3. 对外统一入口: 一次性挂载到 Dataset 上
 # ============================================================
 def attach_domain_reliability(
@@ -203,6 +237,10 @@ def attach_domain_reliability(
 
     dataset.domain_diffs = domain_diffs
     dataset.reliability_scores = reliability_scores
+    # C-1: 冗余度始终预计算并挂载 (开销极小), 是否生效由 model 侧 --redundancy 开关决定
+    dataset.descriptor_redundancy = compute_descriptor_redundancy(
+        domain_diffs, topk=getattr(dataset, "redundancy_topk", 0)
+    )
 
     if weight_strategy == "binary":
         dataset.domain_weights = make_weights_binary(reliability_scores, binary_high, binary_low)

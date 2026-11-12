@@ -99,6 +99,9 @@ class TrainingSession:
                 weight_mode=(getattr(self.args, 'weight_mode', 'prior_residual')
                              if getattr(self.args, 'use_c3_weights', False) else "none"),
                 cal_rank=getattr(self.args, 'cal_rank', 0),
+                descriptor_redundancy=getattr(self.train_dataset, "descriptor_redundancy", None),
+                use_redundancy=(getattr(self.args, 'redundancy', False)
+                                and getattr(self.args, 'use_c3_weights', False)),
             ).to(self.device)
         else:
             # 改动时间26.4.29-----------------------------------
@@ -108,7 +111,9 @@ class TrainingSession:
                 concept_names=list(self.train_dataset.concept2id.keys()),
                 domain_diffs=self.train_dataset.domain_diffs,
                 domain_weights=getattr(self.train_dataset, "domain_weights", None),
-                weight_mode=getattr(self.args, "weight_mode", "prior_residual")
+                weight_mode=getattr(self.args, "weight_mode", "prior_residual"),
+                descriptor_redundancy=getattr(self.train_dataset, "descriptor_redundancy", None),
+                use_redundancy=getattr(self.args, "redundancy", False),
             ).to(self.device)
         # print("Model domain_weights:", getattr(self.model, "domain_weights", None), flush=True)
         # if hasattr(self.model, "domain_weights") and self.model.domain_weights is not None:

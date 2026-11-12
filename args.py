@@ -26,6 +26,10 @@ def get_args():
                         help='A1 语义关系约束权重: top-k 邻域 Gram 结构保持; 0=关闭')
     parser.add_argument('--anchor_topk', type=int, default=5,
                         help='A1: 语义邻域 top-k')
+    parser.add_argument('--redundancy', action="store_true", default=False,
+                        help='C-1 去冗余 RW-DDO: logits 减 log(c_j), 冗余描述符降话语权')
+    parser.add_argument('--redundancy_topk', type=int, default=0,
+                        help='C-1: 冗余统计稀疏化 top-k; 0=全矩阵')
     parser.add_argument('--cls_rank', type=int, default=16,
                         help='M2 class-conditional selection: low-rank correction rank r')
     parser.add_argument('--lambda_cls_sparse', type=float, default=0.01,
