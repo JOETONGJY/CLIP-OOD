@@ -223,21 +223,20 @@ class clip_cbm_orth(nn.Module):
             self.domain_residual = nn.Parameter(
                 torch.zeros_like(scores)
             )
-            # --- Graph Laplacian (pr_graph): 描述符关系结构约束残差修正一致性 ---
+            # --- Graph Laplacian (仅 pr_graph 模式构造): 描述符关系结构约束残差修正一致性 ---
             # A_ij = max(0, cos(d_i, d_j)), d_i 为类平均域方向 (与第四章共享同一 D)
-            # F1-补丁 (2026-11-07, 外审意见): 仅 pr_graph 模式允许构造 ——
-            # 旧版在 prior_residual 等模式也无条件构造, 配合 lambda_graph 默认 0.1
-            # 曾使第三章历史结果混入图正则 (现标为 RW-DDO+Graph, 待干净对照)
-            assert weight_mode == "pr_graph", \
-                'desc_laplacian 仅限 pr_graph 模式; 其他模式请 --lambda_graph 0 且不应构造图正则'
-            with torch.no_grad():
-                dirs = self.diffs.mean(dim=1).float()
-                dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
-                A = (dirs @ dirs.T).clamp(min=0)
-                A.fill_diagonal_(0)
-                deg = A.sum(1)
-                L_G = torch.diag(deg) - A
-                self.register_buffer('desc_laplacian', L_G)
+            # F1-补丁 v2 (2026-11-20, 外审意见): 上一版把 assert 放在了 else 分支内,
+            # 导致 prior_residual 正常路径也触发断言失败 —— 改为条件构造:
+            # 仅 weight_mode == "pr_graph" 时才构造 L_G, 其他模式一律不构造。
+            if weight_mode == "pr_graph":
+                with torch.no_grad():
+                    dirs = self.diffs.mean(dim=1).float()
+                    dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+                    A = (dirs @ dirs.T).clamp(min=0)
+                    A.fill_diagonal_(0)
+                    deg = A.sum(1)
+                    L_G = torch.diag(deg) - A
+                    self.register_buffer('desc_laplacian', L_G)
 
         self.class_names = class_names
         self.concept_names = concept_names
