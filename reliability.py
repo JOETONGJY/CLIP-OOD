@@ -179,6 +179,45 @@ def compute_descriptor_redundancy(
 
 
 # ============================================================
+# 2c. E3 方案 B: 近重复描述符聚簇 (2026-11-21)
+# ============================================================
+def compute_descriptor_clusters(domain_diffs, threshold=0.9):
+    """
+    方向相似度 |cos| > threshold 的描述符归入同一簇 (连通分量 / single-linkage,
+    对 "linocut vs linocut print" 这类近似重复表达形成链式近似族)。
+
+    仅依据离线文本方向相似度分布选择阈值, 不使用任何目标域信息。
+
+    Returns
+    -------
+    assignment : (N,) LongTensor, 每个描述符的簇 id
+    n_groups   : int, 簇数
+    """
+    with torch.no_grad():
+        dirs = domain_diffs.mean(dim=1).float()               # (N, D) 类平均方向
+        dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+        S = (dirs @ dirs.T).abs()
+        S.fill_diagonal_(0)
+        adj = S > threshold
+        n = S.size(0)
+        assignment = torch.full((n,), -1, dtype=torch.long)
+        g = 0
+        for i in range(n):
+            if assignment[i] >= 0:
+                continue
+            stack = [i]
+            assignment[i] = g
+            while stack:
+                u = stack.pop()
+                for v in torch.nonzero(adj[u], as_tuple=True)[0].tolist():
+                    if assignment[v] < 0:
+                        assignment[v] = g
+                        stack.append(v)
+            g += 1
+    return assignment, g
+
+
+# ============================================================
 # 3. 对外统一入口: 一次性挂载到 Dataset 上
 # ============================================================
 def attach_domain_reliability(

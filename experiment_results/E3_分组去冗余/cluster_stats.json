@@ -1,0 +1,26 @@
+{
+ "CUB": {
+  "n_groups": 192,
+  "multi_clusters": 11,
+  "largest": 3,
+  "in_multi": 23
+ },
+ "AWA2": {
+  "n_groups": 195,
+  "multi_clusters": 8,
+  "largest": 3,
+  "in_multi": 17
+ },
+ "LADV": {
+  "n_groups": 193,
+  "multi_clusters": 10,
+  "largest": 3,
+  "in_multi": 21
+ },
+ "PACS": {
+  "n_groups": 194,
+  "multi_clusters": 9,
+  "largest": 3,
+  "in_multi": 19
+ }
+}

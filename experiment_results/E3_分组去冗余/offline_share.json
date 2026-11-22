@@ -1,0 +1,17 @@
+{
+ "orig": {
+  "clean_base25_share": 25.1941,
+  "inj_50_share": 50.3456,
+  "inflation": 1.998
+ },
+ "c1_topk5": {
+  "clean_base25_share": 25.7055,
+  "inj_50_share": 47.2901,
+  "inflation": 1.84
+ },
+ "grouped": {
+  "clean_base25_share": 25.6896,
+  "inj_50_share": 29.2561,
+  "inflation": 1.139
+ }
+}

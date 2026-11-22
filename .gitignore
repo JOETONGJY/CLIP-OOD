@@ -42,3 +42,7 @@ data/pacs/OfficeHome/
 # 实验产物
 experiment_results/02_单run指标/
 experiment_results.7z
+
+# 训练中间快照 (诊断 JSON 已含曲线摘要, 同 seed 可复现, 本地保留不入库)
+experiment_results/*/runs/
+experiment_results/*/cls_snapshots/

@@ -180,7 +180,10 @@ class clip_cbm_orth(nn.Module):
             weight_mode="prior_residual",
             init_with_class_embedding=False,
             descriptor_redundancy=None,
-            use_redundancy=False
+            use_redundancy=False,
+            freeze_delta_mask=None,
+            grouped_weights=False,
+            descriptor_clusters=None
     ):
         # def __init__(self, args, class_names, concept_names, domain_diffs,init_with_class_embedding=False):
         super(clip_cbm_orth, self).__init__()
@@ -219,10 +222,32 @@ class clip_cbm_orth(nn.Module):
                 scores = torch.zeros_like(scores)  # Residual Only: 先验置零
             # prior: 固定 buffer, detach, 不参与梯度 (作为归纳偏置)
             self.register_buffer('reliability_prior', scores)
-            # residual: 可学习 Parameter, 初始为 0 (训练初期 logits=prior)
-            self.domain_residual = nn.Parameter(
-                torch.zeros_like(scores)
-            )
+            # ===== E3 方案 B (2026-11-21): 簇级分组加权 =====
+            # 近重复描述符 (|cos|>θ 同簇) 共享话语权: 簇级先验=簇内 r 均值 (成员数无关,
+            # 注入复制不改变簇权重), 残差升至簇级 (G 维); 全单元素簇时严格退化回 RW-DDO。
+            self.grouped_weights = bool(grouped_weights) and descriptor_clusters is not None
+            if self.grouped_weights:
+                if use_redundancy:
+                    raise ValueError("grouped_weights 与 C-1 redundancy 互斥 (机制上相互替代)")
+                assignment, n_groups = descriptor_clusters
+                self.cluster_assignment = assignment.long().to(self.device)
+                self.num_groups = int(n_groups)
+                counts = torch.bincount(self.cluster_assignment, minlength=self.num_groups)
+                cluster_prior = torch.zeros(self.num_groups, device=self.device)
+                cluster_prior.scatter_add_(0, self.cluster_assignment, scores)
+                cluster_prior = cluster_prior / counts.to(self.device).clamp_min(1).float()
+                self.register_buffer('cluster_prior', cluster_prior)
+                self.cluster_residual = nn.Parameter(
+                    torch.zeros(self.num_groups, device=self.device))
+                n_multi = int((counts > 1).sum().item())
+                print(f"[E3] grouped weights: {self.num_prompts} prompts -> {self.num_groups} clusters "
+                      f"(multi-member: {n_multi})")
+                self.domain_residual = None   # 残差升至簇级, 不再逐描述符
+            else:
+                # residual: 可学习 Parameter, 初始为 0 (训练初期 logits=prior)
+                self.domain_residual = nn.Parameter(
+                    torch.zeros_like(scores)
+                )
             # --- Graph Laplacian (仅 pr_graph 模式构造): 描述符关系结构约束残差修正一致性 ---
             # A_ij = max(0, cos(d_i, d_j)), d_i 为类平均域方向 (与第四章共享同一 D)
             # F1-补丁 v2 (2026-11-20, 外审意见): 上一版把 assert 放在了 else 分支内,
@@ -237,6 +262,12 @@ class clip_cbm_orth(nn.Module):
                     deg = A.sum(1)
                     L_G = torch.diag(deg) - A
                     self.register_buffer('desc_laplacian', L_G)
+
+        # E1 干预 (2026-11-21): 冻结象限掩码 (LongTensor 索引); apply_delta_freeze() 在每个 step 后回零
+        if freeze_delta_mask is not None:
+            self.register_buffer(
+                'delta_freeze_mask',
+                freeze_delta_mask.to(device=self.device).long().clone())
 
         self.class_names = class_names
         self.concept_names = concept_names
@@ -280,6 +311,22 @@ class clip_cbm_orth(nn.Module):
         if self.weight_mode == "fixed":
             return self.fixed_weights, None
 
+        # E3 方案 B: 簇级分组加权
+        # w_i = Q_g(i) * q_i|g, Q_g = softmax(mean_r_g + Δ_g) * G (簇总话语权与成员数无关),
+        # q_i|g = softmax(r) 簇内份额; 最后校准 mean(w)=1。全单元素簇时严格退化回 RW-DDO。
+        if getattr(self, 'grouped_weights', False):
+            logits_g = self.cluster_prior + self.cluster_residual          # (G,)
+            Q = torch.softmax(logits_g, dim=0) * self.num_groups
+            r = self.reliability_prior
+            # 簇内 softmax(r): 全局 shift (r 范围 ~[0.5,0.95], 无下溢风险), 兼容所有 torch 版本
+            e = torch.exp(r - r.max())
+            denom = torch.zeros(self.num_groups, device=r.device, dtype=r.dtype)
+            denom.scatter_add_(0, self.cluster_assignment, e)
+            q_in = e / denom[self.cluster_assignment]                      # Σ_{i∈g} q = 1
+            w = Q[self.cluster_assignment] * q_in
+            w = w * (self.num_prompts / w.sum())
+            return w, torch.softmax(self.cluster_residual, dim=0)          # KL 约束簇级残差
+
         logits = self.reliability_prior + self.domain_residual
         weights = torch.softmax(logits, dim=0) * self.num_prompts  # 均值=1, 保量级
         # C-1 (方案 C): 去重复计权 —— logits 减 log(c_j), 冗余方向降话语权
@@ -297,6 +344,13 @@ class clip_cbm_orth(nn.Module):
         if self.weight_mode == "none" or self.reliability_prior is None:
             return None
         return torch.softmax(self.reliability_prior, dim=0) * self.num_prompts
+
+    def apply_delta_freeze(self):
+        """E1 干预: 每个 optimizer.step 后将冻结象限的 δ 强制回零 (权重退化为先验)。无掩码时 no-op。"""
+        mask = getattr(self, 'delta_freeze_mask', None)
+        if mask is not None and self.domain_residual is not None:
+            with torch.no_grad():
+                self.domain_residual.data[mask] = 0.0
 
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):

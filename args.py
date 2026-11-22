@@ -30,6 +30,17 @@ def get_args():
                         help='C-1 去冗余 RW-DDO: logits 减 log(c_j), 冗余描述符降话语权')
     parser.add_argument('--redundancy_topk', type=int, default=0,
                         help='C-1: 冗余统计稀疏化 top-k; 0=全矩阵')
+    parser.add_argument('--freeze_delta_file', type=str, default='',
+                        help='E1 干预: 冻结象限掩码文件 (含 "indices" LongTensor); 空=关闭。'
+                             '掩码内描述符的 residual 每个 step 后强制回零, 权重退化为先验')
+    parser.add_argument('--grouped_weights', action="store_true", default=False,
+                        help='E3 方案 B: 近重复簇级分组加权 (簇级先验+残差, 复制不变, '
+                             '全单元素簇时严格退化回 RW-DDO)')
+    parser.add_argument('--cluster_threshold', type=float, default=0.9,
+                        help='E3: 方向 |cos| 聚簇阈值 (仅依据离线相似度分布选择, 不按目标精度调)')
+    parser.add_argument('--inject_file', type=str, default='',
+                        help='E3 扰动实验: 注入描述符列表 json (含 "prompts"); 空=关闭。'
+                             '仅实验驱动层使用, 在数据集构建前 patch target_text_prompts')
     parser.add_argument('--cls_rank', type=int, default=16,
                         help='M2 class-conditional selection: low-rank correction rank r')
     parser.add_argument('--lambda_cls_sparse', type=float, default=0.01,

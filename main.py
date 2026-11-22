@@ -105,6 +105,16 @@ class TrainingSession:
             ).to(self.device)
         else:
             # 改动时间26.4.29-----------------------------------
+            # E1 干预 (2026-11-21): 可选加载 δ 冻结掩码 (可信-困难象限), 默认空=关闭
+            freeze_file = getattr(self.args, "freeze_delta_file", "")
+            freeze_mask = None
+            if freeze_file:
+                _fm = torch.load(freeze_file, map_location="cpu", weights_only=False)
+                if isinstance(_fm, dict):
+                    _fm = _fm["indices"]
+                freeze_mask = _fm.long().clone()
+                logger.info(f"[E1] freeze_delta_file={freeze_file} "
+                            f"-> 冻结 {freeze_mask.numel()} 个描述符的 δ")
             self.model = model_class(
                 args=self.args,
                 class_names=list(self.train_dataset.classname2id.keys()),
@@ -114,6 +124,13 @@ class TrainingSession:
                 weight_mode=getattr(self.args, "weight_mode", "prior_residual"),
                 descriptor_redundancy=getattr(self.train_dataset, "descriptor_redundancy", None),
                 use_redundancy=getattr(self.args, "redundancy", False),
+                freeze_delta_mask=freeze_mask,
+                grouped_weights=getattr(self.args, "grouped_weights", False),
+                descriptor_clusters=(
+                    __import__('reliability').compute_descriptor_clusters(
+                        self.train_dataset.domain_diffs,
+                        threshold=float(getattr(self.args, 'cluster_threshold', 0.9)))
+                    if getattr(self.args, 'grouped_weights', False) else None),
             ).to(self.device)
         # print("Model domain_weights:", getattr(self.model, "domain_weights", None), flush=True)
         # if hasattr(self.model, "domain_weights") and self.model.domain_weights is not None:
@@ -342,6 +359,9 @@ class TrainingSession:
 
             total_loss.backward()
             self.optimizer.step()
+            # E1 干预 (2026-11-21): 冻结象限的 δ 每个 step 后回零 (无掩码时为 no-op)
+            if hasattr(self.model, 'apply_delta_freeze'):
+                self.model.apply_delta_freeze()
 
             batch_size = images.size(0)
             total += batch_size
