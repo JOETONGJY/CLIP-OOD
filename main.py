@@ -259,18 +259,17 @@ class TrainingSession:
             }
             # E3 grouped 模式日志 (2026-11-22 外审修复: 簇级残差/结构不落盘导致
             # "分组结构 vs 簇级残差"无法归因) —— 分组结构与两级权重分开记录
+            # 2026-11-23 修正: grouped_prior_weights 改用 get_grouped_prior_weights()
+            # (Δ_g=0 完整 w^(0), 含簇内份额与校准); 旧实现混入残差且仅展开簇级, 名实不符。
+            # 归因分解: Δw_structure = w^(0) − prior_weights; Δw_learn = final_weights − w^(0)
             if getattr(self.model, 'grouped_weights', False):
-                with torch.no_grad():
-                    logits_g = self.model.cluster_prior + self.model.cluster_residual
-                    Q = torch.softmax(logits_g, dim=0) * self.model.num_groups
-                    grouped_prior_w = Q[self.model.cluster_assignment]          # Δ_g=0 时的初始权重
-                    cp_clean = self.model.cluster_prior.detach().cpu()
+                gpw = self.model.get_grouped_prior_weights()
                 save_dict.update({
                     'grouped': True,
                     'cluster_assignment': self.model.cluster_assignment.detach().cpu(),
-                    'cluster_prior': cp_clean,
+                    'cluster_prior': self.model.cluster_prior.detach().cpu(),
                     'cluster_residual': self.model.cluster_residual.detach().cpu(),
-                    'grouped_prior_weights': grouped_prior_w.detach().cpu(),
+                    'grouped_prior_weights': gpw.detach().cpu(),
                 })
             torch.save(save_dict, f"logs/weights/{run_name}/epoch_{epoch:04d}.pt")
 

@@ -224,7 +224,8 @@ class clip_cbm_orth(nn.Module):
             self.register_buffer('reliability_prior', scores)
             # ===== E3 方案 B (2026-11-21): 簇级分组加权 =====
             # 近重复描述符 (|cos|>θ 同簇) 共享话语权: 簇级先验=簇内 r 均值 (成员数无关,
-            # 注入复制不改变簇权重), 残差升至簇级 (G 维); 全单元素簇时严格退化回 RW-DDO。
+            # 注入复制不改变簇相对话语权; 单元素簇复制下相对份额严格不变),
+            # 残差升至簇级 (G 维); 全单元素簇时严格退化回 RW-DDO。
             self.grouped_weights = bool(grouped_weights) and descriptor_clusters is not None
             if self.grouped_weights:
                 if use_redundancy:
@@ -353,6 +354,25 @@ class clip_cbm_orth(nn.Module):
         if mask is not None and self.domain_residual is not None:
             with torch.no_grad():
                 self.domain_residual.data[mask] = 0.0
+
+    def get_grouped_prior_weights(self):
+        """E3 grouped: 簇级残差 Δ_g=0 时的完整初始权重
+        w^(0)_i = N·softmax_g(R_g)·q_{i|g}·(N/Σw), 与 get_domain_weights 同构但残差置零。
+        (2026-11-23 外审修正: 旧日志字段混入残差且未乘簇内份额, 名实不符;
+         Δw_structure = w^(0) − RW先验权重, Δw_learn = w^(1) − w^(0) 由此可分离)
+        仅 grouped_weights 模式有效, 其余返回 None。"""
+        if not getattr(self, 'grouped_weights', False):
+            return None
+        with torch.no_grad():
+            a = self.cluster_assignment
+            Q0 = torch.softmax(self.cluster_prior, dim=0) * self.num_groups
+            r = self.reliability_prior
+            e = torch.exp(r - r.max())                       # 全局 shift, 与主分支一致
+            den = torch.zeros(self.num_groups, device=r.device, dtype=r.dtype)
+            den.scatter_add_(0, a, e)
+            q_in = e / den[a]
+            w = Q0[a] * q_in
+            return w * (self.num_prompts / w.sum())
 
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):

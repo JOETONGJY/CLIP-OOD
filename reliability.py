@@ -253,12 +253,13 @@ def attach_domain_reliability(
         return
 
     # ---- 缓存: 大类数数据集 (如 DomainNet 345 类) 需 ~3 小时, 必须缓存 ----
-    # 键组成: src prompts + class_names + tgt prompts (2026-11-22 外审修复:
-    # 旧键不含 src 模板, 换源模板会错误命中缓存)。注意: 键不含 CLIP 权重标识,
+    # 键组成: src prompts + class_names(实际顺序) + tgt prompts (2026-11-22/23 外审修复:
+    # 旧键不含 src 模板; sorted(class_names) 与 diffs 的实际类别顺序不一致,
+    # 类别集合相同而排列不同时会错误命中)。注意: 键不含 CLIP 权重标识,
     # 更换 CLIP_type 后需手动清理 cache/reliability (项目实际只用 ViT-L-14.pt)。
     import hashlib, os
     cache_key = hashlib.md5(
-        ("\u0000".join(src_dm_texts) + "\u0000" + "\u0000".join(sorted(class_names))
+        ("\u0000".join(src_dm_texts) + "\u0000" + "\u0000".join(class_names)
          + "\u0000" + "\u0000".join(tgt_dm_texts)
         ).encode("utf-8")
     ).hexdigest()[:16]

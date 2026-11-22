@@ -34,8 +34,8 @@ def get_args():
                         help='E1 干预: 冻结象限掩码文件 (含 "indices" LongTensor); 空=关闭。'
                              '掩码内描述符的 residual 每个 step 后强制回零, 权重退化为先验')
     parser.add_argument('--grouped_weights', action="store_true", default=False,
-                        help='E3 方案 B: 近重复簇级分组加权 (簇级先验+残差, 复制不变, '
-                             '全单元素簇时严格退化回 RW-DDO)')
+                        help='E3 方案 B: 近重复簇级分组加权 (簇级先验+残差, 抑制重复计权:'
+                             '单元素簇复制下相对份额严格不变, 全单元素簇时严格退化回 RW-DDO)')
     parser.add_argument('--cluster_threshold', type=float, default=0.9,
                         help='E3: 方向 |cos| 聚簇阈值 (仅依据离线相似度分布选择, 不按目标精度调)')
     parser.add_argument('--inject_file', type=str, default='',

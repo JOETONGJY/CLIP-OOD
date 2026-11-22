@@ -13,7 +13,13 @@
   "weighted_ddo_contrib_before": 8.612924,
   "weighted_ddo_contrib_after_orig10": 8.701595,
   "max_weight_change": 0.600751,
-  "strict_invariance": false
+  "raw_weight_invariance": false,
+  "max_share_deviation_all": 0.0667501,
+  "max_share_deviation_outside_copied_cluster": 1.49e-08,
+  "share_invariance_outside_copied_cluster": false,
+  "merged_cluster_share_before": 0.1335,
+  "merged_cluster_share_after": 0.1335,
+  "merged_cluster_share_invariance": false
  },
  "B_多元素簇内复制": {
   "copied_cluster_size_before": 2,
@@ -29,6 +35,12 @@
   "weighted_ddo_contrib_before": 8.612924,
   "weighted_ddo_contrib_after_orig10": 9.073248,
   "max_weight_change": 0.15621,
-  "strict_invariance": false
+  "raw_weight_invariance": false,
+  "max_share_deviation_all": 0.01954692,
+  "max_share_deviation_outside_copied_cluster": 0.0001916438,
+  "share_invariance_outside_copied_cluster": false,
+  "merged_cluster_share_before": 0.113569,
+  "merged_cluster_share_after": 0.112379,
+  "merged_cluster_share_invariance": false
  }
 }

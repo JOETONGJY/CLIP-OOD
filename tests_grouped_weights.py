@@ -93,6 +93,19 @@ def main():
         grp_sum1 = float(w1[a1 == a1[idx]].sum())
         contrib1 = ddo_contrib(w1[:len(ell)], ell)   # 原 10 个方向的加权贡献
 
+        # 归一化份额 (相对话语权结构) —— 真正要断言的对象 (2026-11-23 外审: 原测试
+        # 只断言原始权重逐位相等 = false, 缺少 p=w/Σw 的严格断言)
+        p0 = w0 / w0.sum()
+        p1 = w1[:len(w0)] / w1.sum()
+        # 被复制簇的合并份额 (含复制体; 2026-11-23 修正: 旧实现 a1[:N] 漏掉复制体)
+        merged_share0 = float(p0[a0 == a0[idx]].sum())
+        merged_share1 = float(p1_full := (w1 / w1.sum())[a1 == a0[idx]].sum())
+        # 被复制簇之外的方向份额是否逐位严格不变 (单元素簇复制下的正确主张)
+        outside = a0 != a0[idx]
+        outside_share_invariance = bool(torch.equal(p0[outside], p1[outside]))
+        outside_max_dev = float((p1[outside] - p0[outside]).abs().max())
+        share_max_dev = float((p1 - p0).abs().max())
+
         strict = torch.equal(w0, w1[:10])
         results[scene] = {
             "copied_cluster_size_before": int(c0[a0[idx]]),
@@ -105,12 +118,21 @@ def main():
             "weighted_ddo_contrib_before": round(base_contrib, 6),
             "weighted_ddo_contrib_after_orig10": round(contrib1, 6),
             "max_weight_change": round(float((w1[:10] - w0).abs().max()), 6),
-            "strict_invariance": bool(strict),
+            "raw_weight_invariance": bool(strict),
+            "max_share_deviation_all": round(share_max_dev, 8),
+            "max_share_deviation_outside_copied_cluster": round(outside_max_dev, 10),
+            "share_invariance_outside_copied_cluster": outside_share_invariance,
+            "merged_cluster_share_before": round(merged_share0, 6),
+            "merged_cluster_share_after": round(merged_share1, 6),
+            "merged_cluster_share_invariance": bool(abs(merged_share1 - merged_share0) < 1e-9),
         }
         print(f"[{scene}] 复制前簇规模={c0[a0[idx]]} G:{g0}->{g1}")
         print(f"  原 w={base_w:.4f} -> 原 {new_w_orig:.4f} / 复制体 {new_w_clone:.4f}")
         print(f"  簇份额 {grp_sum0:.4f} -> {grp_sum1:.4f}   DDO贡献 {base_contrib:.4f} -> {contrib1:.4f}")
-        print(f"  max|Δw|={results[scene]['max_weight_change']:.6f}   严格不变={strict}")
+        print(f"  max|Δw|={results[scene]['max_weight_change']:.6f}   原始权重不变={strict}")
+        print(f"  被复制簇外份额逐位不变={outside_share_invariance} (max|Δp|={outside_max_dev:.1e})"
+              f"   被复制簇合并份额 {merged_share0:.6f} -> {merged_share1:.6f}"
+              f"   全体 max|Δp|={share_max_dev:.2e}")
 
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=1)
