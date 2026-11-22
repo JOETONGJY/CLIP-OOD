@@ -1,0 +1,464 @@
+{
+ "CUB": {
+  "n_groups": 192,
+  "multi_clusters": 11,
+  "largest_cluster": 3,
+  "min_pairwise_cos_all_multi": 0.9025,
+  "mean_pairwise_cos_multi": 0.9459,
+  "clusters": [
+   {
+    "members": [
+     2,
+     179
+    ],
+    "texts": [
+     "an infographic of a [类]",
+     "an environmental infographic of a [类]"
+    ],
+    "min_pairwise_cos": 0.9261
+   },
+   {
+    "members": [
+     7,
+     148
+    ],
+    "texts": [
+     "a watercolor of a [类]",
+     "a watercolor wash of a [类]"
+    ],
+    "min_pairwise_cos": 0.9521
+   },
+   {
+    "members": [
+     9,
+     48,
+     181
+    ],
+    "texts": [
+     "a blueprint of a [类]",
+     "a blueprint diagram of a [类]",
+     "a blueprint schematic of a [类]"
+    ],
+    "min_pairwise_cos": 0.9389
+   },
+   {
+    "members": [
+     10,
+     146
+    ],
+    "texts": [
+     "a silhouette of a [类]",
+     "a silhouette photo of a [类]"
+    ],
+    "min_pairwise_cos": 0.962
+   },
+   {
+    "members": [
+     25,
+     39
+    ],
+    "texts": [
+     "a collage of a [类]",
+     "a photo collage of a [类]"
+    ],
+    "min_pairwise_cos": 0.9629
+   },
+   {
+    "members": [
+     41,
+     102
+    ],
+    "texts": [
+     "a stained glass of a [类]",
+     "a stained glass panel of a [类]"
+    ],
+    "min_pairwise_cos": 0.9498
+   },
+   {
+    "members": [
+     51,
+     68
+    ],
+    "texts": [
+     "a pastel drawing of a [类]",
+     "a pastel artwork of a [类]"
+    ],
+    "min_pairwise_cos": 0.9652
+   },
+   {
+    "members": [
+     58,
+     152
+    ],
+    "texts": [
+     "a holographic image of a [类]",
+     "a 3D hologram of a [类]"
+    ],
+    "min_pairwise_cos": 0.9025
+   },
+   {
+    "members": [
+     88,
+     123
+    ],
+    "texts": [
+     "a kinetic sculpture of a [类]",
+     "a kinetic art piece of a [类]"
+    ],
+    "min_pairwise_cos": 0.9075
+   },
+   {
+    "members": [
+     105,
+     173
+    ],
+    "texts": [
+     "a postage stamp of a [类]",
+     "a postage stamp illustration of a [类]"
+    ],
+    "min_pairwise_cos": 0.9134
+   },
+   {
+    "members": [
+     144,
+     186
+    ],
+    "texts": [
+     "a linocut of a [类]",
+     "a linocut print of a [类]"
+    ],
+    "min_pairwise_cos": 0.9868
+   }
+  ]
+ },
+ "AWA2": {
+  "n_groups": 195,
+  "multi_clusters": 8,
+  "largest_cluster": 3,
+  "min_pairwise_cos_all_multi": 0.913,
+  "mean_pairwise_cos_multi": 0.9429,
+  "clusters": [
+   {
+    "members": [
+     7,
+     148
+    ],
+    "texts": [
+     "a watercolor of a [类]",
+     "a watercolor wash of a [类]"
+    ],
+    "min_pairwise_cos": 0.9365
+   },
+   {
+    "members": [
+     9,
+     48,
+     181
+    ],
+    "texts": [
+     "a blueprint of a [类]",
+     "a blueprint diagram of a [类]",
+     "a blueprint schematic of a [类]"
+    ],
+    "min_pairwise_cos": 0.913
+   },
+   {
+    "members": [
+     10,
+     146
+    ],
+    "texts": [
+     "a silhouette of a [类]",
+     "a silhouette photo of a [类]"
+    ],
+    "min_pairwise_cos": 0.9249
+   },
+   {
+    "members": [
+     25,
+     39
+    ],
+    "texts": [
+     "a collage of a [类]",
+     "a photo collage of a [类]"
+    ],
+    "min_pairwise_cos": 0.9482
+   },
+   {
+    "members": [
+     41,
+     102
+    ],
+    "texts": [
+     "a stained glass of a [类]",
+     "a stained glass panel of a [类]"
+    ],
+    "min_pairwise_cos": 0.9443
+   },
+   {
+    "members": [
+     51,
+     68
+    ],
+    "texts": [
+     "a pastel drawing of a [类]",
+     "a pastel artwork of a [类]"
+    ],
+    "min_pairwise_cos": 0.9635
+   },
+   {
+    "members": [
+     88,
+     123
+    ],
+    "texts": [
+     "a kinetic sculpture of a [类]",
+     "a kinetic art piece of a [类]"
+    ],
+    "min_pairwise_cos": 0.9182
+   },
+   {
+    "members": [
+     144,
+     186
+    ],
+    "texts": [
+     "a linocut of a [类]",
+     "a linocut print of a [类]"
+    ],
+    "min_pairwise_cos": 0.9816
+   }
+  ]
+ },
+ "LADV": {
+  "n_groups": 193,
+  "multi_clusters": 10,
+  "largest_cluster": 3,
+  "min_pairwise_cos_all_multi": 0.9017,
+  "mean_pairwise_cos_multi": 0.9384,
+  "clusters": [
+   {
+    "members": [
+     7,
+     148
+    ],
+    "texts": [
+     "a watercolor of a [类]",
+     "a watercolor wash of a [类]"
+    ],
+    "min_pairwise_cos": 0.9474
+   },
+   {
+    "members": [
+     9,
+     48,
+     181
+    ],
+    "texts": [
+     "a blueprint of a [类]",
+     "a blueprint diagram of a [类]",
+     "a blueprint schematic of a [类]"
+    ],
+    "min_pairwise_cos": 0.915
+   },
+   {
+    "members": [
+     10,
+     146
+    ],
+    "texts": [
+     "a silhouette of a [类]",
+     "a silhouette photo of a [类]"
+    ],
+    "min_pairwise_cos": 0.9098
+   },
+   {
+    "members": [
+     25,
+     39
+    ],
+    "texts": [
+     "a collage of a [类]",
+     "a photo collage of a [类]"
+    ],
+    "min_pairwise_cos": 0.9517
+   },
+   {
+    "members": [
+     41,
+     102
+    ],
+    "texts": [
+     "a stained glass of a [类]",
+     "a stained glass panel of a [类]"
+    ],
+    "min_pairwise_cos": 0.9504
+   },
+   {
+    "members": [
+     51,
+     68
+    ],
+    "texts": [
+     "a pastel drawing of a [类]",
+     "a pastel artwork of a [类]"
+    ],
+    "min_pairwise_cos": 0.9659
+   },
+   {
+    "members": [
+     88,
+     123
+    ],
+    "texts": [
+     "a kinetic sculpture of a [类]",
+     "a kinetic art piece of a [类]"
+    ],
+    "min_pairwise_cos": 0.9255
+   },
+   {
+    "members": [
+     93,
+     195
+    ],
+    "texts": [
+     "a flower arrangement resembling a [类]",
+     "a floral arrangement shaped like a [类]"
+    ],
+    "min_pairwise_cos": 0.9043
+   },
+   {
+    "members": [
+     139,
+     166
+    ],
+    "texts": [
+     "a topographic map with a [类]",
+     "a topographic elevation map of a [类]"
+    ],
+    "min_pairwise_cos": 0.9017
+   },
+   {
+    "members": [
+     144,
+     186
+    ],
+    "texts": [
+     "a linocut of a [类]",
+     "a linocut print of a [类]"
+    ],
+    "min_pairwise_cos": 0.981
+   }
+  ]
+ },
+ "PACS": {
+  "n_groups": 194,
+  "multi_clusters": 9,
+  "largest_cluster": 3,
+  "min_pairwise_cos_all_multi": 0.9032,
+  "mean_pairwise_cos_multi": 0.9376,
+  "clusters": [
+   {
+    "members": [
+     7,
+     148
+    ],
+    "texts": [
+     "a watercolor of a [类]",
+     "a watercolor wash of a [类]"
+    ],
+    "min_pairwise_cos": 0.9392
+   },
+   {
+    "members": [
+     9,
+     48,
+     181
+    ],
+    "texts": [
+     "a blueprint of a [类]",
+     "a blueprint diagram of a [类]",
+     "a blueprint schematic of a [类]"
+    ],
+    "min_pairwise_cos": 0.9032
+   },
+   {
+    "members": [
+     10,
+     146
+    ],
+    "texts": [
+     "a silhouette of a [类]",
+     "a silhouette photo of a [类]"
+    ],
+    "min_pairwise_cos": 0.9184
+   },
+   {
+    "members": [
+     25,
+     39
+    ],
+    "texts": [
+     "a collage of a [类]",
+     "a photo collage of a [类]"
+    ],
+    "min_pairwise_cos": 0.9455
+   },
+   {
+    "members": [
+     41,
+     102
+    ],
+    "texts": [
+     "a stained glass of a [类]",
+     "a stained glass panel of a [类]"
+    ],
+    "min_pairwise_cos": 0.9467
+   },
+   {
+    "members": [
+     51,
+     68
+    ],
+    "texts": [
+     "a pastel drawing of a [类]",
+     "a pastel artwork of a [类]"
+    ],
+    "min_pairwise_cos": 0.9593
+   },
+   {
+    "members": [
+     88,
+     123
+    ],
+    "texts": [
+     "a kinetic sculpture of a [类]",
+     "a kinetic art piece of a [类]"
+    ],
+    "min_pairwise_cos": 0.9263
+   },
+   {
+    "members": [
+     139,
+     166
+    ],
+    "texts": [
+     "a topographic map with a [类]",
+     "a topographic elevation map of a [类]"
+    ],
+    "min_pairwise_cos": 0.9058
+   },
+   {
+    "members": [
+     144,
+     186
+    ],
+    "texts": [
+     "a linocut of a [类]",
+     "a linocut print of a [类]"
+    ],
+    "min_pairwise_cos": 0.9769
+   }
+  ]
+ }
+}

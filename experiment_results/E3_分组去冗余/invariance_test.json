@@ -1,0 +1,34 @@
+{
+ "A_单元素簇复制": {
+  "copied_cluster_size_before": 1,
+  "clusters_G": [
+   8,
+   8
+  ],
+  "w_copied_before": 1.335002,
+  "w_orig_after": 0.734251,
+  "w_clone_after": 0.734251,
+  "cluster_weight_share_before": 1.335002,
+  "cluster_weight_share_after": 1.468503,
+  "weighted_ddo_contrib_before": 8.612924,
+  "weighted_ddo_contrib_after_orig10": 8.701595,
+  "max_weight_change": 0.600751,
+  "strict_invariance": false
+ },
+ "B_多元素簇内复制": {
+  "copied_cluster_size_before": 2,
+  "clusters_G": [
+   8,
+   8
+  ],
+  "w_copied_before": 0.547626,
+  "w_orig_after": 0.402158,
+  "w_clone_after": 0.402158,
+  "cluster_weight_share_before": 1.135689,
+  "cluster_weight_share_after": 1.236169,
+  "weighted_ddo_contrib_before": 8.612924,
+  "weighted_ddo_contrib_after_orig10": 9.073248,
+  "max_weight_change": 0.15621,
+  "strict_invariance": false
+ }
+}

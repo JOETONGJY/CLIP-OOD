@@ -70,6 +70,21 @@ class TrainingSession:
         logger.info(f"Source test samples: {len(self.source_test_dataset):,}")
         logger.info(f"Target test samples: {len(self.target_test_dataset):,}")
 
+        self._apply_redundancy_args()
+
+    def _apply_redundancy_args(self):
+        """C-1 冗余参数接线 (2026-11-22 外审修复): 旧版 --redundancy_topk 从未传到
+        数据集 (attach 时的 getattr(dataset,'redundancy_topk',0) 恒为 0)。此处按 args
+        重算挂载, 使 topk 真正生效; main_cached 复用同一方法。"""
+        if getattr(self.args, "redundancy", False):
+            topk = int(getattr(self.args, "redundancy_topk", 0))
+            if topk > 0 and getattr(self.train_dataset, "domain_diffs", None) is not None:
+                from reliability import compute_descriptor_redundancy
+                self.train_dataset.redundancy_topk = topk
+                self.train_dataset.descriptor_redundancy = compute_descriptor_redundancy(
+                    self.train_dataset.domain_diffs, topk=topk)
+                logger.info(f"[C-1] redundancy_topk={topk} 已生效 (数据集侧冗余度重算)")
+
     def _init_model(self):
         """clip_cbm, cliplp, clip_cbm_subspace"""
         model_factory = {
@@ -242,6 +257,21 @@ class TrainingSession:
                 'final_weights': final_w.detach().cpu(),
                 'weight_entropy': entropy,
             }
+            # E3 grouped 模式日志 (2026-11-22 外审修复: 簇级残差/结构不落盘导致
+            # "分组结构 vs 簇级残差"无法归因) —— 分组结构与两级权重分开记录
+            if getattr(self.model, 'grouped_weights', False):
+                with torch.no_grad():
+                    logits_g = self.model.cluster_prior + self.model.cluster_residual
+                    Q = torch.softmax(logits_g, dim=0) * self.model.num_groups
+                    grouped_prior_w = Q[self.model.cluster_assignment]          # Δ_g=0 时的初始权重
+                    cp_clean = self.model.cluster_prior.detach().cpu()
+                save_dict.update({
+                    'grouped': True,
+                    'cluster_assignment': self.model.cluster_assignment.detach().cpu(),
+                    'cluster_prior': cp_clean,
+                    'cluster_residual': self.model.cluster_residual.detach().cpu(),
+                    'grouped_prior_weights': grouped_prior_w.detach().cpu(),
+                })
             torch.save(save_dict, f"logs/weights/{run_name}/epoch_{epoch:04d}.pt")
 
             # Δw 摘要 (final - prior), 只在日志里打 Top 修正

@@ -56,6 +56,9 @@ class CachedTrainingSession(TrainingSession):
                 ds.clip_model = None
         torch.cuda.empty_cache()
 
+        # C-1 冗余参数接线 (与 main.py 同一逻辑, 2026-11-22 修复 topk 断链)
+        self._apply_redundancy_args()
+
         # 缓存特征 loader
         name = self.args.dataset
         self.train_loader = DataLoader(

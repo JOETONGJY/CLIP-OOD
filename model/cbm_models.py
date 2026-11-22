@@ -230,7 +230,9 @@ class clip_cbm_orth(nn.Module):
                 if use_redundancy:
                     raise ValueError("grouped_weights 与 C-1 redundancy 互斥 (机制上相互替代)")
                 assignment, n_groups = descriptor_clusters
-                self.cluster_assignment = assignment.long().to(self.device)
+                # 注册为 buffer: 簇成员映射随 state_dict 保存/恢复 (外审 2026-11-22 建议)
+                self.register_buffer('cluster_assignment',
+                                     assignment.long().to(self.device).clone())
                 self.num_groups = int(n_groups)
                 counts = torch.bincount(self.cluster_assignment, minlength=self.num_groups)
                 cluster_prior = torch.zeros(self.num_groups, device=self.device)
