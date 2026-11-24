@@ -1,0 +1,172 @@
+{
+ "dataset": "CUB",
+ "beta": 0.5,
+ "templates_stats": {
+  "a photo of a {}.": {
+   "stats": {
+    "var_R": 0.5485467910766602,
+    "var_I": 0.14007346332073212,
+    "interaction_ratio": 0.2554,
+    "iid_noise_ratio_reference": 0.9901,
+    "tukey_1df_slope": -0.287244,
+    "tukey_1df_t": -27.03,
+    "tukey_1df_p": 0.0
+   },
+   "align_mean": 0.9169120788574219,
+   "sem_mean": -0.08140362054109573
+  },
+  "a photograph of a {}.": {
+   "stats": {
+    "var_R": 0.5289141535758972,
+    "var_I": 0.13746477663516998,
+    "interaction_ratio": 0.2599,
+    "iid_noise_ratio_reference": 0.9901,
+    "tukey_1df_slope": -0.236251,
+    "tukey_1df_t": -22.04,
+    "tukey_1df_p": 0.0
+   },
+   "align_mean": 0.9204807281494141,
+   "sem_mean": -0.08174881339073181
+  },
+  "an image of a {}.": {
+   "stats": {
+    "var_R": 0.527059018611908,
+    "var_I": 0.14310793578624725,
+    "interaction_ratio": 0.2715,
+    "iid_noise_ratio_reference": 0.9901,
+    "tukey_1df_slope": -0.302266,
+    "tukey_1df_t": -27.97,
+    "tukey_1df_p": 0.0
+   },
+   "align_mean": 0.9160621762275696,
+   "sem_mean": -0.07985299080610275
+  }
+ },
+ "template_stability": {
+  "a photo of a {}.|a photograph of a {}.": {
+   "spearman": 0.9548,
+   "topk_overlap": 0.4
+  },
+  "a photo of a {}.|an image of a {}.": {
+   "spearman": 0.9509,
+   "topk_overlap": 0.6
+  },
+  "a photograph of a {}.|an image of a {}.": {
+   "spearman": 0.9527,
+   "topk_overlap": 0.533
+  }
+ },
+ "corr_r_row_effect": 0.4857,
+ "top_interactions": [
+  {
+   "i": 83,
+   "c": 5,
+   "I": -5.605,
+   "desc": "a visual novel character of a {}.",
+   "class": "least auklet"
+  },
+  {
+   "i": 83,
+   "c": 149,
+   "I": -5.337,
+   "desc": "a visual novel character of a {}.",
+   "class": "sage thrasher"
+  },
+  {
+   "i": 54,
+   "c": 85,
+   "I": -4.132,
+   "desc": "an editorial cartoon of a {}.",
+   "class": "pacific loon"
+  },
+  {
+   "i": 35,
+   "c": 149,
+   "I": -3.917,
+   "desc": "a futuristic concept art of a {}.",
+   "class": "sage thrasher"
+  },
+  {
+   "i": 31,
+   "c": 145,
+   "I": -3.915,
+   "desc": "a retro style of a {}.",
+   "class": "forsters tern"
+  },
+  {
+   "i": 83,
+   "c": 152,
+   "I": -3.662,
+   "desc": "a visual novel character of a {}.",
+   "class": "philadelphia vireo"
+  },
+  {
+   "i": 96,
+   "c": 14,
+   "I": -3.458,
+   "desc": "a 16-bit video game character of a {}.",
+   "class": "lazuli bunting"
+  },
+  {
+   "i": 71,
+   "c": 3,
+   "I": -3.435,
+   "desc": "a medieval manuscript of a {}.",
+   "class": "groove billed ani"
+  },
+  {
+   "i": 42,
+   "c": 75,
+   "I": -3.423,
+   "desc": "an anime style of a {}.",
+   "class": "dark eyed junco"
+  },
+  {
+   "i": 96,
+   "c": 149,
+   "I": -3.413,
+   "desc": "a 16-bit video game character of a {}.",
+   "class": "sage thrasher"
+  },
+  {
+   "i": 104,
+   "c": 97,
+   "I": -3.34,
+   "desc": "a Gothic architecture detail of a {}.",
+   "class": "scott oriole"
+  },
+  {
+   "i": 202,
+   "c": 7,
+   "I": -3.313,
+   "desc": "a medieval tapestry with a {}.",
+   "class": "rhinoceros auklet"
+  },
+  {
+   "i": 83,
+   "c": 75,
+   "I": -3.294,
+   "desc": "a visual novel character of a {}.",
+   "class": "dark eyed junco"
+  },
+  {
+   "i": 179,
+   "c": 104,
+   "I": -3.178,
+   "desc": "an environmental infographic of a {}.",
+   "class": "whip poor will"
+  },
+  {
+   "i": 59,
+   "c": 97,
+   "I": -3.14,
+   "desc": "a VR model of a {}.",
+   "class": "scott oriole"
+  }
+ ],
+ "verdict": {
+  "interaction_significant": true,
+  "template_stable": true,
+  "pass": true
+ }
+}
