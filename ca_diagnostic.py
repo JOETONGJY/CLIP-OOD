@@ -110,10 +110,10 @@ def main():
     t_cache = os.path.join("cache", "gate_a_T_cub.pt")
     if os.path.exists(t_cache):
         T = torch.load(t_cache, map_location=device, weights_only=False)
-        print(f"[G-A] 复用缓存 T 矩阵: {t_cache}")
+        print(f"[CA-Diag] 复用缓存 T 矩阵: {t_cache}")
     else:
         texts_t = [tp.format(cn) for tp in target_text_prompts for cn in class_names]
-        print(f"[G-A] 编码 {n_t}×{C}={len(texts_t)} 条目标文本 (~2-4 分钟)...")
+        print(f"[CA-Diag] 编码 {n_t}×{C}={len(texts_t)} 条目标文本 (~2-4 分钟)...")
         T = encode_texts(model, texts_t, device).reshape(n_t, C, -1)   # (204, C, D) 已归一化
         os.makedirs("cache", exist_ok=True)
         torch.save(T, t_cache)
@@ -155,7 +155,7 @@ def main():
         Is[tpl] = I
         templates_stats[tpl] = {"stats": stats,
                                 "align_mean": float(align.mean()), "sem_mean": float(m.mean())}
-        print(f"[G-A] 模板 '{tpl}': var(R)={stats['var_R']:.4f} var(I)={stats['var_I']:.4f} "
+        print(f"[CA-Diag] 模板 '{tpl}': var(R)={stats['var_R']:.4f} var(I)={stats['var_I']:.4f} "
               f"交互占比={stats['interaction_ratio']} (iid噪声参照 {stats['iid_noise_ratio_reference']}) "
               f"Tukey1df p={stats['tukey_1df_p']:.2e}")
 
@@ -170,7 +170,7 @@ def main():
             kb = set(np.argsort(-Is[tb].flatten())[:TOP_K].tolist())
             stab[f"{ta}|{tb}"] = {"spearman": round(rho, 4),
                                   "topk_overlap": round(len(ka & kb) / TOP_K, 3)}
-            print(f"[G-A] 模板稳定性 {ta} vs {tb}: Spearman={rho:.4f} Top{TOP_K}重合={len(ka & kb)}/{TOP_K}")
+            print(f"[CA-Diag] 模板稳定性 {ta} vs {tb}: Spearman={rho:.4f} Top{TOP_K}重合={len(ka & kb)}/{TOP_K}")
 
     # 交互项 Top-K 语义示例 (photo 模板)
     I_main = Is[TEMPLATES[0]]
@@ -201,10 +201,10 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(os.path.join(OUT_DIR, "gate_a_cub.json"), "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=1)
-    print(f"[G-A] 判定: 交互显著={result['verdict']['interaction_significant']} "
+    print(f"[CA-Diag] 判定: 交互显著={result['verdict']['interaction_significant']} "
           f"模板稳定={result['verdict']['template_stable']} → "
           f"{'通过' if result['verdict']['pass'] else '不通过'}")
-    print(f"[G-A] corr(r_i, 行效应)={corr_r_row:.4f} (低=交互项是 r 之外的新信息)")
+    print(f"[CA-Diag] corr(r_i, 行效应)={corr_r_row:.4f} (低=交互项是 r 之外的新信息)")
     print(f"[saved] {os.path.join(OUT_DIR, 'gate_a_cub.json')}")
 
 
