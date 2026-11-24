@@ -1,0 +1,745 @@
+{
+ "dataset": "AWA2",
+ "beta": 0.5,
+ "templates_stats": {
+  "a photo of a {}.": {
+   "stats": {
+    "var_R": 0.40517285466194153,
+    "var_I": 0.16311223804950714,
+    "interaction_ratio": 0.4026,
+    "iid_noise_ratio_reference": 0.9751,
+    "tukey_1df_slope": -0.074465,
+    "tukey_1df_t": -2.02,
+    "tukey_1df_p": 0.04300800820701145
+   },
+   "align_mean": 0.9345918297767639,
+   "sem_mean": -0.053401753306388855
+  },
+  "a photograph of a {}.": {
+   "stats": {
+    "var_R": 0.3939255475997925,
+    "var_I": 0.1639677882194519,
+    "interaction_ratio": 0.4162,
+    "iid_noise_ratio_reference": 0.9751,
+    "tukey_1df_slope": 0.011605,
+    "tukey_1df_t": 0.3,
+    "tukey_1df_p": 0.7634581621393681
+   },
+   "align_mean": 0.9362327456474304,
+   "sem_mean": -0.05294887349009514
+  },
+  "an image of a {}.": {
+   "stats": {
+    "var_R": 0.39623790979385376,
+    "var_I": 0.1632930189371109,
+    "interaction_ratio": 0.4121,
+    "iid_noise_ratio_reference": 0.9751,
+    "tukey_1df_slope": -0.181477,
+    "tukey_1df_t": -4.94,
+    "tukey_1df_p": 7.84908935624884e-07
+   },
+   "align_mean": 0.9375105500221252,
+   "sem_mean": -0.052119918167591095
+  }
+ },
+ "template_stability": {
+  "a photo of a {}.|a photograph of a {}.": {
+   "spearman": 0.9398,
+   "topk_overlap": 0.733
+  },
+  "a photo of a {}.|an image of a {}.": {
+   "spearman": 0.9153,
+   "topk_overlap": 0.533
+  },
+  "a photograph of a {}.|an image of a {}.": {
+   "spearman": 0.9412,
+   "topk_overlap": 0.6
+  }
+ },
+ "corr_r_row_effect": 0.2414,
+ "top_interactions": [
+  {
+   "i": 31,
+   "c": 39,
+   "I": -4.851,
+   "desc": "a retro style of a {}.",
+   "class": "seal",
+   "I_per_template": [
+    -4.851,
+    -3.454,
+    -3.412
+   ]
+  },
+  {
+   "i": 74,
+   "c": 39,
+   "I": -2.955,
+   "desc": "an Art Deco version of a {}.",
+   "class": "seal",
+   "I_per_template": [
+    -2.955,
+    -1.693,
+    -1.461
+   ]
+  },
+  {
+   "i": 42,
+   "c": 39,
+   "I": -2.866,
+   "desc": "an anime style of a {}.",
+   "class": "seal",
+   "I_per_template": [
+    -2.866,
+    -1.408,
+    -1.148
+   ]
+  },
+  {
+   "i": 95,
+   "c": 41,
+   "I": -2.748,
+   "desc": "an Egyptian hieroglyph of a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    -2.748,
+    -2.874,
+    -2.642
+   ]
+  },
+  {
+   "i": 177,
+   "c": 10,
+   "I": -2.602,
+   "desc": "an ancient rune of a {}.",
+   "class": "dalmatian",
+   "I_per_template": [
+    -2.602,
+    -3.158,
+    -2.942
+   ]
+  },
+  {
+   "i": 117,
+   "c": 41,
+   "I": -2.541,
+   "desc": "a Moai statue resembling a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    -2.541,
+    -2.907,
+    -2.524
+   ]
+  },
+  {
+   "i": 156,
+   "c": 41,
+   "I": -2.427,
+   "desc": "a constellation resembling a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    -2.427,
+    -2.647,
+    -2.323
+   ]
+  },
+  {
+   "i": 146,
+   "c": 24,
+   "I": 2.33,
+   "desc": "a silhouette photo of a {}.",
+   "class": "killer+whale",
+   "I_per_template": [
+    2.33,
+    2.357,
+    1.493
+   ]
+  },
+  {
+   "i": 42,
+   "c": 42,
+   "I": -2.265,
+   "desc": "an anime style of a {}.",
+   "class": "skunk",
+   "I_per_template": [
+    -2.265,
+    -2.358,
+    -2.409
+   ]
+  },
+  {
+   "i": 177,
+   "c": 41,
+   "I": -2.195,
+   "desc": "an ancient rune of a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    -2.195,
+    -2.106,
+    -2.154
+   ]
+  },
+  {
+   "i": 131,
+   "c": 41,
+   "I": -2.185,
+   "desc": "an astrological chart with a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    -2.185,
+    -2.386,
+    -2.023
+   ]
+  },
+  {
+   "i": 154,
+   "c": 41,
+   "I": 2.174,
+   "desc": "a paper cutout of a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    2.174,
+    2.425,
+    2.146
+   ]
+  },
+  {
+   "i": 25,
+   "c": 41,
+   "I": 2.171,
+   "desc": "a collage of a {}.",
+   "class": "siamese+cat",
+   "I_per_template": [
+    2.171,
+    2.083,
+    1.5
+   ]
+  },
+  {
+   "i": 40,
+   "c": 38,
+   "I": -2.133,
+   "desc": "a CGI render of a {}.",
+   "class": "rhinoceros",
+   "I_per_template": [
+    -2.133,
+    -2.175,
+    -1.91
+   ]
+  },
+  {
+   "i": 71,
+   "c": 39,
+   "I": -2.133,
+   "desc": "a medieval manuscript of a {}.",
+   "class": "seal",
+   "I_per_template": [
+    -2.133,
+    -1.036,
+    -0.86
+   ]
+  }
+ ],
+ "enhanced_stats": {
+  "descriptor_main_effect_top": [
+   {
+    "name": "an advertising posters of a {}.",
+    "value": 0.4915
+   },
+   {
+    "name": "a tattoo flash of a {}.",
+    "value": 0.4689
+   },
+   {
+    "name": "a sand sculpture of a {}.",
+    "value": 0.4684
+   },
+   {
+    "name": "a children’s book illustration of a {}.",
+    "value": 0.4582
+   },
+   {
+    "name": "a wire sculpture of a {}.",
+    "value": 0.4395
+   },
+   {
+    "name": "a woodcut of a {}.",
+    "value": 0.4164
+   },
+   {
+    "name": "a pencil drawing of a {}.",
+    "value": 0.4039
+   },
+   {
+    "name": "a low-poly model of a {}.",
+    "value": 0.3988
+   },
+   {
+    "name": "a VR model of a {}.",
+    "value": 0.3831
+   },
+   {
+    "name": "a wireframe model of a {}.",
+    "value": 0.3793
+   }
+  ],
+  "descriptor_main_effect_bottom": [
+   {
+    "name": "a Rube Goldberg machine featuring a {}.",
+    "value": -0.8806
+   },
+   {
+    "name": "an album cover with a {}.",
+    "value": -0.7754
+   },
+   {
+    "name": "a retrowave poster of a {}.",
+    "value": -0.7715
+   },
+   {
+    "name": "an editorial cartoon of a {}.",
+    "value": -0.7702
+   },
+   {
+    "name": "a silhouette photo of a {}.",
+    "value": -0.5922
+   },
+   {
+    "name": "a video game avatar of a {}.",
+    "value": -0.5026
+   },
+   {
+    "name": "a sci-fi style of a {}.",
+    "value": -0.4989
+   },
+   {
+    "name": "a cookie cutter shape of a {}.",
+    "value": -0.4634
+   },
+   {
+    "name": "an Egyptian hieroglyph of a {}.",
+    "value": -0.446
+   },
+   {
+    "name": "a domino tile of a {}.",
+    "value": -0.4399
+   }
+  ],
+  "class_main_effect_top": [
+   {
+    "name": "cow",
+    "value": 0.593
+   },
+   {
+    "name": "elephant",
+    "value": 0.5921
+   },
+   {
+    "name": "pig",
+    "value": 0.5834
+   },
+   {
+    "name": "sheep",
+    "value": 0.57
+   },
+   {
+    "name": "deer",
+    "value": 0.5038
+   },
+   {
+    "name": "buffalo",
+    "value": 0.4856
+   },
+   {
+    "name": "rabbit",
+    "value": 0.4555
+   },
+   {
+    "name": "horse",
+    "value": 0.4238
+   },
+   {
+    "name": "tiger",
+    "value": 0.3945
+   },
+   {
+    "name": "spider+monkey",
+    "value": 0.3901
+   }
+  ],
+  "class_main_effect_bottom": [
+   {
+    "name": "persian+cat",
+    "value": -1.3136
+   },
+   {
+    "name": "seal",
+    "value": -0.8032
+   },
+   {
+    "name": "siamese+cat",
+    "value": -0.7375
+   },
+   {
+    "name": "german+shepherd",
+    "value": -0.737
+   },
+   {
+    "name": "grizzly+bear",
+    "value": -0.6182
+   },
+   {
+    "name": "humpback+whale",
+    "value": -0.5187
+   },
+   {
+    "name": "collie",
+    "value": -0.5053
+   },
+   {
+    "name": "dalmatian",
+    "value": -0.4464
+   },
+   {
+    "name": "bobcat",
+    "value": -0.4416
+   },
+   {
+    "name": "weasel",
+    "value": -0.429
+   }
+  ],
+  "descriptor_interaction_variance_top": [
+   {
+    "name": "a retro style of a {}.",
+    "value": 0.7138
+   },
+   {
+    "name": "a gouache painting of a {}.",
+    "value": 0.484
+   },
+   {
+    "name": "an anime style of a {}.",
+    "value": 0.461
+   },
+   {
+    "name": "an Egyptian hieroglyph of a {}.",
+    "value": 0.4564
+   },
+   {
+    "name": "a visual novel character of a {}.",
+    "value": 0.4425
+   },
+   {
+    "name": "an ancient rune of a {}.",
+    "value": 0.4257
+   },
+   {
+    "name": "a silhouette photo of a {}.",
+    "value": 0.4131
+   },
+   {
+    "name": "a sepia photo of a {}.",
+    "value": 0.3865
+   },
+   {
+    "name": "a pastel artwork of a {}.",
+    "value": 0.3674
+   },
+   {
+    "name": "a constellation resembling a {}.",
+    "value": 0.351
+   }
+  ],
+  "class_interaction_variance_top": [
+   {
+    "name": "siamese+cat",
+    "value": 0.7107
+   },
+   {
+    "name": "seal",
+    "value": 0.5779
+   },
+   {
+    "name": "persian+cat",
+    "value": 0.3631
+   },
+   {
+    "name": "weasel",
+    "value": 0.351
+   },
+   {
+    "name": "chihuahua",
+    "value": 0.3224
+   },
+   {
+    "name": "killer+whale",
+    "value": 0.3154
+   },
+   {
+    "name": "dalmatian",
+    "value": 0.2905
+   },
+   {
+    "name": "humpback+whale",
+    "value": 0.2883
+   },
+   {
+    "name": "german+shepherd",
+    "value": 0.264
+   },
+   {
+    "name": "collie",
+    "value": 0.2304
+   }
+  ],
+  "top10_positive": [
+   {
+    "i": 146,
+    "c": 24,
+    "I": 2.33,
+    "desc": "a silhouette photo of a {}.",
+    "class": "killer+whale",
+    "I_per_template": [
+     2.33,
+     2.357,
+     1.493
+    ]
+   },
+   {
+    "i": 154,
+    "c": 41,
+    "I": 2.174,
+    "desc": "a paper cutout of a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     2.174,
+     2.425,
+     2.146
+    ]
+   },
+   {
+    "i": 25,
+    "c": 41,
+    "I": 2.171,
+    "desc": "a collage of a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     2.171,
+     2.083,
+     1.5
+    ]
+   },
+   {
+    "i": 40,
+    "c": 38,
+    "I": -2.133,
+    "desc": "a CGI render of a {}.",
+    "class": "rhinoceros",
+    "I_per_template": [
+     -2.133,
+     -2.175,
+     -1.91
+    ]
+   },
+   {
+    "i": 71,
+    "c": 39,
+    "I": -2.133,
+    "desc": "a medieval manuscript of a {}.",
+    "class": "seal",
+    "I_per_template": [
+     -2.133,
+     -1.036,
+     -0.86
+    ]
+   },
+   {
+    "i": 131,
+    "c": 41,
+    "I": -2.185,
+    "desc": "an astrological chart with a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.185,
+     -2.386,
+     -2.023
+    ]
+   },
+   {
+    "i": 177,
+    "c": 41,
+    "I": -2.195,
+    "desc": "an ancient rune of a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.195,
+     -2.106,
+     -2.154
+    ]
+   },
+   {
+    "i": 42,
+    "c": 42,
+    "I": -2.265,
+    "desc": "an anime style of a {}.",
+    "class": "skunk",
+    "I_per_template": [
+     -2.265,
+     -2.358,
+     -2.409
+    ]
+   },
+   {
+    "i": 156,
+    "c": 41,
+    "I": -2.427,
+    "desc": "a constellation resembling a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.427,
+     -2.647,
+     -2.323
+    ]
+   },
+   {
+    "i": 117,
+    "c": 41,
+    "I": -2.541,
+    "desc": "a Moai statue resembling a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.541,
+     -2.907,
+     -2.524
+    ]
+   }
+  ],
+  "top10_negative": [
+   {
+    "i": 31,
+    "c": 39,
+    "I": -4.851,
+    "desc": "a retro style of a {}.",
+    "class": "seal",
+    "I_per_template": [
+     -4.851,
+     -3.454,
+     -3.412
+    ]
+   },
+   {
+    "i": 74,
+    "c": 39,
+    "I": -2.955,
+    "desc": "an Art Deco version of a {}.",
+    "class": "seal",
+    "I_per_template": [
+     -2.955,
+     -1.693,
+     -1.461
+    ]
+   },
+   {
+    "i": 42,
+    "c": 39,
+    "I": -2.866,
+    "desc": "an anime style of a {}.",
+    "class": "seal",
+    "I_per_template": [
+     -2.866,
+     -1.408,
+     -1.148
+    ]
+   },
+   {
+    "i": 95,
+    "c": 41,
+    "I": -2.748,
+    "desc": "an Egyptian hieroglyph of a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.748,
+     -2.874,
+     -2.642
+    ]
+   },
+   {
+    "i": 177,
+    "c": 10,
+    "I": -2.602,
+    "desc": "an ancient rune of a {}.",
+    "class": "dalmatian",
+    "I_per_template": [
+     -2.602,
+     -3.158,
+     -2.942
+    ]
+   },
+   {
+    "i": 117,
+    "c": 41,
+    "I": -2.541,
+    "desc": "a Moai statue resembling a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.541,
+     -2.907,
+     -2.524
+    ]
+   },
+   {
+    "i": 156,
+    "c": 41,
+    "I": -2.427,
+    "desc": "a constellation resembling a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.427,
+     -2.647,
+     -2.323
+    ]
+   },
+   {
+    "i": 42,
+    "c": 42,
+    "I": -2.265,
+    "desc": "an anime style of a {}.",
+    "class": "skunk",
+    "I_per_template": [
+     -2.265,
+     -2.358,
+     -2.409
+    ]
+   },
+   {
+    "i": 177,
+    "c": 41,
+    "I": -2.195,
+    "desc": "an ancient rune of a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.195,
+     -2.106,
+     -2.154
+    ]
+   },
+   {
+    "i": 131,
+    "c": 41,
+    "I": -2.185,
+    "desc": "an astrological chart with a {}.",
+    "class": "siamese+cat",
+    "I_per_template": [
+     -2.185,
+     -2.386,
+     -2.023
+    ]
+   }
+  ]
+ },
+ "verdict": {
+  "interaction_significant": false,
+  "template_stable": true,
+  "pass": false
+ }
+}

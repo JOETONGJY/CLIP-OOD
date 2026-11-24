@@ -183,7 +183,9 @@ class clip_cbm_orth(nn.Module):
             use_redundancy=False,
             freeze_delta_mask=None,
             grouped_weights=False,
-            descriptor_clusters=None
+            descriptor_clusters=None,
+            ca_prior=None,
+            ca_beta=1.0
     ):
         # def __init__(self, args, class_names, concept_names, domain_diffs,init_with_class_embedding=False):
         super(clip_cbm_orth, self).__init__()
@@ -214,6 +216,27 @@ class clip_cbm_orth(nn.Module):
             fixed_w = torch.softmax(scores, dim=0) * self.num_prompts
             self.register_buffer('reliability_prior', scores)   # 仍保存 scores 供日志对比
             self.fixed_weights = fixed_w
+            self.domain_residual = None
+        elif weight_mode == "ca_fixed":
+            # CA-Fixed (2026-11-24): 类别感知固定权重 w_{i,c} = N·softmax_i(r_i + β·Î_{i,c})
+            # Î 尺度匹配到 r 的 std (用户要求: 控制交互项尺度与 softmax 集中度);
+            # β=0 严格退化回 fixed 模式 (RW-DDO 固定权重)。无可学习残差, KL=0。
+            if ca_prior is None:
+                raise ValueError("ca_fixed 需要 --ca_prior_file 提供 (204, C) 交互矩阵")
+            self.ca_beta = float(ca_beta)
+            scores = domain_weights.clone().float().to(self.device).detach()
+            ca = ca_prior.float().to(self.device)
+            C = domain_diffs.size(1)
+            if ca.shape != (self.num_prompts, C):
+                raise ValueError(f"ca_prior 形状 {tuple(ca.shape)} != ({self.num_prompts}, {C})")
+            scale = scores.std() / ca.std().clamp_min(1e-8)
+            logits_ca = scores.unsqueeze(1) + self.ca_beta * ca * scale
+            w_ca = torch.softmax(logits_ca, dim=0) * self.num_prompts   # 每类和 = N
+            self.register_buffer('reliability_prior', scores)
+            self.register_buffer('fixed_weights_ca', w_ca)
+            n_eff = (1.0 / (torch.softmax(logits_ca, 0) ** 2).sum(0))
+            print(f"[CA-Fixed] β={self.ca_beta} scale={scale:.3f} "
+                  f"N_eff/类: min={n_eff.min():.1f} mean={n_eff.mean():.1f} max={n_eff.max():.1f}")
             self.domain_residual = None
         else:
             # "prior_residual" / "residual" / "pr_graph"
@@ -313,6 +336,8 @@ class clip_cbm_orth(nn.Module):
             return None, None
         if self.weight_mode == "fixed":
             return self.fixed_weights, None
+        if self.weight_mode == "ca_fixed":
+            return self.fixed_weights_ca, None    # (204, C), forward 按 dim 分支
 
         # E3 方案 B: 簇级分组加权
         # w_i = Q_g(i) * q_i|g, Q_g = softmax(mean_r_g + Δ_g) * G (簇总话语权与成员数无关),
@@ -391,7 +416,10 @@ class clip_cbm_orth(nn.Module):
 
         weights, _ = self.get_domain_weights()
         if weights is not None:
-            regularizer = regularizer * weights.view(-1, 1, 1)
+            if weights.dim() == 2:        # CA-Fixed: (204, C) 逐类别加权
+                regularizer = regularizer * weights.unsqueeze(-1)
+            else:
+                regularizer = regularizer * weights.view(-1, 1, 1)
 
         return concept_activations, self.classifier(concept_activations), regularizer
     # 改动时间26.4.29-----------------------------------
@@ -720,7 +748,10 @@ class clip_cbm_subspace(nn.Module):
         # 2×2 联合实验: 第三章 importance 加权 (C3+C4 组合时启用)
         weights, _ = self.get_domain_weights()
         if weights is not None:
-            regularizer = regularizer * weights.view(-1, 1, 1)
+            if weights.dim() == 2:        # CA-Fixed: (204, C) 逐类别加权
+                regularizer = regularizer * weights.unsqueeze(-1)
+            else:
+                regularizer = regularizer * weights.view(-1, 1, 1)
 
         return main_concept, cls_preds, regularizer
 

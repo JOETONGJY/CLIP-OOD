@@ -138,32 +138,67 @@ def main():
     s_scale = float(d_real.median())
     print(f"[DS] 真实域偏移尺度 s (类原型距离中位数) = {s_scale:.4f}")
 
-    # ===== DS-Local: 孤立响应 vs 实际局部预测变化 =====
+    # ===== DS-Local: 孤立响应 vs 实际局部预测变化 (多强度 + 随机方向对照, 2026-11-24 升级) =====
     rng = torch.Generator().manual_seed(SEED)
     pts = torch.randperm(z_all.size(0), generator=rng)[:N_PERT_SAMPLES]
     z_pts = z_all[pts]                       # (M, 768) 已归一化
     y_pts = y_all[pts].to(device)
     subset = list(range(0, 204, PERT_SUBSET_STRIDE))
+    rand_dirs = torch.nn.functional.normalize(
+        torch.randn(N_PERT_SAMPLES, z_pts.size(1), generator=rng), dim=-1).to(device)
 
-    cos_c_list, mag_ratio_list, common_share_actual = [], [], []
+    def margins(h):
+        """类别间隔: logit_y - max_{k≠y} logit_k"""
+        return h.gather(1, y_pts.unsqueeze(1)).squeeze(1) - \
+            h.scatter(1, y_pts.unsqueeze(1), -1e9).max(dim=-1).values
+
     with torch.no_grad():
         a_base = z_pts @ E.T                                  # (M, 312)
         h_base = head(a_base)
-        h_base_c = head_c(a_base)
-        for i in subset:
-            d_iy = diffs[i][y_pts]                            # (M, 768)
-            z_pert = torch.nn.functional.normalize(z_pts + s_scale * d_iy, dim=-1)
-            h_pert = head(z_pert @ E.T)
-            dh = h_pert - h_base                              # 实际局部预测变化 (M, K)
-            iso = reg_a[i][y_pts]                             # 孤立方向响应 (M, K)
-            dh_c = dh - dh.mean(dim=-1, keepdim=True)
-            iso_c = iso - iso.mean(dim=-1, keepdim=True)
-            cosv = torch.nn.functional.cosine_similarity(dh_c, iso_c, dim=-1)
-            cos_c_list.append(float(cosv.mean()))
-            mag_ratio_list.append(float(dh.norm(dim=-1).mean() / iso.norm(dim=-1).mean()))
-            common_share_actual.append(float(
-                (dh.mean(dim=-1).abs().mean()) /
-                (dh.abs().mean() + 1e-12)))
+    m_base = margins(h_base)
+
+    strengths = [0.5, 1.0, 2.0]                  # 真实域偏移尺度的倍数 (用户要求多强度)
+    ds_local = {"strengths": strengths}
+    with torch.no_grad():
+        for s_frac in strengths:
+            s = s_frac * s_scale
+            cos_list, mag_list, cshare_list = [], [], []
+            txt_centered_mag, txt_margin_change = [], []
+            rand_centered_mag, rand_margin_change = [], []
+            for i in subset:
+                d_iy = diffs[i][y_pts]                            # (M, 768) 文本域方向
+                z_pert = torch.nn.functional.normalize(z_pts + s * d_iy, dim=-1)
+                h_pert = head(z_pert @ E.T)
+                dh = h_pert - h_base
+                iso = reg_a[i][y_pts]
+                dh_c = dh - dh.mean(dim=-1, keepdim=True)
+                iso_c = iso - iso.mean(dim=-1, keepdim=True)
+                cos_list.append(float(torch.nn.functional.cosine_similarity(dh_c, iso_c, -1).mean()))
+                mag_list.append(float(dh.norm(dim=-1).mean() / iso.norm(dim=-1).mean()))
+                cshare_list.append(float(dh.mean(-1).abs().mean() / (dh.abs().mean() + 1e-12)))
+                txt_centered_mag.append(float(dh_c.norm(dim=-1).mean()))
+                txt_margin_change.append(float((margins(h_pert) - m_base).abs().mean()))
+                # 随机方向对照 (同尺度同归一化)
+                z_rand = torch.nn.functional.normalize(z_pts + s * rand_dirs, dim=-1)
+                dh_r = head(z_rand @ E.T) - h_base
+                rand_centered_mag.append(float((dh_r - dh_r.mean(-1, keepdim=True)).norm(dim=-1).mean()))
+                rand_margin_change.append(float((margins(h_base + dh_r) - m_base).abs().mean()))
+            ds_local[f"s={s_frac}x"] = {
+                "mean_cos_centered_actual_vs_isolated": round(float(np.mean(cos_list)), 4),
+                "mean_magnitude_ratio_actual_vs_isolated": round(float(np.mean(mag_list)), 4),
+                "mean_common_l1_share_actual": round(float(np.mean(cshare_list)), 4),
+                "centered_mag_text_mean": round(float(np.mean(txt_centered_mag)), 4),
+                "centered_mag_random_mean": round(float(np.mean(rand_centered_mag)), 4),
+                "text_over_random_centered_ratio": round(
+                    float(np.mean(txt_centered_mag) / np.mean(rand_centered_mag)), 4),
+                "mean_abs_margin_change_text": round(float(np.mean(txt_margin_change)), 4),
+                "mean_abs_margin_change_random": round(float(np.mean(rand_margin_change)), 4),
+                "per_descriptor_cos": [round(c, 4) for c in cos_list],
+            }
+            print(f"[DS-Local] s={s_frac}x: cos={ds_local[f's={s_frac}x']['mean_cos_centered_actual_vs_isolated']} "
+                  f"文本/随机居中幅度比={ds_local[f's={s_frac}x']['text_over_random_centered_ratio']} "
+                  f"间隔变化 文本={ds_local[f's={s_frac}x']['mean_abs_margin_change_text']:.4f} "
+                  f"随机={ds_local[f's={s_frac}x']['mean_abs_margin_change_random']:.4f}")
 
     result = {
         "dataset": "CUB", "run": "CUB_prior_residual_sel_seed1 (E1 诊断协议收敛快照)",
@@ -180,18 +215,10 @@ def main():
             "l1_common_share": round(l1_share_iso, 4),
             "l2_common_energy_share": round(l2_share_iso, 4),
         },
-        "ds_local": {
-            "n_descriptors": len(subset), "n_samples": N_PERT_SAMPLES,
-            "mean_cos_centered_actual_vs_isolated": round(float(np.mean(cos_c_list)), 4),
-            "mean_magnitude_ratio_actual_vs_isolated": round(float(np.mean(mag_ratio_list)), 4),
-            "mean_common_l1_share_actual": round(float(np.mean(common_share_actual)), 4),
-            "per_descriptor_cos": [round(c, 4) for c in cos_c_list],
-        },
+        "ds_local": ds_local,
     }
     print(json.dumps({k: v for k, v in result.items() if k != "ds_local"}, ensure_ascii=False, indent=1))
-    print(f"[DS] 局部敏感性: cos(实际Δh居中, 孤立响应居中) mean={result['ds_local']['mean_cos_centered_actual_vs_isolated']} "
-          f"幅度比={result['ds_local']['mean_magnitude_ratio_actual_vs_isolated']} "
-          f"实际变化公共L1占比={result['ds_local']['mean_common_l1_share_actual']}")
+    print(f"[DS-Local] 详见 JSON (多强度+随机对照)")
 
     with open(os.path.join(OUT_DIR, "ds_diagnostic_cub.json"), "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=1)

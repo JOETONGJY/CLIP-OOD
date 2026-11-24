@@ -130,6 +130,16 @@ class TrainingSession:
                 freeze_mask = _fm.long().clone()
                 logger.info(f"[E1] freeze_delta_file={freeze_file} "
                             f"-> 冻结 {freeze_mask.numel()} 个描述符的 δ")
+            # CA-Fixed (2026-11-24): 类别感知固定权重先验文件
+            ca_prior = None
+            ca_file = getattr(self.args, "ca_prior_file", "")
+            if ca_file:
+                _ca = torch.load(ca_file, map_location="cpu", weights_only=False)
+                if isinstance(_ca, dict):
+                    _ca = _ca["interaction"]
+                ca_prior = _ca.float().clone()
+                logger.info(f"[CA] ca_prior_file={ca_file} -> 交互矩阵 {tuple(ca_prior.shape)}, "
+                            f"β={getattr(self.args, 'ca_beta', 1.0)}")
             self.model = model_class(
                 args=self.args,
                 class_names=list(self.train_dataset.classname2id.keys()),
@@ -146,6 +156,8 @@ class TrainingSession:
                         self.train_dataset.domain_diffs,
                         threshold=float(getattr(self.args, 'cluster_threshold', 0.9)))
                     if getattr(self.args, 'grouped_weights', False) else None),
+                ca_prior=ca_prior,
+                ca_beta=getattr(self.args, "ca_beta", 1.0),
             ).to(self.device)
         # print("Model domain_weights:", getattr(self.model, "domain_weights", None), flush=True)
         # if hasattr(self.model, "domain_weights") and self.model.domain_weights is not None:

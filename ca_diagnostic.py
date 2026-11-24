@@ -1,5 +1,6 @@
 """
-G-A 门控 (2026-11-24): 描述符×类别交互可靠性诊断 — Stage 0 优先级 1
+CA-Diagnostic 类别交互可靠性诊断 (2026-11-24, 原 G-A) — Stage 0 优先级 1
+用法: python ca_diagnostic.py [--dataset CUB|AWA2|LADV|PACS]
 
 研究问题 (外审 2026-11-24 版): 类别感知 DDO 的前提是 R 矩阵 (204×C) 中存在
 显著的"描述符×类别交互效应"——即某描述符对某类别的可靠性偏离
@@ -35,7 +36,7 @@ import torch
 from args import get_args
 from prompts.prompt200new import source_text_prompts, target_text_prompts
 
-OUT_DIR = os.path.join("experiment_results", "Gate_A_类别交互")
+OUT_DIR = os.path.join("experiment_results", "CA-Diagnostic")
 TEMPLATES = ["a photo of a {}.", "a photograph of a {}.", "an image of a {}."]
 BETA = 0.5
 N_PERM = 2000
@@ -92,7 +93,12 @@ def interaction_stats(R):
 
 
 def main():
-    sys.argv = [sys.argv[0], "--dataset", "CUB", "--seed", "1",
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="CUB")
+    ds = ap.parse_known_args()[0].dataset.upper()
+
+    sys.argv = [sys.argv[0], "--dataset", ds, "--seed", "1",
                 "--CLIP_type", os.path.abspath("clip_weights/ViT-L-14.pt"), "--epochs", "1"]
     args = get_args()
     args.save_model = False
@@ -107,7 +113,9 @@ def main():
     model, _ = clip.load(os.path.abspath("clip_weights/ViT-L-14.pt"), device=device)
 
     n_t, n_c = len(target_text_prompts), C
-    t_cache = os.path.join("cache", "gate_a_T_cub.pt")
+    t_cache = os.path.join("cache", f"ca_T_{ds.lower()}.pt")
+    if ds == "CUB" and os.path.exists(os.path.join("cache", "gate_a_T_cub.pt")):
+        t_cache = os.path.join("cache", "gate_a_T_cub.pt")   # 兼容旧缓存
     if os.path.exists(t_cache):
         T = torch.load(t_cache, map_location=device, weights_only=False)
         print(f"[CA-Diag] 复用缓存 T 矩阵: {t_cache}")
@@ -184,12 +192,48 @@ def main():
     row_eff = R_main.mean(axis=1)
     corr_r_row = spearman(r_prior, row_eff)
 
+    # ===== 完整统计 (2026-11-24 用户要求): 主效应排名 / 交互方差排名 / 正负交互 =====
+    I_main = Is[TEMPLATES[0]]
+    row_eff_c = R_main.mean(axis=1) - R_main.mean()
+    col_eff_c = R_main.mean(axis=0) - R_main.mean()
+    var_per_desc = I_main.var(axis=1)          # 每个描述符的交互方差
+    var_per_class = I_main.var(axis=0)         # 每个类别的交互方差
+
+    def _rank(values, names, k=10, desc=True):
+        order = np.argsort(-values) if desc else np.argsort(values)
+        return [{"name": names[int(o)], "value": round(float(values[o]), 4)}
+                for o in order[:k]]
+
+    positives = sorted([e for e in examples], key=lambda e: -e["I"])[:10]
+    negatives = sorted([e for e in examples], key=lambda e: e["I"])[:10]
+    # 逐模板 I 值 (验证 Top 交互不是单一模板伪影)
+    for e in positives + negatives:
+        e["I_per_template"] = [round(float(Is[t][e["i"], e["c"]]), 3) for t in TEMPLATES]
+
+    enhanced = {
+        "descriptor_main_effect_top": _rank(row_eff_c, target_text_prompts),
+        "descriptor_main_effect_bottom": _rank(row_eff_c, target_text_prompts, desc=False),
+        "class_main_effect_top": _rank(col_eff_c, class_names),
+        "class_main_effect_bottom": _rank(col_eff_c, class_names, desc=False),
+        "descriptor_interaction_variance_top": _rank(var_per_desc, target_text_prompts),
+        "class_interaction_variance_top": _rank(var_per_class, class_names),
+        "top10_positive": positives,
+        "top10_negative": negatives,
+    }
+
+    # ===== 矩阵落盘 (供 CA-Fixed 先验生成) =====
+    os.makedirs(OUT_DIR, exist_ok=True)
+    np.savez_compressed(os.path.join(OUT_DIR, f"ca_matrices_{ds.lower()}.npz"),
+                        R=R_main, I=I_main, r_prior=r_prior,
+                        align_templates=np.stack([Is[t] for t in TEMPLATES]))
+
     result = {
-        "dataset": "CUB", "beta": BETA,
+        "dataset": ds, "beta": BETA,
         "templates_stats": templates_stats,
         "template_stability": stab,
         "corr_r_row_effect": round(corr_r_row, 4),
         "top_interactions": examples,
+        "enhanced_stats": enhanced,
         "verdict": {
             "interaction_significant": all(s["stats"]["tukey_1df_p"] < 0.01
                                            for s in templates_stats.values()),
@@ -198,14 +242,14 @@ def main():
     }
     result["verdict"]["pass"] = result["verdict"]["interaction_significant"] and \
         result["verdict"]["template_stable"]
-    os.makedirs(OUT_DIR, exist_ok=True)
-    with open(os.path.join(OUT_DIR, "gate_a_cub.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT_DIR, f"ca_diagnostic_{ds.lower()}.json"), "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=1)
     print(f"[CA-Diag] 判定: 交互显著={result['verdict']['interaction_significant']} "
           f"模板稳定={result['verdict']['template_stable']} → "
           f"{'通过' if result['verdict']['pass'] else '不通过'}")
     print(f"[CA-Diag] corr(r_i, 行效应)={corr_r_row:.4f} (低=交互项是 r 之外的新信息)")
-    print(f"[saved] {os.path.join(OUT_DIR, 'gate_a_cub.json')}")
+    print(f"[saved] {os.path.join(OUT_DIR, f'ca_diagnostic_{ds.lower()}.json')} "
+          f"+ ca_matrices_{ds.lower()}.npz")
 
 
 if __name__ == "__main__":

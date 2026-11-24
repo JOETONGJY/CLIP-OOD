@@ -48,8 +48,12 @@ def get_args():
     parser.add_argument('--lambda_graph', type=float, default=0.1,
                         help='graph Laplacian reg weight on residual (pr_graph mode)')
     parser.add_argument('--weight_mode', type=str, default='prior_residual',
-                        choices=['none', 'fixed', 'residual', 'prior_residual', 'pr_graph'],
-                        help='none=Original DDO; fixed=Soft Reliability; residual=Residual Only; prior_residual=full method; pr_graph=+graph Laplacian')
+                        choices=['none', 'fixed', 'residual', 'prior_residual', 'pr_graph', 'ca_fixed'],
+                        help='none=Original DDO; fixed=Soft Reliability; residual=Residual Only; prior_residual=full method; pr_graph=+graph Laplacian; ca_fixed=类别感知固定权重(CA-Fixed)')
+    parser.add_argument('--ca_prior_file', type=str, default='',
+                        help='CA-Fixed: 类别交互矩阵文件 (含 "interaction" (204,C) 张量); 空=关闭')
+    parser.add_argument('--ca_beta', type=float, default=1.0,
+                        help='CA-Fixed: 交互项强度 β (尺度自动匹配到 r 的 std; β=0 退化回 fixed)')
     ## Chapter 4: Domain Subspace Guided Invariant Classification ##
     parser.add_argument('--ch4_mode', type=str, default='full',
                         choices=['ddo', 'hardproj', 'softproj', 'headonly', 'full', 'full_e', 'full_m', 'full_m7', 'full_mc', 'full_align'],
