@@ -1,0 +1,158 @@
+{
+ "dataset": "CUB",
+ "head": "CUB_prior_residual_sel_seed1 epoch99 (E1 协议快照)",
+ "ds_sourcescale": {
+  "keep_curve": {
+   "0.05": 0.6205000281333923,
+   "0.1": 0.5540000200271606,
+   "0.15": 0.47600001096725464,
+   "0.2": 0.40400001406669617,
+   "0.25": 0.33800002932548523,
+   "0.3": 0.2665000259876251,
+   "0.35": 0.1990000158548355,
+   "0.4": 0.14500001072883606,
+   "0.45": 0.10650000721216202,
+   "0.5": 0.07349999994039536,
+   "0.55": 0.05250000208616257,
+   "0.6": 0.03700000047683716,
+   "0.65": 0.02500000037252903,
+   "0.7": 0.01850000023841858,
+   "0.75": 0.012500000186264515,
+   "0.8": 0.008500000461935997,
+   "0.85": 0.004500000271946192,
+   "0.9": 0.001500000013038516,
+   "0.95": 0.0010000000474974513,
+   "1.0": 0.0005000000237487257
+  },
+  "s_sem_95pct": 0.05,
+  "proto_dispersion_ref": 0.6182
+ },
+ "ds_local": {
+  "s=0.025": {
+   "margin_drop_text_mean": 0.0122,
+   "margin_drop_random": -0.0002,
+   "margin_ratio_text_over_random": 12162050.391,
+   "flip_rate_text_mean": 0.0064,
+   "flip_rate_random": 0.003,
+   "flip_ratio_text_over_random": 2.119,
+   "local_sens_text_mean": 0.5539,
+   "local_sens_random": 0.5246,
+   "per_descriptor_margin_drop_top5": [
+    {
+     "i": 30,
+     "drop": 0.0337,
+     "text": "a sepia photo of a {}."
+    },
+    {
+     "i": 200,
+     "drop": 0.0323,
+     "text": "a cross-sectional diagram of a {}."
+    },
+    {
+     "i": 181,
+     "drop": 0.0309,
+     "text": "a blueprint schematic of a {}."
+    },
+    {
+     "i": 48,
+     "drop": 0.0306,
+     "text": "a blueprint diagram of a {}."
+    },
+    {
+     "i": 17,
+     "drop": 0.0283,
+     "text": "a lithograph of a {}."
+    }
+   ]
+  },
+  "s=0.05": {
+   "margin_drop_text_mean": 0.0279,
+   "margin_drop_random": 0.0014,
+   "margin_ratio_text_over_random": 19.623,
+   "flip_rate_text_mean": 0.0134,
+   "flip_rate_random": 0.009,
+   "flip_ratio_text_over_random": 1.491,
+   "local_sens_text_mean": 1.1141,
+   "local_sens_random": 1.0489,
+   "per_descriptor_margin_drop_top5": [
+    {
+     "i": 30,
+     "drop": 0.0851,
+     "text": "a sepia photo of a {}."
+    },
+    {
+     "i": 200,
+     "drop": 0.0681,
+     "text": "a cross-sectional diagram of a {}."
+    },
+    {
+     "i": 181,
+     "drop": 0.0679,
+     "text": "a blueprint schematic of a {}."
+    },
+    {
+     "i": 48,
+     "drop": 0.0673,
+     "text": "a blueprint diagram of a {}."
+    },
+    {
+     "i": 203,
+     "drop": 0.0633,
+     "text": "a carved pumpkin in the shape of a {}."
+    }
+   ]
+  },
+  "s=0.1": {
+   "margin_drop_text_mean": 0.0706,
+   "margin_drop_random": 0.0101,
+   "margin_ratio_text_over_random": 7.014,
+   "flip_rate_text_mean": 0.0276,
+   "flip_rate_random": 0.018,
+   "flip_ratio_text_over_random": 1.532,
+   "local_sens_text_mean": 2.2509,
+   "local_sens_random": 2.0949,
+   "per_descriptor_margin_drop_top5": [
+    {
+     "i": 30,
+     "drop": 0.2342,
+     "text": "a sepia photo of a {}."
+    },
+    {
+     "i": 203,
+     "drop": 0.1673,
+     "text": "a carved pumpkin in the shape of a {}."
+    },
+    {
+     "i": 181,
+     "drop": 0.16,
+     "text": "a blueprint schematic of a {}."
+    },
+    {
+     "i": 48,
+     "drop": 0.1589,
+     "text": "a blueprint diagram of a {}."
+    },
+    {
+     "i": 60,
+     "drop": 0.1504,
+     "text": "a bronze statue of a {}."
+    }
+   ]
+  }
+ },
+ "ds_tail": {
+  "spearman_isolated_vs_local": 0.5989,
+  "blind_spot_count": 3,
+  "blind_spot_texts": [
+   "a pastel artwork of a {}.",
+   "a stained glass panel of a {}.",
+   "a constellation resembling a {}."
+  ]
+ },
+ "verdict": {
+  "margin_ratio_at_ssem": 19.623,
+  "flip_ratio_at_ssem": 1.491,
+  "tail_decoupled": true,
+  "pass": true
+ }
+}
