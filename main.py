@@ -286,7 +286,8 @@ class TrainingSession:
             torch.save(save_dict, f"logs/weights/{run_name}/epoch_{epoch:04d}.pt")
 
             # Δw 摘要 (final - prior), 只在日志里打 Top 修正
-            if prior_w is not None:
+            # (2026-11-24 修复: CA-Fixed 的 final_w 是 (204, C), 与 (204,) prior 形状不同 → 跳过 Δw)
+            if prior_w is not None and final_w.shape == prior_w.shape:
                 delta_w = (final_w - prior_w)
                 top_up = delta_w.argmax().item()
                 top_down = delta_w.argmin().item()
