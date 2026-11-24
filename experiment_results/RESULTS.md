@@ -443,6 +443,7 @@ SemanticAnchor（top-5 邻域 Gram 结构保持，model/semantic_anchor.py，单
 2. **corr(r, u_P1)=0.585 的精确含义**：是**梯度方向余弦效用（Spearman）**，非梯度内积。规范表述："高可靠描述符的约束梯度与源验证分类梯度方向冲突更小"。
 3. **CA 语义 margin 实现错误（外审代码审查发现，重要）**：ca_diagnostic.py 旧 sims 仅为对角配对 cos(t_{i,k},S_k)，行内 Top-2 实际比较的是不同风格化文本各自的 margin——未实现设计的"同一风格化文本 vs 竞争原型"语义保持分。修复（3D einsum + 单测 tests_ca_margin.py 逐元素通过）后重跑：**CA-Diagnostic 门控不通过**（CUB Tukey p=6.5e-4/4.1e-7/**3.1e-1**，AWA2 p=0.22/5.6e-4/5.7e-9；交互占比降至 0.19-0.35；**corr(r, 行效应) 升至 0.87-0.90**——正确 margin 的描述符级信号大部分被现有先验覆盖）。CA-DDO 连同 CA-Fixed（旧评分函数）**关闭**；旧 CA 训练结果保留为旧评分函数的探索记录。
 4. **DS/TU 扰动尺度 s=0.5456 使用了目标域标签**（违反 source-only 方法选择约定）——相关诊断降级为事后分析；DS/TU 的方法筛选级重验需换源域尺度（如语义保持驱动的扰动尺度）后进行，DS-Local 的间隔变化信号（1.36~1.53×随机）在该重验中一并复核。
+5. **RW-Fixed 对照完成（2026-11-24 深夜）**：weight_mode=fixed 严格 DG ×3 → 55.90 ± 0.48。CA 线效应分解闭合：残差学习贡献（RW-DDO − RW-Fixed）= **+0.12**；交互贡献（CA-Fixed − RW-Fixed）= **+0.011**（噪声内）；交互信息净效应（CA-Fixed − CA-Shuf）= **+0.055**（噪声内）——与正确 sem 门控不通过（修正 3）三层一致，**CA-DDO 定论关闭**。+0.12 同时是 RW-DDO 消融（fixed vs prior_residual）在严格 DG 口径下的补充量化。
 
 ### 工程记录
 C-1 首轮试金石作废一次：--redundancy 未接入 clip_cbm_subspace 分支（两组结果逐 seed 相同暴露），补 subspace 构造函数与 get_domain_weights 后重跑。C-2 首轮作废一次：扰动发生在 _init_model 之后（模型已用干净 diffs 构建），拆开 __init__ 手动插入后重跑。两处均以"逐 seed 数值完全相同"为信号发现。
