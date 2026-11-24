@@ -4,742 +4,742 @@
  "templates_stats": {
   "a photo of a {}.": {
    "stats": {
-    "var_R": 0.5485467910766602,
-    "var_I": 0.14007346332073212,
-    "interaction_ratio": 0.2554,
+    "var_R": 0.3890492022037506,
+    "var_I": 0.07501178979873657,
+    "interaction_ratio": 0.1928,
     "iid_noise_ratio_reference": 0.9901,
-    "tukey_1df_slope": -0.287244,
-    "tukey_1df_t": -27.03,
-    "tukey_1df_p": 0.0
+    "tukey_1df_slope": 0.033912,
+    "tukey_1df_t": 3.41,
+    "tukey_1df_p": 0.0006474199533719194
    },
    "align_mean": 0.9169120788574219,
-   "sem_mean": -0.08140362054109573
+   "sem_mean": 0.14715424180030823
   },
   "a photograph of a {}.": {
    "stats": {
-    "var_R": 0.5289141535758972,
-    "var_I": 0.13746477663516998,
-    "interaction_ratio": 0.2599,
+    "var_R": 0.39762264490127563,
+    "var_I": 0.0780659168958664,
+    "interaction_ratio": 0.1963,
     "iid_noise_ratio_reference": 0.9901,
-    "tukey_1df_slope": -0.236251,
-    "tukey_1df_t": -22.04,
-    "tukey_1df_p": 0.0
+    "tukey_1df_slope": 0.05089,
+    "tukey_1df_t": 5.07,
+    "tukey_1df_p": 4.0671907974854093e-07
    },
    "align_mean": 0.9204807281494141,
-   "sem_mean": -0.08174881339073181
+   "sem_mean": 0.14533396065235138
   },
   "an image of a {}.": {
    "stats": {
-    "var_R": 0.527059018611908,
-    "var_I": 0.14310793578624725,
-    "interaction_ratio": 0.2715,
+    "var_R": 0.40160641074180603,
+    "var_I": 0.08037496358156204,
+    "interaction_ratio": 0.2001,
     "iid_noise_ratio_reference": 0.9901,
-    "tukey_1df_slope": -0.302266,
-    "tukey_1df_t": -27.97,
-    "tukey_1df_p": 0.0
+    "tukey_1df_slope": 0.009991,
+    "tukey_1df_t": 1.02,
+    "tukey_1df_p": 0.30575290584022596
    },
    "align_mean": 0.9160621762275696,
-   "sem_mean": -0.07985299080610275
+   "sem_mean": 0.14874358475208282
   }
  },
  "template_stability": {
   "a photo of a {}.|a photograph of a {}.": {
-   "spearman": 0.9548,
-   "topk_overlap": 0.4
+   "spearman": 0.9435,
+   "topk_overlap": 0.267
   },
   "a photo of a {}.|an image of a {}.": {
-   "spearman": 0.9509,
-   "topk_overlap": 0.6
+   "spearman": 0.9445,
+   "topk_overlap": 0.733
   },
   "a photograph of a {}.|an image of a {}.": {
-   "spearman": 0.9527,
-   "topk_overlap": 0.533
+   "spearman": 0.9425,
+   "topk_overlap": 0.2
   }
  },
- "corr_r_row_effect": 0.4857,
+ "corr_r_row_effect": 0.8982,
  "top_interactions": [
-  {
-   "i": 83,
-   "c": 5,
-   "I": -5.605,
-   "desc": "a visual novel character of a {}.",
-   "class": "least auklet",
-   "I_per_template": [
-    -5.605,
-    -5.68,
-    -5.7
-   ]
-  },
-  {
-   "i": 83,
-   "c": 149,
-   "I": -5.337,
-   "desc": "a visual novel character of a {}.",
-   "class": "sage thrasher",
-   "I_per_template": [
-    -5.337,
-    -4.907,
-    -5.322
-   ]
-  },
   {
    "i": 54,
    "c": 85,
-   "I": -4.132,
+   "I": -4.281,
    "desc": "an editorial cartoon of a {}.",
    "class": "pacific loon",
    "I_per_template": [
-    -4.132,
-    -4.205,
-    -4.547
+    -4.281,
+    -4.456,
+    -4.875
    ]
   },
   {
-   "i": 35,
+   "i": 139,
+   "c": 21,
+   "I": -4.201,
+   "desc": "a topographic map with a {}.",
+   "class": "chuck will widow",
+   "I_per_template": [
+    -4.201,
+    -4.236,
+    -4.325
+   ]
+  },
+  {
+   "i": 83,
    "c": 149,
-   "I": -3.917,
-   "desc": "a futuristic concept art of a {}.",
+   "I": -3.666,
+   "desc": "a visual novel character of a {}.",
    "class": "sage thrasher",
    "I_per_template": [
-    -3.917,
-    -3.366,
-    -3.963
+    -3.666,
+    -3.629,
+    -3.797
    ]
   },
   {
    "i": 31,
    "c": 145,
-   "I": -3.915,
+   "I": -3.4,
    "desc": "a retro style of a {}.",
    "class": "forsters tern",
    "I_per_template": [
-    -3.915,
-    -3.006,
-    -3.552
+    -3.4,
+    -2.664,
+    -3.135
+   ]
+  },
+  {
+   "i": 3,
+   "c": 21,
+   "I": -3.227,
+   "desc": "a quickdraw of a {}.",
+   "class": "chuck will widow",
+   "I_per_template": [
+    -3.227,
+    -3.438,
+    -3.028
    ]
   },
   {
    "i": 83,
-   "c": 152,
-   "I": -3.662,
+   "c": 5,
+   "I": -3.15,
    "desc": "a visual novel character of a {}.",
-   "class": "philadelphia vireo",
+   "class": "least auklet",
    "I_per_template": [
-    -3.662,
-    -3.425,
-    -3.528
+    -3.15,
+    -3.37,
+    -3.413
    ]
   },
   {
-   "i": 96,
-   "c": 14,
-   "I": -3.458,
-   "desc": "a 16-bit video game character of a {}.",
-   "class": "lazuli bunting",
+   "i": 24,
+   "c": 21,
+   "I": -3.139,
+   "desc": "a comic strip of a {}.",
+   "class": "chuck will widow",
    "I_per_template": [
-    -3.458,
-    -3.604,
-    -4.183
+    -3.139,
+    -3.383,
+    -2.806
    ]
   },
   {
    "i": 71,
    "c": 3,
-   "I": -3.435,
+   "I": -2.916,
    "desc": "a medieval manuscript of a {}.",
    "class": "groove billed ani",
    "I_per_template": [
-    -3.435,
-    -3.199,
-    -3.175
+    -2.916,
+    -2.97,
+    -3.0
    ]
   },
   {
-   "i": 42,
-   "c": 75,
-   "I": -3.423,
-   "desc": "an anime style of a {}.",
-   "class": "dark eyed junco",
+   "i": 166,
+   "c": 21,
+   "I": -2.753,
+   "desc": "a topographic elevation map of a {}.",
+   "class": "chuck will widow",
    "I_per_template": [
-    -3.423,
-    -3.45,
-    -3.965
-   ]
-  },
-  {
-   "i": 96,
-   "c": 149,
-   "I": -3.413,
-   "desc": "a 16-bit video game character of a {}.",
-   "class": "sage thrasher",
-   "I_per_template": [
-    -3.413,
-    -2.943,
-    -3.401
-   ]
-  },
-  {
-   "i": 104,
-   "c": 97,
-   "I": -3.34,
-   "desc": "a Gothic architecture detail of a {}.",
-   "class": "scott oriole",
-   "I_per_template": [
-    -3.34,
-    -2.344,
-    -3.219
-   ]
-  },
-  {
-   "i": 202,
-   "c": 7,
-   "I": -3.313,
-   "desc": "a medieval tapestry with a {}.",
-   "class": "rhinoceros auklet",
-   "I_per_template": [
-    -3.313,
-    -3.305,
-    -3.276
-   ]
-  },
-  {
-   "i": 83,
-   "c": 75,
-   "I": -3.294,
-   "desc": "a visual novel character of a {}.",
-   "class": "dark eyed junco",
-   "I_per_template": [
-    -3.294,
-    -3.449,
-    -3.571
+    -2.753,
+    -2.695,
+    -2.636
    ]
   },
   {
    "i": 179,
    "c": 104,
-   "I": -3.178,
+   "I": -2.732,
    "desc": "an environmental infographic of a {}.",
    "class": "whip poor will",
    "I_per_template": [
-    -3.178,
-    -2.644,
-    -2.933
+    -2.732,
+    -2.382,
+    -2.54
    ]
   },
   {
-   "i": 59,
-   "c": 97,
-   "I": -3.14,
-   "desc": "a VR model of a {}.",
-   "class": "scott oriole",
+   "i": 35,
+   "c": 149,
+   "I": -2.588,
+   "desc": "a futuristic concept art of a {}.",
+   "class": "sage thrasher",
    "I_per_template": [
-    -3.14,
-    -2.105,
-    -2.848
+    -2.588,
+    -2.248,
+    -2.696
+   ]
+  },
+  {
+   "i": 42,
+   "c": 75,
+   "I": -2.587,
+   "desc": "an anime style of a {}.",
+   "class": "dark eyed junco",
+   "I_per_template": [
+    -2.587,
+    -2.636,
+    -3.028
+   ]
+  },
+  {
+   "i": 83,
+   "c": 14,
+   "I": -2.554,
+   "desc": "a visual novel character of a {}.",
+   "class": "lazuli bunting",
+   "I_per_template": [
+    -2.554,
+    -2.719,
+    -3.209
+   ]
+  },
+  {
+   "i": 31,
+   "c": 71,
+   "I": -2.533,
+   "desc": "a retro style of a {}.",
+   "class": "pomarine jaeger",
+   "I_per_template": [
+    -2.533,
+    -2.386,
+    -2.645
+   ]
+  },
+  {
+   "i": 105,
+   "c": 21,
+   "I": -2.51,
+   "desc": "a postage stamp of a {}.",
+   "class": "chuck will widow",
+   "I_per_template": [
+    -2.51,
+    -2.724,
+    -1.868
    ]
   }
  ],
  "enhanced_stats": {
   "descriptor_main_effect_top": [
    {
-    "name": "a collage of a {}.",
-    "value": 0.7375
-   },
-   {
-    "name": "an infographic of a {}.",
-    "value": 0.6599
-   },
-   {
     "name": "a photo collage of a {}.",
-    "value": 0.6524
+    "value": 0.7399
+   },
+   {
+    "name": "a collage of a {}.",
+    "value": 0.7327
    },
    {
     "name": "a sketch of a {}.",
-    "value": 0.6292
+    "value": 0.4848
    },
    {
-    "name": "an aerial view photo of a {}.",
-    "value": 0.6185
-   },
-   {
-    "name": "a doodle of a {}.",
-    "value": 0.6125
+    "name": "a watercolor of a {}.",
+    "value": 0.4827
    },
    {
     "name": "a painting of a {}.",
-    "value": 0.5454
+    "value": 0.4732
    },
    {
-    "name": "an environmental infographic of a {}.",
-    "value": 0.5007
+    "name": "an aerial view photo of a {}.",
+    "value": 0.4567
    },
    {
-    "name": "a street photography shot of a {}.",
-    "value": 0.4769
+    "name": "a digital art of a {}.",
+    "value": 0.4107
    },
    {
-    "name": "a photorealistic painting of a {}.",
-    "value": 0.471
+    "name": "an infographic of a {}.",
+    "value": 0.4074
+   },
+   {
+    "name": "an oil painting of a {}.",
+    "value": 0.3819
+   },
+   {
+    "name": "a silhouette photo of a {}.",
+    "value": 0.3752
    }
   ],
   "descriptor_main_effect_bottom": [
    {
     "name": "a visual novel character of a {}.",
-    "value": -1.2128
+    "value": -1.1402
    },
    {
     "name": "a flower arrangement resembling a {}.",
-    "value": -0.8923
-   },
-   {
-    "name": "a scrimshaw of a {}.",
-    "value": -0.8405
+    "value": -0.8331
    },
    {
     "name": "a medieval manuscript of a {}.",
-    "value": -0.8227
-   },
-   {
-    "name": "a floral arrangement shaped like a {}.",
-    "value": -0.734
+    "value": -0.8291
    },
    {
     "name": "a constellation resembling a {}.",
-    "value": -0.7217
+    "value": -0.7511
    },
    {
-    "name": "a steampunk version of a {}.",
-    "value": -0.6702
+    "name": "an ancient rune of a {}.",
+    "value": -0.7365
    },
    {
-    "name": "a retrowave poster of a {}.",
-    "value": -0.6191
+    "name": "a steampunk watch gear featuring a {}.",
+    "value": -0.6764
    },
    {
-    "name": "a totem pole with a {}.",
-    "value": -0.6027
+    "name": "a futuristic concept art of a {}.",
+    "value": -0.652
    },
    {
     "name": "a Moai statue resembling a {}.",
-    "value": -0.5799
+    "value": -0.5902
+   },
+   {
+    "name": "an album cover with a {}.",
+    "value": -0.5087
+   },
+   {
+    "name": "a carved pumpkin in the shape of a {}.",
+    "value": -0.5016
    }
   ],
   "class_main_effect_top": [
    {
-    "name": "pied kingfisher",
-    "value": 0.9237
+    "name": "horned puffin",
+    "value": 1.1223
    },
    {
-    "name": "american goldfinch",
-    "value": 0.921
+    "name": "brown creeper",
+    "value": 0.9985
    },
    {
-    "name": "marsh wren",
-    "value": 0.9124
+    "name": "pine grosbeak",
+    "value": 0.9724
    },
    {
-    "name": "belted kingfisher",
-    "value": 0.8851
+    "name": "gadwall",
+    "value": 0.8986
    },
    {
-    "name": "red bellied woodpecker",
-    "value": 0.7984
+    "name": "northern flicker",
+    "value": 0.8941
    },
    {
-    "name": "hooded merganser",
-    "value": 0.6837
+    "name": "american redstart",
+    "value": 0.781
    },
    {
-    "name": "vermilion flycatcher",
-    "value": 0.6639
-   },
-   {
-    "name": "downy woodpecker",
-    "value": 0.6637
-   },
-   {
-    "name": "ringed kingfisher",
-    "value": 0.6268
+    "name": "cape glossy starling",
+    "value": 0.7714
    },
    {
     "name": "rose breasted grosbeak",
-    "value": 0.6124
+    "value": 0.7698
+   },
+   {
+    "name": "blue grosbeak",
+    "value": 0.7192
+   },
+   {
+    "name": "yellow headed blackbird",
+    "value": 0.7045
    }
   ],
   "class_main_effect_bottom": [
    {
-    "name": "pomarine jaeger",
-    "value": -2.5156
-   },
-   {
-    "name": "scott oriole",
-    "value": -1.9432
+    "name": "least auklet",
+    "value": -1.5471
    },
    {
     "name": "chuck will widow",
-    "value": -1.91
+    "value": -1.4782
+   },
+   {
+    "name": "rhinoceros auklet",
+    "value": -1.4415
+   },
+   {
+    "name": "crested auklet",
+    "value": -1.1369
+   },
+   {
+    "name": "pomarine jaeger",
+    "value": -1.0851
+   },
+   {
+    "name": "black billed cuckoo",
+    "value": -1.0456
+   },
+   {
+    "name": "parakeet auklet",
+    "value": -1.0094
    },
    {
     "name": "whip poor will",
-    "value": -1.7282
+    "value": -1.0019
    },
    {
-    "name": "green violetear",
-    "value": -1.4769
+    "name": "shiny cowbird",
+    "value": -0.9893
    },
    {
-    "name": "long tailed jaeger",
-    "value": -1.3571
-   },
-   {
-    "name": "lazuli bunting",
-    "value": -1.3386
-   },
-   {
-    "name": "baird sparrow",
-    "value": -1.3046
-   },
-   {
-    "name": "nelson sharp tailed sparrow",
-    "value": -1.1742
-   },
-   {
-    "name": "sayornis",
-    "value": -1.1185
+    "name": "scott oriole",
+    "value": -0.9496
    }
   ],
   "descriptor_interaction_variance_top": [
    {
     "name": "a visual novel character of a {}.",
-    "value": 1.0375
+    "value": 0.4785
    },
    {
     "name": "a retro style of a {}.",
-    "value": 0.5431
+    "value": 0.371
    },
    {
     "name": "a futuristic concept art of a {}.",
-    "value": 0.4966
-   },
-   {
-    "name": "an Art Deco version of a {}.",
-    "value": 0.405
-   },
-   {
-    "name": "a 16-bit video game character of a {}.",
-    "value": 0.4049
-   },
-   {
-    "name": "a medieval manuscript of a {}.",
-    "value": 0.3751
-   },
-   {
-    "name": "an anime style of a {}.",
-    "value": 0.3742
+    "value": 0.2609
    },
    {
     "name": "a constellation resembling a {}.",
-    "value": 0.3445
+    "value": 0.2386
+   },
+   {
+    "name": "an anime style of a {}.",
+    "value": 0.2237
+   },
+   {
+    "name": "an Art Deco version of a {}.",
+    "value": 0.2179
+   },
+   {
+    "name": "an editorial cartoon of a {}.",
+    "value": 0.2045
+   },
+   {
+    "name": "a sci-fi style of a {}.",
+    "value": 0.2009
    },
    {
     "name": "an emoji of a {}.",
-    "value": 0.3315
+    "value": 0.1908
    },
    {
-    "name": "a flower arrangement resembling a {}.",
-    "value": 0.3047
+    "name": "a medieval manuscript of a {}.",
+    "value": 0.183
    }
   ],
   "class_interaction_variance_top": [
    {
-    "name": "forsters tern",
-    "value": 0.8455
-   },
-   {
-    "name": "pomarine jaeger",
-    "value": 0.8338
-   },
-   {
-    "name": "scott oriole",
-    "value": 0.7503
-   },
-   {
-    "name": "sage thrasher",
-    "value": 0.7169
+    "name": "chuck will widow",
+    "value": 0.8328
    },
    {
     "name": "green violetear",
-    "value": 0.6248
-   },
-   {
-    "name": "chuck will widow",
-    "value": 0.6091
-   },
-   {
-    "name": "least auklet",
-    "value": 0.5178
+    "value": 0.5367
    },
    {
     "name": "whip poor will",
-    "value": 0.51
+    "value": 0.448
    },
    {
-    "name": "lazuli bunting",
-    "value": 0.5061
+    "name": "pomarine jaeger",
+    "value": 0.4373
    },
    {
-    "name": "dark eyed junco",
-    "value": 0.4677
+    "name": "forsters tern",
+    "value": 0.4341
+   },
+   {
+    "name": "groove billed ani",
+    "value": 0.3566
+   },
+   {
+    "name": "pacific loon",
+    "value": 0.3099
+   },
+   {
+    "name": "nighthawk",
+    "value": 0.2827
+   },
+   {
+    "name": "scott oriole",
+    "value": 0.2742
+   },
+   {
+    "name": "sage thrasher",
+    "value": 0.2658
    }
   ],
   "top10_positive": [
    {
-    "i": 59,
-    "c": 97,
-    "I": -3.14,
-    "desc": "a VR model of a {}.",
-    "class": "scott oriole",
+    "i": 105,
+    "c": 21,
+    "I": -2.51,
+    "desc": "a postage stamp of a {}.",
+    "class": "chuck will widow",
     "I_per_template": [
-     -3.14,
-     -2.105,
-     -2.848
+     -2.51,
+     -2.724,
+     -1.868
     ]
    },
    {
-    "i": 179,
-    "c": 104,
-    "I": -3.178,
-    "desc": "an environmental infographic of a {}.",
-    "class": "whip poor will",
+    "i": 31,
+    "c": 71,
+    "I": -2.533,
+    "desc": "a retro style of a {}.",
+    "class": "pomarine jaeger",
     "I_per_template": [
-     -3.178,
-     -2.644,
-     -2.933
+     -2.533,
+     -2.386,
+     -2.645
     ]
    },
    {
     "i": 83,
-    "c": 75,
-    "I": -3.294,
+    "c": 14,
+    "I": -2.554,
     "desc": "a visual novel character of a {}.",
-    "class": "dark eyed junco",
+    "class": "lazuli bunting",
     "I_per_template": [
-     -3.294,
-     -3.449,
-     -3.571
-    ]
-   },
-   {
-    "i": 202,
-    "c": 7,
-    "I": -3.313,
-    "desc": "a medieval tapestry with a {}.",
-    "class": "rhinoceros auklet",
-    "I_per_template": [
-     -3.313,
-     -3.305,
-     -3.276
-    ]
-   },
-   {
-    "i": 104,
-    "c": 97,
-    "I": -3.34,
-    "desc": "a Gothic architecture detail of a {}.",
-    "class": "scott oriole",
-    "I_per_template": [
-     -3.34,
-     -2.344,
-     -3.219
-    ]
-   },
-   {
-    "i": 96,
-    "c": 149,
-    "I": -3.413,
-    "desc": "a 16-bit video game character of a {}.",
-    "class": "sage thrasher",
-    "I_per_template": [
-     -3.413,
-     -2.943,
-     -3.401
+     -2.554,
+     -2.719,
+     -3.209
     ]
    },
    {
     "i": 42,
     "c": 75,
-    "I": -3.423,
+    "I": -2.587,
     "desc": "an anime style of a {}.",
     "class": "dark eyed junco",
     "I_per_template": [
-     -3.423,
-     -3.45,
-     -3.965
-    ]
-   },
-   {
-    "i": 71,
-    "c": 3,
-    "I": -3.435,
-    "desc": "a medieval manuscript of a {}.",
-    "class": "groove billed ani",
-    "I_per_template": [
-     -3.435,
-     -3.199,
-     -3.175
-    ]
-   },
-   {
-    "i": 96,
-    "c": 14,
-    "I": -3.458,
-    "desc": "a 16-bit video game character of a {}.",
-    "class": "lazuli bunting",
-    "I_per_template": [
-     -3.458,
-     -3.604,
-     -4.183
-    ]
-   },
-   {
-    "i": 83,
-    "c": 152,
-    "I": -3.662,
-    "desc": "a visual novel character of a {}.",
-    "class": "philadelphia vireo",
-    "I_per_template": [
-     -3.662,
-     -3.425,
-     -3.528
-    ]
-   }
-  ],
-  "top10_negative": [
-   {
-    "i": 83,
-    "c": 5,
-    "I": -5.605,
-    "desc": "a visual novel character of a {}.",
-    "class": "least auklet",
-    "I_per_template": [
-     -5.605,
-     -5.68,
-     -5.7
-    ]
-   },
-   {
-    "i": 83,
-    "c": 149,
-    "I": -5.337,
-    "desc": "a visual novel character of a {}.",
-    "class": "sage thrasher",
-    "I_per_template": [
-     -5.337,
-     -4.907,
-     -5.322
-    ]
-   },
-   {
-    "i": 54,
-    "c": 85,
-    "I": -4.132,
-    "desc": "an editorial cartoon of a {}.",
-    "class": "pacific loon",
-    "I_per_template": [
-     -4.132,
-     -4.205,
-     -4.547
+     -2.587,
+     -2.636,
+     -3.028
     ]
    },
    {
     "i": 35,
     "c": 149,
-    "I": -3.917,
+    "I": -2.588,
     "desc": "a futuristic concept art of a {}.",
     "class": "sage thrasher",
     "I_per_template": [
-     -3.917,
-     -3.366,
-     -3.963
+     -2.588,
+     -2.248,
+     -2.696
     ]
    },
    {
-    "i": 31,
-    "c": 145,
-    "I": -3.915,
-    "desc": "a retro style of a {}.",
-    "class": "forsters tern",
+    "i": 179,
+    "c": 104,
+    "I": -2.732,
+    "desc": "an environmental infographic of a {}.",
+    "class": "whip poor will",
     "I_per_template": [
-     -3.915,
-     -3.006,
-     -3.552
+     -2.732,
+     -2.382,
+     -2.54
     ]
    },
    {
-    "i": 83,
-    "c": 152,
-    "I": -3.662,
-    "desc": "a visual novel character of a {}.",
-    "class": "philadelphia vireo",
+    "i": 166,
+    "c": 21,
+    "I": -2.753,
+    "desc": "a topographic elevation map of a {}.",
+    "class": "chuck will widow",
     "I_per_template": [
-     -3.662,
-     -3.425,
-     -3.528
-    ]
-   },
-   {
-    "i": 96,
-    "c": 14,
-    "I": -3.458,
-    "desc": "a 16-bit video game character of a {}.",
-    "class": "lazuli bunting",
-    "I_per_template": [
-     -3.458,
-     -3.604,
-     -4.183
+     -2.753,
+     -2.695,
+     -2.636
     ]
    },
    {
     "i": 71,
     "c": 3,
-    "I": -3.435,
+    "I": -2.916,
     "desc": "a medieval manuscript of a {}.",
     "class": "groove billed ani",
     "I_per_template": [
-     -3.435,
-     -3.199,
-     -3.175
+     -2.916,
+     -2.97,
+     -3.0
     ]
    },
    {
-    "i": 42,
-    "c": 75,
-    "I": -3.423,
-    "desc": "an anime style of a {}.",
-    "class": "dark eyed junco",
+    "i": 24,
+    "c": 21,
+    "I": -3.139,
+    "desc": "a comic strip of a {}.",
+    "class": "chuck will widow",
     "I_per_template": [
-     -3.423,
-     -3.45,
-     -3.965
+     -3.139,
+     -3.383,
+     -2.806
     ]
    },
    {
-    "i": 96,
+    "i": 83,
+    "c": 5,
+    "I": -3.15,
+    "desc": "a visual novel character of a {}.",
+    "class": "least auklet",
+    "I_per_template": [
+     -3.15,
+     -3.37,
+     -3.413
+    ]
+   }
+  ],
+  "top10_negative": [
+   {
+    "i": 54,
+    "c": 85,
+    "I": -4.281,
+    "desc": "an editorial cartoon of a {}.",
+    "class": "pacific loon",
+    "I_per_template": [
+     -4.281,
+     -4.456,
+     -4.875
+    ]
+   },
+   {
+    "i": 139,
+    "c": 21,
+    "I": -4.201,
+    "desc": "a topographic map with a {}.",
+    "class": "chuck will widow",
+    "I_per_template": [
+     -4.201,
+     -4.236,
+     -4.325
+    ]
+   },
+   {
+    "i": 83,
     "c": 149,
-    "I": -3.413,
-    "desc": "a 16-bit video game character of a {}.",
+    "I": -3.666,
+    "desc": "a visual novel character of a {}.",
     "class": "sage thrasher",
     "I_per_template": [
-     -3.413,
-     -2.943,
-     -3.401
+     -3.666,
+     -3.629,
+     -3.797
+    ]
+   },
+   {
+    "i": 31,
+    "c": 145,
+    "I": -3.4,
+    "desc": "a retro style of a {}.",
+    "class": "forsters tern",
+    "I_per_template": [
+     -3.4,
+     -2.664,
+     -3.135
+    ]
+   },
+   {
+    "i": 3,
+    "c": 21,
+    "I": -3.227,
+    "desc": "a quickdraw of a {}.",
+    "class": "chuck will widow",
+    "I_per_template": [
+     -3.227,
+     -3.438,
+     -3.028
+    ]
+   },
+   {
+    "i": 83,
+    "c": 5,
+    "I": -3.15,
+    "desc": "a visual novel character of a {}.",
+    "class": "least auklet",
+    "I_per_template": [
+     -3.15,
+     -3.37,
+     -3.413
+    ]
+   },
+   {
+    "i": 24,
+    "c": 21,
+    "I": -3.139,
+    "desc": "a comic strip of a {}.",
+    "class": "chuck will widow",
+    "I_per_template": [
+     -3.139,
+     -3.383,
+     -2.806
+    ]
+   },
+   {
+    "i": 71,
+    "c": 3,
+    "I": -2.916,
+    "desc": "a medieval manuscript of a {}.",
+    "class": "groove billed ani",
+    "I_per_template": [
+     -2.916,
+     -2.97,
+     -3.0
+    ]
+   },
+   {
+    "i": 166,
+    "c": 21,
+    "I": -2.753,
+    "desc": "a topographic elevation map of a {}.",
+    "class": "chuck will widow",
+    "I_per_template": [
+     -2.753,
+     -2.695,
+     -2.636
+    ]
+   },
+   {
+    "i": 179,
+    "c": 104,
+    "I": -2.732,
+    "desc": "an environmental infographic of a {}.",
+    "class": "whip poor will",
+    "I_per_template": [
+     -2.732,
+     -2.382,
+     -2.54
     ]
    }
   ]
  },
  "verdict": {
-  "interaction_significant": true,
+  "interaction_significant": false,
   "template_stable": true,
-  "pass": true
+  "pass": false
  }
 }

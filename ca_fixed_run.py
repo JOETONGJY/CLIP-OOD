@@ -26,9 +26,10 @@ if __name__ == "__main__":
     args.wandb = False
     args.model_selection = "final"
     args.CBM_type = "clip_cbm"
-    args.weight_mode = "ca_fixed"
-    if not getattr(args, "ca_prior_file", ""):
-        raise ValueError("必须提供 --ca_prior_file")
+    # 2026-11-24 支持 --weight_mode fixed 作为 RW-Fixed 对照 (固定先验, 无残差无交互)
+    args.weight_mode = getattr(args, "weight_mode", "ca_fixed")
+    if args.weight_mode == "ca_fixed" and not getattr(args, "ca_prior_file", ""):
+        raise ValueError("ca_fixed 模式必须提供 --ca_prior_file")
 
     torch.manual_seed(args.seed)
     random.seed(args.seed)

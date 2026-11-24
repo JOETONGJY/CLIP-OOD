@@ -143,15 +143,15 @@ def main():
         d_bar = d.mean(dim=1, keepdim=True)
         d_bar = d_bar / d_bar.norm(dim=-1, keepdim=True)
         align = (d * d_bar).sum(-1).cpu().numpy()                          # (204, C)
-        # 语义保持 m_{i,c}: 风格化类文本与"最接近的非自身类原型"的 margin
-        # (2026-11-24 修复: 旧实现行级 -inf 掩码把整行置 -inf → NaN 污染)
-        sims = torch.einsum("icd,cd->ic", T, S_c).cpu().numpy()            # (204, C)
-        top2 = np.partition(sims, -2, axis=1)[:, -2:]                      # 每行前两大
-        max1, max2 = top2[:, 1], top2[:, 0]
-        arg1 = sims.argmax(axis=1)                                         # 每行最近原型
-        runner_up = np.where(np.arange(C)[None, :] == arg1[:, None],
-                             max2[:, None], max1[:, None])                 # max_{k≠c}
-        m = sims - runner_up                                               # (204, C) m_{i,c}
+        # 语义保持 m_{i,c} = cos(t_{i,c}, t_c^0) - max_{k≠c} cos(t_{i,c}, t_k^0)
+        # (2026-11-24 二次修复, 外审发现: 旧实现 sims 只有对角配对 cos(t_{i,k},S_k),
+        #  行内 Top-2 实际比较的是【不同风格化文本各自的 margin】——跨条目比较,
+        #  并非同一风格化文本对竞争原型的语义保持。改用 3D 相似度矩阵。)
+        sims3 = torch.einsum("icd,kd->ick", T, S_c)                  # (204, C, C)
+        gt = sims3.diagonal(dim1=1, dim2=2)                          # (204, C) 对角项
+        eye = torch.eye(C, dtype=torch.bool, device=sims3.device).unsqueeze(0)
+        runner_up = sims3.masked_fill(eye, float("-inf")).max(dim=-1).values
+        m = (gt - runner_up).cpu().numpy()                           # (204, C) m_{i,c}
         sem = m
         zA, zS = zscore(align), zscore(sem)
         assert np.isfinite(zA).all() and np.isfinite(zS).all(), "R 分量含 NaN/Inf"
