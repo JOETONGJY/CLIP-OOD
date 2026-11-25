@@ -39,6 +39,7 @@ from prompts.prompt200new import target_text_prompts
 OUT_DIR = os.path.join("experiment_results", "TU-Diagnostic")
 SNAP_DIR = os.path.join("experiment_results", "07_权重逃逸诊断", "cls_snapshots")
 EPOCHS = [25, 50, 99]
+P2_SCALE = 0.5456   # 目标域标签导出的尺度 (非 source-only, 仅事后分析; 见下方注释)
 N_PROXY_SAMPLES = 2000
 N_PERM_SEED = 0
 
@@ -138,11 +139,15 @@ def main():
         g_P1_n = torch.nn.functional.normalize(g_P1, dim=0)
 
         # ===== Proxy-2: 语言域扰动 CE (语义筛选, 逐 j 梯度) =====
-        s_scale = torch.tensor(0.5456)                            # 真实域偏移尺度 (DS-Diagnostic 实测)
+        # 2026-11-25 标注: P2_SCALE=0.5456 由【目标域】(CUB-Painting) 带标签的源/目标类原型
+        # 距离中位数估计, 违反 source-only 方法选择约定 —— 本脚本的 Proxy-2 结果仅作
+        # 事后分析, 不得作为方法筛选依据; 重验须改用源域确定的条件语义保持尺度
+        # (见 ds_local_diagnostic_v2.py 的 DS-SourceScale)。
+        s_scale = torch.tensor(P2_SCALE)
         ce_P2_list, keep_rates = [], []
         for j in range(n_t):
             d_jy = diffs[j][y_P2]                                # (M, 768)
-            z_pert = torch.nn.functional.normalize(z_P2 + 0.5456 * d_jy, dim=-1)
+            z_pert = torch.nn.functional.normalize(z_P2 + P2_SCALE * d_jy, dim=-1)
             # 语义保持筛选: CLIP 原型 margin > 0
             with torch.no_grad():
                 sims_pert = z_pert @ S_proto.T                   # (M, C)

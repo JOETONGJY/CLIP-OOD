@@ -585,7 +585,14 @@ class TrainingSession:
                 if self.args.wandb:
                     wandb.log(log_data)
 
+        except KeyboardInterrupt:
+            # 2026-11-25: 中断的 run 不得留下"部分训练"的结果 json; 原样上抛, 由外层处理
+            self._training_failed = True
+            raise
         except Exception as e:
+            # 2026-11-25: 标记失败 —— 原先 finally 无条件写结果 json, 失败的 run 会留下
+            # 0.0 的"结果"并被汇总/断点续跑脚本当作已完成 (11-24 的 12 个静默零结果即此因)
+            self._training_failed = True
             logger.error(f"Training interrupted: {str(e)}", exc_info=True)
             if self.args.wandb:
                 wandb.alert(
@@ -634,6 +641,12 @@ class TrainingSession:
                     'lambda_cal': getattr(self.args, 'lambda_cal', 0.01),
                     'protect_k': getattr(self.args, 'protect_k', 0),
                 },
+                # 2026-11-25: 完整运行配置落盘 (外审要求: ca_beta/先验文件/batch 等
+                # 不能再靠文件名或报告反推)
+                'run_config': {k: getattr(self.args, k, None) for k in (
+                    'weight_mode', 'batch_size', 'epochs', 'ch4_mode', 'tau', 'use_c3_weights',
+                    'ca_beta', 'ca_prior_file', 'grouped_weights', 'cluster_threshold',
+                    'freeze_delta_file', 'redundancy', 'redundancy_topk', 'run_tag')},
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},
@@ -641,9 +654,13 @@ class TrainingSession:
                                if sel_mode == 'final' else self.best_metrics['target_acc']),
             }
             result_path = f"logs/results/{self.run_name}.json"
-            with open(result_path, 'w') as f:
-                json.dump(result, f, indent=2)
-            logger.info(f"Result saved to {result_path}")
+            if getattr(self, "_training_failed", False):
+                logger.error(f"[main] 训练未完成: 不写 {result_path} "
+                             f"(避免被汇总/续跑脚本当作已完成; 同名旧结果如有则保持不动)")
+            else:
+                with open(result_path, 'w') as f:
+                    json.dump(result, f, indent=2)
+                logger.info(f"Result saved to {result_path}")
 
             logger.info("\n" + "=" * 60)
             logger.info("Training Completed")

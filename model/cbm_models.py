@@ -515,6 +515,12 @@ class clip_cbm_subspace(nn.Module):
                 self.fixed_weights = torch.softmax(scores, dim=0) * self.num_prompts
                 self.register_buffer('reliability_prior', scores)
                 self.domain_residual = None
+            elif weight_mode not in ("residual", "prior_residual", "pr_graph"):
+                # 2026-11-25 守卫: 未实现的 weight_mode 不能静默落入 prior_residual 分支
+                # (ca_fixed / grouped 仅在 clip_cbm_orth 下实现)
+                raise ValueError(
+                    f"clip_cbm_subspace 不支持 weight_mode='{weight_mode}' "
+                    f"(仅 none/fixed/residual/prior_residual/pr_graph)")
             else:
                 if weight_mode == "residual":
                     scores = torch.zeros_like(scores)

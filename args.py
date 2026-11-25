@@ -88,6 +88,10 @@ def get_args():
     parser.add_argument('--model_save_path', type=str, default=r'logs')
     parser.add_argument('--prompt_type', type=str, default=r'origin') # origin, others
     parser.add_argument("--save_model", action="store_true", default=True)
+    # 2026-11-25: store_true + default=True 意味着命令行无法关闭保存 —— 11-20 的
+    # 1-epoch smoke 正是这样覆盖了 best_CUB.pth。补一个显式关闭开关 (默认行为不变)。
+    parser.add_argument("--no_save_model", dest="save_model", action="store_false",
+                        help="不写 best_<dataset>*.pth (smoke/诊断 run 应始终使用)")
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')
