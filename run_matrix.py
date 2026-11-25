@@ -113,6 +113,20 @@ MATRICES = {
     "mechanism": ("DDO-Subspace", [
         ("CUB", f"mech_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a)] + MECH_DIRS[arm])
         for arm in ("proj8", "res8", "split8", "proj32", "res32", "split32") for a in MECH_DOSES[arm]]),
+    # Stage 0 机制诊断用的收敛分类头 (主线 B): 只产出模型, 不做任何判定。CE-Only、Full DDO、Mean、Full-Sym、
+    # Bias-Free 各在预先确定的剂量下重训并 --save_head (正式矩阵都是 --no_save_model, 没有保存分类头)。
+    # 配置与正式矩阵一致 (同 batch / epochs / 协议), 所以精度应与已有的正式结果逐位相同 —— 这本身就是一项核对。
+    "stage0": ("DDO-Subspace", [
+        ("CUB", "s0_ce_a0", EQUAL + ["--alpha", "0.0", "--save_head"]),
+        ("CUB", "s0_full_a1", EQUAL + ["--alpha", "1.0", "--save_head"]),
+        ("CUB", "s0_full_a2", EQUAL + ["--alpha", "2.0", "--save_head"]),
+        ("CUB", "s0_mean_a1", EQUAL + ["--alpha", "1.0", "--ddo_dirs", "mean", "--save_head"]),
+        ("CUB", "s0_mean_a2", EQUAL + ["--alpha", "2.0", "--ddo_dirs", "mean", "--save_head"]),
+        ("CUB", "s0_sym_a1", EQUAL + ["--alpha", "1.0", "--ddo_dirs", "full_sym", "--save_head"]),
+        ("CUB", "s0_sym_a2", EQUAL + ["--alpha", "2.0", "--ddo_dirs", "full_sym", "--save_head"]),
+        ("CUB", "s0_bf_a1", EQUAL + ["--alpha", "1.0", "--ddo_dirs", "full_bf", "--save_head"]),
+        ("CUB", "s0_bf_a2", EQUAL + ["--alpha", "2.0", "--ddo_dirs", "full_bf", "--save_head"]),
+    ]),
     # Split 的偏置对照 (§3q): bias-free 的 split 对 bias-free 的 full, k in {8,32} x 4 个剂量 x 3 seeds = 48 个 run
     "biasfree": ("DDO-Subspace", [
         ("CUB", f"bf_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a), "--ddo_dirs", dirs, "--ddo_k", str(k)])
@@ -122,7 +136,9 @@ MATRICES = {
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
-STORE_TRUE = {"--grad_diag": "grad_diag", "--overwrite_run": "overwrite_run", "--grouped_weights": "grouped_weights"}
+# 新增任何 store_true/store_false 参数都必须在这里登记, 否则 expected() 会把它当成"缺值的参数"而报错 (导入时自检)
+STORE_TRUE = {"--grad_diag": "grad_diag", "--overwrite_run": "overwrite_run", "--grouped_weights": "grouped_weights",
+              "--save_head": "save_head"}
 STORE_FALSE = {"--no_save_model": "save_model"}
 
 
@@ -162,6 +178,7 @@ def _self_test_expected():
     assert len(_subspace_entries()) == 26, len(_subspace_entries())        # 22 预注册 + 4 低剂量配置
     assert len(MATRICES["mechanism"][1]) == 24, len(MATRICES["mechanism"][1])
     assert len(MATRICES["biasfree"][1]) == 16, len(MATRICES["biasfree"][1])       # 4 臂 x 4 剂量
+    assert len(MATRICES["stage0"][1]) == 9, len(MATRICES["stage0"][1])
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
