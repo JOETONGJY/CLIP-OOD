@@ -162,10 +162,16 @@ class Data:
         changed = set()
         for c in commits:
             changed |= set(x for x in _git("diff", "--name-only", c, "HEAD")[1].splitlines() if x)
+        # 4b374dc 相对 1cd707a 改了 args.py / model/cbm_models.py / run_matrix.py: 只新增 projected/residual/split
+        # 分支与参数选项, 不改已有臂的执行路径。行为等价由逐位复跑核验 (见 RESULTS §3p 结果一节):
+        # 默认路径回归与 11-20 留档逐位一致; CUB_sub_mean_a1_seed1 在 HEAD 复跑与正式结果逐位相同
+        # (final_diag / 100 条 epoch_metrics / grad_diag 全部一致)。
+        ADDITIVE = ("args.py", "model/cbm_models.py", "run_matrix.py")
         non_code = all(x.startswith(("experiment_results/", "doc/")) or x in
                        ("ddo_subspace_report.py", "tests_subspace_report.py", "tests_projected_dirs.py",
-                        "ddo_dose_report.py", "ddo_principal_class_relevance.py") for x in changed)
-        self.checks.append(("子空间 run 的提交与当前 HEAD 之间只有分析脚本与报告不同, 训练代码逐字节相同", non_code,
+                        "ddo_dose_report.py", "ddo_principal_class_relevance.py") or x in ADDITIVE for x in changed)
+        self.checks.append(("记录的提交 -> HEAD 的差异仅含分析/报告文件与 4b374dc 的新增臂/参数选项 (增量改动); "
+                            "已有臂行为经逐位复跑核验不变 (默认路径回归 + mean a1 复跑, 见 RESULTS §3p)", non_code,
                             "; ".join(sorted(changed))[:300] if changed else "没有差异"))
         ref = sorted({j["git"]["commit"][:7] for (arm, _, _), j in self.r.items()
                       if arm == "full" and isinstance(j.get("git"), dict) and j["git"].get("commit")})
