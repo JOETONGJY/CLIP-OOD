@@ -1,0 +1,1624 @@
+{
+ "integrity": [
+  {
+   "check": "66 个子空间 run 的结果文件都存在",
+   "ok": true,
+   "detail": "66 / 66"
+  },
+  {
+   "check": "全部 run 在驱动的完成判据下为完成 (status / 100 epochs / 命令行全部配置逐项匹配)",
+   "ok": true,
+   "detail": "87 个"
+  },
+  {
+   "check": "每个子空间 run 的方向集与设计一致 (类型 / PCA 来源 / k / 方向种子 / 方向数 / 摘要)",
+   "ok": true,
+   "detail": "通过"
+  },
+  {
+   "check": "方向集摘要一致: 同一臂 (随机臂: 同一方向种子) 的所有 run 摘要相同",
+   "ok": true,
+   "detail": "通过"
+  },
+  {
+   "check": "三个随机标架 (方向种子 1/2/3) 互不相同",
+   "ok": true,
+   "detail": "3 / 3"
+  },
+  {
+   "check": "每个子空间 run 记录的代码提交都是当前 HEAD 的祖先",
+   "ok": true,
+   "detail": "1cd707a / 8590d1d (HEAD 8590d1d)"
+  },
+  {
+   "check": "子空间 run 的提交与当前 HEAD 之间只有分析脚本与报告不同, 训练代码逐字节相同",
+   "ok": true,
+   "detail": "ddo_subspace_report.py; tests_subspace_report.py"
+  },
+  {
+   "check": "子空间 run 中记录为 dirty 的: 31 / 66；参照用的 full 曲线的提交: a84fd25",
+   "ok": true,
+   "detail": "dirty 为 true 是因为工作区里有未跟踪的分析脚本 (它不参与训练, 见上一项)"
+  }
+ ],
+ "thresholds": {
+  "min_effect": 0.5,
+  "operating_band": 0.3
+ },
+ "curves": {
+  "mean": {
+   "0.5": {
+    "target_acc": {
+     "seeds": [
+      55.3,
+      54.644,
+      55.005
+     ],
+     "mean": 54.983,
+     "sd": 0.329
+    },
+    "source_ce": 1.2033,
+    "source_acc": 79.113,
+    "ddo_eq": 1.2364
+   },
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      55.957,
+      55.071,
+      55.989
+     ],
+     "mean": 55.672,
+     "sd": 0.521
+    },
+    "source_ce": 1.3288,
+    "source_acc": 79.326,
+    "ddo_eq": 1.0223
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      57.302,
+      56.022,
+      57.368
+     ],
+     "mean": 56.897,
+     "sd": 0.759
+    },
+    "source_ce": 1.5714,
+    "source_acc": 78.923,
+    "ddo_eq": 0.8045
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      56.515,
+      56.416,
+      57.401
+     ],
+     "mean": 56.777,
+     "sd": 0.542
+    },
+    "source_ce": 2.0377,
+    "source_acc": 76.822,
+    "ddo_eq": 0.5747
+   }
+  },
+  "pca8": {
+   "0.5": {
+    "target_acc": {
+     "seeds": [
+      53.069,
+      52.117,
+      52.412
+     ],
+     "mean": 52.533,
+     "sd": 0.487
+    },
+    "source_ce": 1.2553,
+    "source_acc": 78.089,
+    "ddo_eq": 1.272
+   },
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      51.887,
+      51.001,
+      51.625
+     ],
+     "mean": 51.504,
+     "sd": 0.455
+    },
+    "source_ce": 1.3535,
+    "source_acc": 77.334,
+    "ddo_eq": 1.1962
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      51.264,
+      50.279,
+      51.165
+     ],
+     "mean": 50.903,
+     "sd": 0.542
+    },
+    "source_ce": 1.5232,
+    "source_acc": 76.028,
+    "ddo_eq": 1.1042
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      49.984,
+      48.474,
+      49.885
+     ],
+     "mean": 49.448,
+     "sd": 0.845
+    },
+    "source_ce": 1.9114,
+    "source_acc": 73.661,
+    "ddo_eq": 0.911
+   }
+  },
+  "pca32": {
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      50.279,
+      49.688,
+      50.574
+     ],
+     "mean": 50.181,
+     "sd": 0.451
+    },
+    "source_ce": 1.5696,
+    "source_acc": 75.567,
+    "ddo_eq": 1.5241
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      48.769,
+      48.343,
+      48.933
+     ],
+     "mean": 48.682,
+     "sd": 0.305
+    },
+    "source_ce": 2.0475,
+    "source_acc": 72.596,
+    "ddo_eq": 1.0785
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      43.288,
+      42.796,
+      42.14
+     ],
+     "mean": 42.741,
+     "sd": 0.576
+    },
+    "source_ce": 2.8971,
+    "source_acc": 64.214,
+    "ddo_eq": 0.5972
+   },
+   "8.0": {
+    "target_acc": {
+     "seeds": [
+      30.555,
+      27.306,
+      30.325
+     ],
+     "mean": 29.395,
+     "sd": 1.813
+    },
+    "source_ce": 3.9869,
+    "source_acc": 49.073,
+    "ddo_eq": 0.2265
+   }
+  },
+  "rand8": {
+   "0.5": {
+    "target_acc": {
+     "seeds": [
+      49.984,
+      49.787,
+      49.59
+     ],
+     "mean": 49.787,
+     "sd": 0.197
+    },
+    "source_ce": 1.1046,
+    "source_acc": 77.133,
+    "ddo_eq": 2.4921
+   },
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      49.754,
+      49.458,
+      49.426
+     ],
+     "mean": 49.546,
+     "sd": 0.181
+    },
+    "source_ce": 1.1476,
+    "source_acc": 76.914,
+    "ddo_eq": 2.4122
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      49.393,
+      49.032,
+      49.163
+     ],
+     "mean": 49.196,
+     "sd": 0.183
+    },
+    "source_ce": 1.266,
+    "source_acc": 75.924,
+    "ddo_eq": 2.2225
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      48.835,
+      48.244,
+      49.262
+     ],
+     "mean": 48.78,
+     "sd": 0.511
+    },
+    "source_ce": 1.5328,
+    "source_acc": 74.185,
+    "ddo_eq": 1.8962
+   }
+  },
+  "rand32": {
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      49.163,
+      49.918,
+      49.229
+     ],
+     "mean": 49.437,
+     "sd": 0.418
+    },
+    "source_ce": 1.1544,
+    "source_acc": 76.488,
+    "ddo_eq": 2.411
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      48.933,
+      49.426,
+      48.966
+     ],
+     "mean": 49.108,
+     "sd": 0.275
+    },
+    "source_ce": 1.204,
+    "source_acc": 76.079,
+    "ddo_eq": 2.3311
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      48.704,
+      48.933,
+      48.244
+     ],
+     "mean": 48.627,
+     "sd": 0.351
+    },
+    "source_ce": 1.3456,
+    "source_acc": 75.112,
+    "ddo_eq": 2.1279
+   },
+   "8.0": {
+    "target_acc": {
+     "seeds": [
+      47.686,
+      46.931,
+      47.424
+     ],
+     "mean": 47.347,
+     "sd": 0.383
+    },
+    "source_ce": 1.6649,
+    "source_acc": 73.161,
+    "ddo_eq": 1.7799
+   }
+  },
+  "fullsym": {
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      56.186,
+      55.464,
+      56.383
+     ],
+     "mean": 56.011,
+     "sd": 0.484
+    },
+    "source_ce": 1.4025,
+    "source_acc": 79.545,
+    "ddo_eq": 0.9115
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      57.237,
+      56.613,
+      57.073
+     ],
+     "mean": 56.974,
+     "sd": 0.323
+    },
+    "source_ce": 1.7724,
+    "source_acc": 79.05,
+    "ddo_eq": 0.6256
+   }
+  },
+  "full": {
+   "0.0": {
+    "target_acc": {
+     "seeds": [
+      49.852,
+      49.819,
+      50.345
+     ],
+     "mean": 50.005,
+     "sd": 0.294
+    },
+    "source_ce": 1.0757,
+    "source_acc": 77.248,
+    "ddo_eq": 2.5554
+   },
+   "0.125": {
+    "target_acc": {
+     "seeds": [
+      52.642,
+      52.937,
+      52.773
+     ],
+     "mean": 52.784,
+     "sd": 0.148
+    },
+    "source_ce": 1.1081,
+    "source_acc": 78.187,
+    "ddo_eq": 1.7183
+   },
+   "0.25": {
+    "target_acc": {
+     "seeds": [
+      53.725,
+      53.758,
+      54.119
+     ],
+     "mean": 53.867,
+     "sd": 0.219
+    },
+    "source_ce": 1.1468,
+    "source_acc": 78.705,
+    "ddo_eq": 1.4584
+   },
+   "0.5": {
+    "target_acc": {
+     "seeds": [
+      55.038,
+      54.447,
+      54.874
+     ],
+     "mean": 54.786,
+     "sd": 0.305
+    },
+    "source_ce": 1.2277,
+    "source_acc": 79.28,
+    "ddo_eq": 1.1896
+   },
+   "1.0": {
+    "target_acc": {
+     "seeds": [
+      55.924,
+      55.432,
+      56.285
+     ],
+     "mean": 55.88,
+     "sd": 0.428
+    },
+    "source_ce": 1.4,
+    "source_acc": 79.62,
+    "ddo_eq": 0.9102
+   },
+   "2.0": {
+    "target_acc": {
+     "seeds": [
+      57.401,
+      56.252,
+      57.237
+     ],
+     "mean": 56.963,
+     "sd": 0.621
+    },
+    "source_ce": 1.768,
+    "source_acc": 79.096,
+    "ddo_eq": 0.6249
+   },
+   "4.0": {
+    "target_acc": {
+     "seeds": [
+      55.333,
+      54.545,
+      55.3
+     ],
+     "mean": 55.06,
+     "sd": 0.446
+    },
+    "source_ce": 2.5563,
+    "source_acc": 73.846,
+    "ddo_eq": 0.3452
+   }
+  }
+ },
+ "q1_pca_vs_random": {
+  "k=8": {
+   "pairs": {
+    "0.5": {
+     "1": 3.085,
+     "2": 2.33,
+     "3": 2.822
+    },
+    "1.0": {
+     "1": 2.133,
+     "2": 1.543,
+     "3": 2.199
+    },
+    "2.0": {
+     "1": 1.871,
+     "2": 1.247,
+     "3": 2.002
+    },
+    "4.0": {
+     "1": 1.149,
+     "2": 0.23,
+     "3": 0.624
+    }
+   },
+   "mean": 1.77,
+   "seed_means": {
+    "1": 2.059,
+    "2": 1.337,
+    "3": 1.912
+   },
+   "n_pairs": 12,
+   "verdict": "支持"
+  },
+  "k=32": {
+   "pairs": {
+    "1.0": {
+     "1": 1.116,
+     "2": -0.23,
+     "3": 1.346
+    },
+    "2.0": {
+     "1": -0.164,
+     "2": -1.083,
+     "3": -0.033
+    },
+    "4.0": {
+     "1": -5.415,
+     "2": -6.137,
+     "3": -6.104
+    },
+    "8.0": {
+     "1": -17.132,
+     "2": -19.626,
+     "3": -17.099
+    }
+   },
+   "mean": -5.88,
+   "seed_means": {
+    "1": -5.399,
+    "2": -6.769,
+    "3": -5.473
+   },
+   "n_pairs": 12,
+   "verdict": "不支持"
+  }
+ },
+ "q2_lowdim_vs_full": {
+  "pca8": {
+   "pairs": {
+    "0.5": {
+     "1": -1.969,
+     "2": -2.33,
+     "3": -2.461
+    },
+    "1.0": {
+     "1": -4.037,
+     "2": -4.431,
+     "3": -4.66
+    },
+    "2.0": {
+     "1": -6.137,
+     "2": -5.973,
+     "3": -6.072
+    },
+    "4.0": {
+     "1": -5.35,
+     "2": -6.072,
+     "3": -5.415
+    }
+   },
+   "mean": -4.576,
+   "seed_means": {
+    "1": -4.373,
+    "2": -4.701,
+    "3": -4.652
+   },
+   "n_pairs": 12,
+   "verdict": "不支持"
+  },
+  "pca32": {
+   "pairs": {
+    "1.0": {
+     "1": -5.645,
+     "2": -5.743,
+     "3": -5.711
+    },
+    "2.0": {
+     "1": -8.631,
+     "2": -7.909,
+     "3": -8.303
+    },
+    "4.0": {
+     "1": -12.045,
+     "2": -11.749,
+     "3": -13.16
+    }
+   },
+   "mean": -8.766,
+   "seed_means": {
+    "1": -8.774,
+    "2": -8.467,
+    "3": -9.058
+   },
+   "n_pairs": 9,
+   "verdict": "不支持"
+  },
+  "mean": {
+   "pairs": {
+    "0.5": {
+     "1": 0.263,
+     "2": 0.197,
+     "3": 0.131
+    },
+    "1.0": {
+     "1": 0.033,
+     "2": -0.361,
+     "3": -0.295
+    },
+    "2.0": {
+     "1": -0.098,
+     "2": -0.23,
+     "3": 0.131
+    },
+    "4.0": {
+     "1": 1.181,
+     "2": 1.871,
+     "3": 2.1
+    }
+   },
+   "mean": 0.41,
+   "seed_means": {
+    "1": 0.345,
+    "2": 0.369,
+    "3": 0.517
+   },
+   "n_pairs": 12,
+   "verdict": "不确定"
+  }
+ },
+ "q3_symmetric": {
+  "pairs": {
+   "1.0": {
+    "1": 0.263,
+    "2": 0.033,
+    "3": 0.098
+   },
+   "2.0": {
+    "1": -0.164,
+    "2": 0.361,
+    "3": -0.164
+   }
+  },
+  "mean": 0.071,
+  "seed_means": {
+   "1": 0.049,
+   "2": 0.197,
+   "3": -0.033
+  },
+  "n_pairs": 6,
+  "verdict": "未见影响",
+  "pca_minus_fullsym": {
+   "k=8": {
+    "1.0": {
+     "1": -4.299,
+     "2": -4.463,
+     "3": -4.759
+    },
+    "2.0": {
+     "1": -5.973,
+     "2": -6.334,
+     "3": -5.907
+    }
+   },
+   "k=32": {
+    "1.0": {
+     "1": -5.907,
+     "2": -5.776,
+     "3": -5.809
+    },
+    "2.0": {
+     "1": -8.467,
+     "2": -8.27,
+     "3": -8.139
+    }
+   }
+  }
+ },
+ "full_curve": {
+  "ddo_eq": [
+   0.3451777398586273,
+   0.6249385476112366,
+   0.9101607799530029,
+   1.189575473467509,
+   1.4583704471588135,
+   1.718265692392985,
+   2.555438995361328
+  ],
+  "target_acc": [
+   55.059621485614265,
+   56.96313313641834,
+   55.880100645443605,
+   54.78612843233782,
+   53.867191773328955,
+   52.78415928235423,
+   50.005469861065535
+  ],
+  "source_ce": [
+   2.556330136341409,
+   1.7680294816495359,
+   1.3999714037434563,
+   1.2277466635492662,
+   1.146769236639854,
+   1.1081229549340976,
+   1.0756852694606396
+  ],
+  "range_all_runs": [
+   0.34510019421577454,
+   2.5590898990631104
+  ]
+ },
+ "q4_tradeoff": {
+  "mean": {
+   "n_in_range": 12,
+   "n_out_of_range": 0,
+   "mean_res_target_acc": 0.34,
+   "mean_res_source_ce": 0.0377,
+   "seed_means_res_target_acc": {
+    "1": 0.527,
+    "2": -0.205,
+    "3": 0.699
+   },
+   "verdict": "不确定",
+   "runs": [
+    {
+     "alpha": 0.5,
+     "seed": 1,
+     "ddo_eq": 1.2371,
+     "in_range": true,
+     "res_target_acc": 0.677,
+     "res_source_ce": -0.0097
+    },
+    {
+     "alpha": 0.5,
+     "seed": 2,
+     "ddo_eq": 1.2356,
+     "in_range": true,
+     "res_target_acc": 0.015,
+     "res_source_ce": -0.01
+    },
+    {
+     "alpha": 0.5,
+     "seed": 3,
+     "ddo_eq": 1.2365,
+     "in_range": true,
+     "res_target_acc": 0.379,
+     "res_source_ce": -0.0113
+    },
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 1.0228,
+     "in_range": true,
+     "res_target_acc": 0.518,
+     "res_source_ce": -0.0015
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 1.0212,
+     "in_range": true,
+     "res_target_acc": -0.375,
+     "res_source_ce": -0.0016
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 1.0227,
+     "in_range": true,
+     "res_target_acc": 0.55,
+     "res_source_ce": -0.0031
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 0.8046,
+     "in_range": true,
+     "res_target_acc": 1.021,
+     "res_source_ce": 0.0346
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 0.8038,
+     "in_range": true,
+     "res_target_acc": -0.262,
+     "res_source_ce": 0.035
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 0.8049,
+     "in_range": true,
+     "res_target_acc": 1.088,
+     "res_source_ce": 0.0354
+    },
+    {
+     "alpha": 4.0,
+     "seed": 1,
+     "ddo_eq": 0.5751,
+     "in_range": true,
+     "res_target_acc": -0.109,
+     "res_source_ce": 0.128
+    },
+    {
+     "alpha": 4.0,
+     "seed": 2,
+     "ddo_eq": 0.5739,
+     "in_range": true,
+     "res_target_acc": -0.2,
+     "res_source_ce": 0.1256
+    },
+    {
+     "alpha": 4.0,
+     "seed": 3,
+     "ddo_eq": 0.5751,
+     "in_range": true,
+     "res_target_acc": 0.777,
+     "res_source_ce": 0.1308
+    }
+   ]
+  },
+  "pca8": {
+   "n_in_range": 12,
+   "n_out_of_range": 0,
+   "mean_res_target_acc": -3.969,
+   "mean_res_source_ce": 0.2337,
+   "seed_means_res_target_acc": {
+    "1": -3.517,
+    "2": -4.598,
+    "3": -3.794
+   },
+   "verdict": "不确定",
+   "runs": [
+    {
+     "alpha": 0.5,
+     "seed": 1,
+     "ddo_eq": 1.2728,
+     "in_range": true,
+     "res_target_acc": -1.433,
+     "res_source_ce": 0.0534
+    },
+    {
+     "alpha": 0.5,
+     "seed": 2,
+     "ddo_eq": 1.271,
+     "in_range": true,
+     "res_target_acc": -2.391,
+     "res_source_ce": 0.0523
+    },
+    {
+     "alpha": 0.5,
+     "seed": 3,
+     "ddo_eq": 1.2722,
+     "in_range": true,
+     "res_target_acc": -2.092,
+     "res_source_ce": 0.0513
+    },
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 1.1957,
+     "in_range": true,
+     "res_target_acc": -2.878,
+     "res_source_ce": 0.128
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 1.197,
+     "in_range": true,
+     "res_target_acc": -3.76,
+     "res_source_ce": 0.1278
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 1.196,
+     "in_range": true,
+     "res_target_acc": -3.14,
+     "res_source_ce": 0.1276
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 1.1033,
+     "in_range": true,
+     "res_target_acc": -3.86,
+     "res_source_ce": 0.2426
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 1.1051,
+     "in_range": true,
+     "res_target_acc": -4.838,
+     "res_source_ce": 0.2441
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 1.1041,
+     "in_range": true,
+     "res_target_acc": -3.956,
+     "res_source_ce": 0.2417
+    },
+    {
+     "alpha": 4.0,
+     "seed": 1,
+     "ddo_eq": 0.9101,
+     "in_range": true,
+     "res_target_acc": -5.897,
+     "res_source_ce": 0.5127
+    },
+    {
+     "alpha": 4.0,
+     "seed": 2,
+     "ddo_eq": 0.9113,
+     "in_range": true,
+     "res_target_acc": -7.402,
+     "res_source_ce": 0.5139
+    },
+    {
+     "alpha": 4.0,
+     "seed": 3,
+     "ddo_eq": 0.9117,
+     "in_range": true,
+     "res_target_acc": -5.989,
+     "res_source_ce": 0.5091
+    }
+   ]
+  },
+  "pca32": {
+   "n_in_range": 9,
+   "n_out_of_range": 3,
+   "mean_res_target_acc": -7.995,
+   "mean_res_source_ce": 0.7449,
+   "seed_means_res_target_acc": {
+    "1": -7.75,
+    "2": -8.258,
+    "3": -7.977
+   },
+   "verdict": "不确定",
+   "runs": [
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 1.5271,
+     "in_range": true,
+     "res_target_acc": -3.302,
+     "res_source_ce": 0.4342
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 1.5203,
+     "in_range": true,
+     "res_target_acc": -3.921,
+     "res_source_ce": 0.4328
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 1.5248,
+     "in_range": true,
+     "res_target_acc": -3.016,
+     "res_source_ce": 0.4308
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 1.0805,
+     "in_range": true,
+     "res_target_acc": -6.444,
+     "res_source_ce": 0.754
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 1.0753,
+     "in_range": true,
+     "res_target_acc": -6.891,
+     "res_source_ce": 0.751
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 1.0798,
+     "in_range": true,
+     "res_target_acc": -6.282,
+     "res_source_ce": 0.7489
+    },
+    {
+     "alpha": 4.0,
+     "seed": 1,
+     "ddo_eq": 0.5997,
+     "in_range": true,
+     "res_target_acc": -13.503,
+     "res_source_ce": 1.0588
+    },
+    {
+     "alpha": 4.0,
+     "seed": 2,
+     "ddo_eq": 0.5947,
+     "in_range": true,
+     "res_target_acc": -13.961,
+     "res_source_ce": 1.0442
+    },
+    {
+     "alpha": 4.0,
+     "seed": 3,
+     "ddo_eq": 0.5971,
+     "in_range": true,
+     "res_target_acc": -14.634,
+     "res_source_ce": 1.0497
+    },
+    {
+     "alpha": 8.0,
+     "seed": 1,
+     "ddo_eq": 0.2271,
+     "in_range": false
+    },
+    {
+     "alpha": 8.0,
+     "seed": 2,
+     "ddo_eq": 0.2251,
+     "in_range": false
+    },
+    {
+     "alpha": 8.0,
+     "seed": 3,
+     "ddo_eq": 0.2274,
+     "in_range": false
+    }
+   ]
+  },
+  "rand8": {
+   "n_in_range": 12,
+   "n_out_of_range": 0,
+   "mean_res_target_acc": -1.673,
+   "mean_res_source_ce": 0.1754,
+   "seed_means_res_target_acc": {
+    "1": -1.537,
+    "2": -1.892,
+    "3": -1.59
+   },
+   "verdict": "不确定",
+   "runs": [
+    {
+     "alpha": 0.5,
+     "seed": 1,
+     "ddo_eq": 2.4854,
+     "in_range": true,
+     "res_target_acc": -0.254,
+     "res_source_ce": 0.0299
+    },
+    {
+     "alpha": 0.5,
+     "seed": 2,
+     "ddo_eq": 2.4854,
+     "in_range": true,
+     "res_target_acc": -0.451,
+     "res_source_ce": 0.0245
+    },
+    {
+     "alpha": 0.5,
+     "seed": 3,
+     "ddo_eq": 2.5055,
+     "in_range": true,
+     "res_target_acc": -0.582,
+     "res_source_ce": 0.0249
+    },
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 2.404,
+     "in_range": true,
+     "res_target_acc": -0.754,
+     "res_source_ce": 0.0712
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 2.4052,
+     "in_range": true,
+     "res_target_acc": -1.046,
+     "res_source_ce": 0.0639
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 2.4274,
+     "in_range": true,
+     "res_target_acc": -1.005,
+     "res_source_ce": 0.0639
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 2.2127,
+     "in_range": true,
+     "res_target_acc": -1.75,
+     "res_source_ce": 0.1846
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 2.2153,
+     "in_range": true,
+     "res_target_acc": -2.102,
+     "res_source_ce": 0.1746
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 2.2393,
+     "in_range": true,
+     "res_target_acc": -1.892,
+     "res_source_ce": 0.173
+    },
+    {
+     "alpha": 4.0,
+     "seed": 1,
+     "ddo_eq": 1.8868,
+     "in_range": true,
+     "res_target_acc": -3.39,
+     "res_source_ce": 0.4414
+    },
+    {
+     "alpha": 4.0,
+     "seed": 2,
+     "ddo_eq": 1.8906,
+     "in_range": true,
+     "res_target_acc": -3.968,
+     "res_source_ce": 0.4302
+    },
+    {
+     "alpha": 4.0,
+     "seed": 3,
+     "ddo_eq": 1.9112,
+     "in_range": true,
+     "res_target_acc": -2.882,
+     "res_source_ce": 0.4231
+    }
+   ]
+  },
+  "rand32": {
+   "n_in_range": 12,
+   "n_out_of_range": 0,
+   "mean_res_target_acc": -2.68,
+   "mean_res_source_ce": 0.2513,
+   "seed_means_res_target_acc": {
+    "1": -2.708,
+    "2": -2.569,
+    "3": -2.762
+   },
+   "verdict": "不确定",
+   "runs": [
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 2.403,
+     "in_range": true,
+     "res_target_acc": -1.348,
+     "res_source_ce": 0.0712
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 2.3911,
+     "in_range": true,
+     "res_target_acc": -0.633,
+     "res_source_ce": 0.0738
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 2.439,
+     "in_range": true,
+     "res_target_acc": -1.163,
+     "res_source_ce": 0.0744
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 2.3239,
+     "in_range": true,
+     "res_target_acc": -1.841,
+     "res_source_ce": 0.1178
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 2.3125,
+     "in_range": true,
+     "res_target_acc": -1.386,
+     "res_source_ce": 0.1194
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 2.3568,
+     "in_range": true,
+     "res_target_acc": -1.699,
+     "res_source_ce": 0.1215
+    },
+    {
+     "alpha": 4.0,
+     "seed": 1,
+     "ddo_eq": 2.1229,
+     "in_range": true,
+     "res_target_acc": -2.738,
+     "res_source_ce": 0.2515
+    },
+    {
+     "alpha": 4.0,
+     "seed": 2,
+     "ddo_eq": 2.1094,
+     "in_range": true,
+     "res_target_acc": -2.552,
+     "res_source_ce": 0.2534
+    },
+    {
+     "alpha": 4.0,
+     "seed": 3,
+     "ddo_eq": 2.1515,
+     "in_range": true,
+     "res_target_acc": -3.102,
+     "res_source_ce": 0.2552
+    },
+    {
+     "alpha": 8.0,
+     "seed": 1,
+     "ddo_eq": 1.7759,
+     "in_range": true,
+     "res_target_acc": -4.907,
+     "res_source_ce": 0.5568
+    },
+    {
+     "alpha": 8.0,
+     "seed": 2,
+     "ddo_eq": 1.7626,
+     "in_range": true,
+     "res_target_acc": -5.706,
+     "res_source_ce": 0.5603
+    },
+    {
+     "alpha": 8.0,
+     "seed": 3,
+     "ddo_eq": 1.8012,
+     "in_range": true,
+     "res_target_acc": -5.085,
+     "res_source_ce": 0.5604
+    }
+   ]
+  },
+  "fullsym": {
+   "n_in_range": 6,
+   "n_out_of_range": 0,
+   "mean_res_target_acc": 0.076,
+   "mean_res_source_ce": 0.0042,
+   "seed_means_res_target_acc": {
+    "1": 0.294,
+    "2": -0.381,
+    "3": 0.314
+   },
+   "verdict": "只改变工作点",
+   "runs": [
+    {
+     "alpha": 1.0,
+     "seed": 1,
+     "ddo_eq": 0.9117,
+     "in_range": true,
+     "res_target_acc": 0.312,
+     "res_source_ce": 0.0038
+    },
+    {
+     "alpha": 1.0,
+     "seed": 2,
+     "ddo_eq": 0.9103,
+     "in_range": true,
+     "res_target_acc": -0.415,
+     "res_source_ce": 0.0035
+    },
+    {
+     "alpha": 1.0,
+     "seed": 3,
+     "ddo_eq": 0.9126,
+     "in_range": true,
+     "res_target_acc": 0.513,
+     "res_source_ce": 0.003
+    },
+    {
+     "alpha": 2.0,
+     "seed": 1,
+     "ddo_eq": 0.6258,
+     "in_range": true,
+     "res_target_acc": 0.277,
+     "res_source_ce": 0.005
+    },
+    {
+     "alpha": 2.0,
+     "seed": 2,
+     "ddo_eq": 0.6246,
+     "in_range": true,
+     "res_target_acc": -0.348,
+     "res_source_ce": 0.0044
+    },
+    {
+     "alpha": 2.0,
+     "seed": 3,
+     "ddo_eq": 0.6264,
+     "in_range": true,
+     "res_target_acc": 0.115,
+     "res_source_ce": 0.0058
+    }
+   ]
+  }
+ },
+ "dose_sensitivity": {
+  "mean": {
+   "alphas": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+   ],
+   "mean_acc": [
+    54.983,
+    55.672,
+    56.897,
+    56.777
+   ],
+   "range": 1.914,
+   "drop_to_highest_alpha": 0.12
+  },
+  "pca8": {
+   "alphas": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+   ],
+   "mean_acc": [
+    52.533,
+    51.504,
+    50.903,
+    49.448
+   ],
+   "range": 3.085,
+   "drop_to_highest_alpha": 3.085
+  },
+  "pca32": {
+   "alphas": [
+    1.0,
+    2.0,
+    4.0,
+    8.0
+   ],
+   "mean_acc": [
+    50.181,
+    48.682,
+    42.741,
+    29.395
+   ],
+   "range": 20.785,
+   "drop_to_highest_alpha": 20.785
+  },
+  "rand8": {
+   "alphas": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+   ],
+   "mean_acc": [
+    49.787,
+    49.546,
+    49.196,
+    48.78
+   ],
+   "range": 1.006,
+   "drop_to_highest_alpha": 1.006
+  },
+  "rand32": {
+   "alphas": [
+    1.0,
+    2.0,
+    4.0,
+    8.0
+   ],
+   "mean_acc": [
+    49.437,
+    49.108,
+    48.627,
+    47.347
+   ],
+   "range": 2.089,
+   "drop_to_highest_alpha": 2.089
+  },
+  "fullsym": {
+   "alphas": [
+    1.0,
+    2.0
+   ],
+   "mean_acc": [
+    56.011,
+    56.974
+   ],
+   "range": 0.963,
+   "drop_to_highest_alpha": 0.0
+  },
+  "full": {
+   "alphas": [
+    0.0,
+    0.125,
+    0.25,
+    0.5,
+    1.0,
+    2.0,
+    4.0
+   ],
+   "mean_acc": [
+    50.005,
+    52.784,
+    53.867,
+    54.786,
+    55.88,
+    56.963,
+    55.06
+   ],
+   "range": 6.958,
+   "drop_to_highest_alpha": 1.904
+  }
+ },
+ "grad_ratio_alpha_scaled": {
+  "mean": {
+   "0.5": {
+    "before_epoch1": 0.0541,
+    "before_epoch10": 0.0255,
+    "before_epoch30": 0.0266,
+    "final": 0.0345
+   },
+   "1.0": {
+    "before_epoch1": 0.1082,
+    "before_epoch10": 0.0386,
+    "before_epoch30": 0.0388,
+    "final": 0.0459
+   },
+   "2.0": {
+    "before_epoch1": 0.2164,
+    "before_epoch10": 0.0569,
+    "before_epoch30": 0.0547,
+    "final": 0.0609
+   },
+   "4.0": {
+    "before_epoch1": 0.4328,
+    "before_epoch10": 0.0823,
+    "before_epoch30": 0.0781,
+    "final": 0.0864
+   }
+  },
+  "pca8": {
+   "0.5": {
+    "before_epoch1": 0.0408,
+    "before_epoch10": 0.0396,
+    "before_epoch30": 0.0436,
+    "final": 0.0941
+   },
+   "1.0": {
+    "before_epoch1": 0.0817,
+    "before_epoch10": 0.0705,
+    "before_epoch30": 0.0888,
+    "final": 0.1759
+   },
+   "2.0": {
+    "before_epoch1": 0.1633,
+    "before_epoch10": 0.132,
+    "before_epoch30": 0.1803,
+    "final": 0.3122
+   },
+   "4.0": {
+    "before_epoch1": 0.3267,
+    "before_epoch10": 0.2791,
+    "before_epoch30": 0.3465,
+    "final": 0.4984
+   }
+  },
+  "pca32": {
+   "1.0": {
+    "before_epoch1": 0.041,
+    "before_epoch10": 0.0413,
+    "before_epoch30": 0.0453,
+    "final": 0.0752
+   },
+   "2.0": {
+    "before_epoch1": 0.082,
+    "before_epoch10": 0.0774,
+    "before_epoch30": 0.0892,
+    "final": 0.1181
+   },
+   "4.0": {
+    "before_epoch1": 0.164,
+    "before_epoch10": 0.1465,
+    "before_epoch30": 0.1675,
+    "final": 0.1899
+   },
+   "8.0": {
+    "before_epoch1": 0.328,
+    "before_epoch10": 0.2939,
+    "before_epoch30": 0.3271,
+    "final": 0.3422
+   }
+  },
+  "rand8": {
+   "0.5": {
+    "before_epoch1": 0.0407,
+    "before_epoch10": 0.034,
+    "before_epoch30": 0.0392,
+    "final": 0.1047
+   },
+   "1.0": {
+    "before_epoch1": 0.0814,
+    "before_epoch10": 0.057,
+    "before_epoch30": 0.0947,
+    "final": 0.2051
+   },
+   "2.0": {
+    "before_epoch1": 0.1628,
+    "before_epoch10": 0.1209,
+    "before_epoch30": 0.1881,
+    "final": 0.367
+   },
+   "4.0": {
+    "before_epoch1": 0.3256,
+    "before_epoch10": 0.2725,
+    "before_epoch30": 0.3592,
+    "final": 0.5908
+   }
+  },
+  "rand32": {
+   "1.0": {
+    "before_epoch1": 0.0409,
+    "before_epoch10": 0.0396,
+    "before_epoch30": 0.0447,
+    "final": 0.1015
+   },
+   "2.0": {
+    "before_epoch1": 0.0819,
+    "before_epoch10": 0.0727,
+    "before_epoch30": 0.093,
+    "final": 0.1932
+   },
+   "4.0": {
+    "before_epoch1": 0.1638,
+    "before_epoch10": 0.1412,
+    "before_epoch30": 0.183,
+    "final": 0.3428
+   },
+   "8.0": {
+    "before_epoch1": 0.3276,
+    "before_epoch10": 0.2939,
+    "before_epoch30": 0.3532,
+    "final": 0.5466
+   }
+  },
+  "fullsym": {
+   "1.0": {
+    "before_epoch1": 0.0944,
+    "before_epoch10": 0.0385,
+    "before_epoch30": 0.0406,
+    "final": 0.0527
+   },
+   "2.0": {
+    "before_epoch1": 0.1888,
+    "before_epoch10": 0.059,
+    "before_epoch30": 0.0611,
+    "final": 0.0702
+   }
+  },
+  "full": {
+   "0.0": {
+    "before_epoch1": 0.0,
+    "before_epoch10": 0.0,
+    "before_epoch30": 0.0,
+    "final": 0.0
+   },
+   "0.125": {
+    "before_epoch1": 0.0119,
+    "before_epoch10": 0.0101,
+    "before_epoch30": 0.0106,
+    "final": 0.0169
+   },
+   "0.25": {
+    "before_epoch1": 0.0237,
+    "before_epoch10": 0.0167,
+    "before_epoch30": 0.017,
+    "final": 0.0253
+   },
+   "0.5": {
+    "before_epoch1": 0.0475,
+    "before_epoch10": 0.0251,
+    "before_epoch30": 0.0264,
+    "final": 0.0369
+   },
+   "1.0": {
+    "before_epoch1": 0.0949,
+    "before_epoch10": 0.0385,
+    "before_epoch30": 0.0404,
+    "final": 0.052
+   },
+   "2.0": {
+    "before_epoch1": 0.1898,
+    "before_epoch10": 0.059,
+    "before_epoch30": 0.0608,
+    "final": 0.0694
+   },
+   "4.0": {
+    "before_epoch1": 0.3796,
+    "before_epoch10": 0.0888,
+    "before_epoch30": 0.0891,
+    "final": 0.0901
+   }
+  }
+ }
+}
