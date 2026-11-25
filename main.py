@@ -811,6 +811,19 @@ class TrainingSession:
                 wandb.summary.update(self.best_metrics)
                 wandb.finish()
 
+            # --save_head (2026-11-25, Stage 0 机制诊断用): 只在训练完整结束时保存**分类头** (W, gamma, beta, b,
+            # 几 KB), 按 run 命名, 不触碰任何按数据集命名的检查点。正式矩阵都用 --no_save_model, 没有收敛的分类头,
+            # Stage 0A/0B 需要它 —— 另跑少量配置并带此开关 (doc/主线B实施规格.md §1、§2)。
+            if getattr(self.args, "save_head", False) and not getattr(self, "_training_failed", False) \
+                    and self._completed_epochs == self.args.epochs:
+                os.makedirs("logs/heads", exist_ok=True)
+                head = {n: p.detach().cpu() for n, p in self.model.classifier.named_parameters()}
+                torch.save({"classifier": head, "run_name": self.run_name,
+                            "run_config": {k: jsonable(v) for k, v in sorted(vars(self.args).items())},
+                            "git": git_info(), "ddo_dirs_info": getattr(self.model, "ddo_dirs_info", None)},
+                           f"logs/heads/{self.run_name}.pt")
+                logger.info(f"Head saved to logs/heads/{self.run_name}.pt")
+
             # 保存结果 json (多 seed 汇总脚本 aggregate_results.py 按命名约定读取)
             # 文件名: logs/results/{dataset}_{method_tag}_seed{seed}.json
             os.makedirs("logs/results", exist_ok=True)

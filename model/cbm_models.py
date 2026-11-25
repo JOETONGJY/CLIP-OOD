@@ -540,8 +540,10 @@ class clip_cbm_orth(nn.Module):
                                            'cum_spectral_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
             elif ddo_dirs in ('full_bf', 'split_bf'):
                 # 外审第四轮 (2026-11-25): split 的 |A·u_p + c| + |A·u_r + c| 把有效偏置 c = W·beta + b 计了两次,
-                # split 与 full 的差异里混入了"截距重复处理"这个因素。注意"偏置只计一次的 split"恒等于 full
-                # (u_p + u_r = u), 所以正确的配对是 bias-free 的 split |A·u_p| + |A·u_r| 对 bias-free 的 full |A·u|:
+                # split 与 full 的差异里混入了"截距重复处理"这个因素。不用"偏置只计一次"的各种 split (如
+                # |A·u_p + c| + |A·u_r|): 偏置分给哪个分量没有自然依据, 会引入不对称性 (外审第五轮更正了我
+                # "它恒等于 full"的说法 —— 只有先把两分量相加再加偏置才恒等于 full)。
+                # 正确的配对是 bias-free 的 split |A·u_p| + |A·u_r| 对 bias-free 的 full |A·u|:
                 # full_bf  = 完整 LN0 方向 (不分解), 无偏置
                 # split_bf = 两分量分别求损失后相加, 无偏置
                 A = (self.diffs @ E.T).reshape(-1, E.size(0))       # (N*C, 312)

@@ -523,8 +523,11 @@ def main():
     have_bf = any(d.alphas(a) for a in BF_ARMS)
     L += ["", "## 8b. Split 的偏置对照（§3q，预注册于运行之前）", ""]
     if have_bf:
-        L += ["§3p 的 split 对两个分量各计一次有效偏置 c = W·β + b；\"偏置只计一次的 split\" 恒等于 full，"
-              "所以去掉该混杂的配对是 bias-free 的 split（split_bf）对 bias-free 的 full（full_bf）。**主比较只判定 split_bf − full_bf。**", "",
+        L += ["§3p 的 split 对两个分量各计一次有效偏置 c = W·β + b。去掉这个混杂的配对是 bias-free 的 split（split_bf）"
+              "对 bias-free 的 full（full_bf）——不用各种\"偏置只计一次\"的 split，因为偏置分给哪个分量没有自然依据（外审第五轮更正了我最初\"它恒等于 full\"的说法）。"
+              "**主比较只判定 split_bf − full_bf。**", "",
+              "注：full_bf 不做分解，`--ddo_k` 对它没有作用；`bf_full8` 与 `bf_full32` 的方向集摘要相同、结果逐位相同，是同一配置（各 12 个 run，相当于两次重复）。"
+              "表中仍按 tag 分两列列出，以便与同 k 的 split_bf 对照读数。", "",
               "| α | " + " | ".join(NAMES[a] for a in bf_cols) + " |",
               "|---|" + "---|" * len(bf_cols)]
         for a in all_a:

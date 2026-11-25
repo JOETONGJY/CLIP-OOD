@@ -92,6 +92,9 @@ def get_args():
     # 1-epoch smoke 正是这样覆盖了 best_CUB.pth。补一个显式关闭开关 (默认行为不变)。
     parser.add_argument("--no_save_model", dest="save_model", action="store_false",
                         help="不写 best_<dataset>*.pth (smoke/诊断 run 应始终使用)")
+    parser.add_argument("--save_head", action="store_true", default=False,
+                        help="训练完整结束时只保存分类头 (W, gamma, beta, b) 到 logs/heads/{run_name}.pt, "
+                             "供 Stage 0 机制诊断使用; 不触碰任何检查点 (默认关闭)")
     # ---- 2026-11-25 实验可靠性修复 (外审建议) ----
     parser.add_argument("--overwrite_run", action="store_true", default=False,
                         help="覆盖保护: 同名结果 json / 权重日志 / 检查点已存在时默认拒绝启动; "
