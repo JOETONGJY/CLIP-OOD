@@ -57,10 +57,11 @@ def load_heads():
 def verify_heads(heads):
     """收敛分类头对应的 run 必须完整, 且 (核对项) 精度与已有的正式结果逐位相同"""
     checks = []
-    pairs = {("full_a1", "dose_a1"), ("full_a2", "dose_a2"), ("ce_a0", "dose_a0"), ("mean_a1", "sub_mean_a1"),
-             ("mean_a2", "sub_mean_a2"), ("sym_a1", "sub_fullsym_a1"), ("sym_a2", "sub_fullsym_a2"),
-             ("bf_a1", "bf_full8_a1"), ("bf_a2", "bf_full8_a2")}
-    n_ok = n_cmp = 0
+    # Stage 0 的 tag -> 对应的正式结果 tag (同配置; Stage 0 只是多加了 --save_head, 不改变训练的随机数消耗)
+    pairs = dict([("full_a1", "dose_a1"), ("full_a2", "dose_a2"), ("ce_a0", "dose_a0"), ("mean_a1", "sub_mean_a1"),
+                  ("mean_a2", "sub_mean_a2"), ("sym_a1", "sub_fullsym_a1"), ("sym_a2", "sub_fullsym_a2"),
+                  ("bf_a1", "bf_full8_a1"), ("bf_a2", "bf_full8_a2")])
+    n_ok = n_cmp = n_same = 0
     for (tag, s), h in sorted(heads.items()):
         rp = f"logs/results/CUB_s0_{tag}_seed{s}.json"
         r = json.load(open(rp, encoding="utf-8")) if os.path.exists(rp) else None
@@ -68,14 +69,17 @@ def verify_heads(heads):
         n_ok += complete
         ref_tag = pairs.get(tag)
         if ref_tag:
-            n_cmp += 1
             ref_p = f"logs/results/CUB_{ref_tag}_seed{s}.json"
             same = False
-            if os.path.exists(ref_p):
+            if os.path.exists(ref_p) and r is not None:        # 参照或本 run 缺失都算未通过, 不静默放过
                 ref = json.load(open(ref_p, encoding="utf-8"))
-                same = (ref["final_diag"] == r["final_diag"]) if r else False
-            checks.append((f"{tag} s{s} vs 正式结果 {ref_tag}: final_diag 逐位相同", same))
-    checks.insert(0, ("27 个 Stage 0 run 都完整结束 (status / 100 epochs)", n_ok == 27 and len(heads) == 27))
+                same = (ref["final_diag"] == r["final_diag"])
+            n_cmp += 1
+            n_same += same
+    checks.append(("27 个 Stage 0 run 都完整结束 (status / 100 epochs)", n_ok == 27 and len(heads) == 27,
+                   f"{n_ok} / 27"))
+    checks.append(("27 个重训 run 的 final_diag 与对应的正式结果逐位相同", n_cmp == 27 and n_same == 27,
+                   f"{n_same} / {n_cmp}"))
     return checks
 
 
@@ -234,6 +238,35 @@ def self_test():
                        ("S8 [反向] 0B 判为'现象不存在'", v2["0B"]["verdict"] == "现象不存在")):
         print(("  OK  " if cond else "  BAD ") + name)
         ok &= bool(cond)
+    # ---- verify_heads: 在临时目录里造假结果, 走通"通过"与"不通过"两条路 (这条路径 selftest 原先走不到) ----
+    import tempfile
+    cwd = os.getcwd()
+    with tempfile.TemporaryDirectory() as d:
+        os.chdir(d)
+        os.makedirs("logs/results", exist_ok=True)
+        fake = lambda **kw: {"status": "completed", "completed_epochs": 100, "final_diag": {"target_acc": 1.0}, **kw}
+        names = {"full_a1": "dose_a1", "full_a2": "dose_a2", "ce_a0": "dose_a0", "mean_a1": "sub_mean_a1", "mean_a2": "sub_mean_a2",
+                 "sym_a1": "sub_fullsym_a1", "sym_a2": "sub_fullsym_a2", "bf_a1": "bf_full8_a1", "bf_a2": "bf_full8_a2"}
+        hd = {}
+        for tag, ref in names.items():
+            for s in SEEDS:
+                json.dump(fake(), open(f"logs/results/CUB_s0_{tag}_seed{s}.json", "w"))
+                json.dump(fake(), open(f"logs/results/CUB_{ref}_seed{s}.json", "w"))
+                hd[(tag, s)] = {}
+        good = verify_heads(hd)
+        c9 = len(good) == 2 and all(c for _, c, _ in good)
+        print(("  OK  " if c9 else "  BAD ") + "S9 verify_heads: 27 个一致 -> 全部通过")
+        ok &= c9
+        json.dump(fake(final_diag={"target_acc": 2.0}), open("logs/results/CUB_s0_full_a1_seed1.json", "w"))
+        bad = verify_heads(hd)
+        c10 = any(not c for _, c, _ in bad)
+        print(("  OK  " if c10 else "  BAD ") + "S10 verify_heads: 有一个不一致 -> 报未通过 (不静默放过)")
+        ok &= c10
+        os.remove("logs/results/CUB_dose_a2_seed3.json")
+        c11 = any(not c for _, c, _ in verify_heads(hd))
+        print(("  OK  " if c11 else "  BAD ") + "S11 verify_heads: 参照文件缺失 -> 报未通过")
+        ok &= c11
+        os.chdir(cwd)
     print("STAGE0_SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -243,9 +276,9 @@ def main():
         return self_test()
     heads = load_heads()
     checks = verify_heads(heads)
-    ok = all(c for _, c in checks)
-    for n, c in checks:
-        print(("  OK  " if c else "  BAD ") + n)
+    ok = all(c for _, c, _ in checks)
+    for n, c, d in checks:
+        print(("  OK  " if c else "  BAD ") + n + (f"  [{d}]" if d else ""))
     if not ok:
         print("STAGE0_DIAGNOSE: 核对未通过, 不进入诊断")
         return 1
@@ -266,7 +299,7 @@ def main():
     U = domain_directions(diffs, E)
     cache = torch.load("cache/CUB_train.pt", map_location="cpu")
     res = diagnose(heads, U)
-    res["checks"] = [{"check": n, "ok": bool(c)} for n, c in checks]
+    res["checks"] = [{"check": n, "ok": bool(c), "detail": d} for n, c, d in checks]
     res["thresholds"] = {"A_EXIST": [A_EXIST_MIN, A_EXIST_GAP], "A_NONE": [A_NONE_MAX, A_NONE_GAP],
                          "B_cancelling": [B_QTL_MAX, B_CI_MIN, B_DEP_MIN],
                          "B_EXIST": [B_EXIST_RATIO, B_EXIST_MIN_ABS], "B_NONE_MAX_DIFF": B_NONE_MAX_DIFF}
@@ -278,8 +311,8 @@ def main():
     L = ["# Stage 0A / 0B 第一层诊断（CUB，3 seeds，2026-11-25）", "",
          "预注册见 `RESULTS.md` §3r；判定全部由 `stage0_diagnose.py` 按预注册阈值算出。只用源域数据。", "",
          "## 核对", "", "| 核对项 | 结果 |", "|---|---|"]
-    for n, c in checks:
-        L.append(f"| {n} | {'通过' if c else '**未通过**'} |")
+    for n, c, d in checks:
+        L.append(f"| {n} | {'通过' if c else '**未通过**'} | {d} |")
     L += ["", f"域方向均值能量占比 η_mean = {res['eta_mean']:.4f}。PCR 随机基线（同一个 G，40000 个超平面内随机权重）："
           f"中位数 {b['q500']:.3f}，5%～95% [{b['q050']:.3f}, {b['q950']:.3f}]；diag(G) 最大值 / 中位数 = {b['diag_max_over_median']:.1f}。", "",
           "## 0A 偏置吸收", "", "| 臂 | ρ_abs 中位数（均值 ± sd） | cos(c, −A·μ) 中位数 | ‖c‖/‖A·μ‖ 中位数 |", "|---|---|---|---|"]
