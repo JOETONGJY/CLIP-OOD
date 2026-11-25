@@ -73,12 +73,17 @@ def isda_loss(logits, M, y, lam):
     return F.cross_entropy(logits + 0.5 * lam * d2, y)
 
 
-def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0):
+def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0, closed_form_starts=False):
     """共享扰动下的数值最坏交叉熵 (PGD, 投影梯度上升), 在 q 空间 (B, r) 中**逐样本**进行
     (与 LD-DRO 的逐样本形式一致: 每个样本有自己的最坏 q)。
     logits (B, C) 为干净 logits; M (C, r)。返回 (batch 平均的最坏损失, q_best (B, r))。
-    **零扰动始终是候选之一, 并保留整个搜索过程中的历史最大损失** (G3)。
-    注意: 凸函数的最大化不保证全局最优 —— 返回值是下界, LD-DRO 是上界。"""
+
+    候选集: 零扰动 (静态 + 作为起点迭代); 每个迭代初值与迭代过程中的历史最大 (G3/外审第六轮);
+    restarts 为**额外**的随机重启次数; closed_form_starts=True 时追加逐竞争类闭式最坏方向
+    q = eps·(M_k − M_y)/‖M_k − M_y‖ (k 取 r_yk 最大的竞争类) 作为另一个起点 —— 用于独立评估上界紧致度。
+    加闭式起点只扩大候选集, 搜索结果单调不降。
+    注意: 凸函数的最大化不保证全局最优 —— 返回值是下界, LD-DRO 是上界。
+    **返回值已脱离计算图 (best 均为 detach 的标量), 只能作评估用**; 训练请用 pgd_train_loss。"""
     B, C = logits.shape
     r = M.size(-1)
     device = logits.device
@@ -90,11 +95,30 @@ def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0):
     best = ce_of(torch.zeros(B, r, device=device)).detach()             # 候选: 零扰动
     best_q = torch.zeros(B, r, device=device)
     g = torch.Generator(device=device).manual_seed(int(seed))
-    for rs in range(int(restarts)):
-        q = torch.zeros(B, r, device=device)
-        if rs > 0:
+    # 固定起点: 零起点始终参与迭代 (不只是静态候选); closed_form_starts=True 时追加逐竞争类闭式
+    # 最坏方向 q = eps·(M_k − M_y)/‖M_k − M_y‖ (k 取 r_yk 最大的竞争类)。随机重启在其之上叠加,
+    # 因此加闭式起点只会扩大候选集 —— 搜索结果单调不降 (L19 钉住)。
+    starts = [torch.zeros(B, r, device=device)]
+    if closed_form_starts and eps > 0:
+        with torch.no_grad():
+            d = Mb - Mb[torch.arange(B, device=device), y][:, None, :]  # (B, C, r): M_k − M_y
+            dn = d.norm(dim=-1)                                          # (B, C) = r_yk
+            dn[torch.arange(B, device=device), y] = -1.0                 # 排除真实类
+            kstar = dn.argmax(dim=-1)                                    # (B,): r_yk 最大的竞争类
+            dsel = d[torch.arange(B, device=device), kstar]              # (B, r)
+            starts.append(dsel / (dsel.norm(dim=-1, keepdim=True) + 1e-12) * eps)
+    for rs in range(len(starts) + int(restarts)):           # restarts = 额外的随机重启次数
+        if rs < len(starts):
+            q = starts[rs].clone()
+        else:
             q = torch.randn(B, r, generator=g, device=device)
-        q = (q / (q.norm(dim=-1, keepdim=True) + 1e-12) * eps).requires_grad_(True)
+            q = q / (q.norm(dim=-1, keepdim=True) + 1e-12) * eps
+        q = q.requires_grad_(True)
+        with torch.no_grad():                               # 初始点本身也是候选 (外审第六轮)
+            cur = ce_of(q.detach())
+            better = cur > best
+            best = torch.where(better, cur, best)
+            best_q = torch.where(better[:, None], q.detach(), best_q)
         for _ in range(int(steps)):
             loss = ce_of(q).sum()
             (gq,) = torch.autograd.grad(loss, q)
@@ -109,6 +133,15 @@ def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0):
                 best_q = torch.where(better[:, None], q, best_q)
             q = q.requires_grad_(True)
     return best.mean(), best_q
+
+
+def pgd_train_loss(logits, M, y, eps, steps=5, restarts=1, seed=0):
+    """Language-PGD 的**训练**损失 (外审第六轮: pgd_worst_loss 的返回值已脱离计算图, 不能直接 backward)。
+    两段式: (1) 用 detach 的 logits / M 搜索最坏扰动 q_best (不建图); (2) 固定该扰动,
+    用原始带梯度的 logits 与 M 重算对抗 CE —— 梯度正常流经 W 与 gamma, 无需对搜索过程做高阶反传。"""
+    _, q_best = pgd_worst_loss(logits.detach(), M.detach(), y, eps, steps=steps, restarts=restarts, seed=seed)
+    adv = logits + torch.einsum("cr,br->bc", M, q_best)     # q_best 已是常量; M 带梯度
+    return F.cross_entropy(adv, y)
 
 
 def self_test():
@@ -201,6 +234,31 @@ def self_test():
     print("  各椭球下的 LD-DRO:", {k: round(v, 4) for k, v in lds.items()})
     check("L13 language 与 random (同谱不同轴) 给出不同损失", abs(lds["language"] - lds["random"]) > 1e-4)
     check("L14 identity 与 language 不同", abs(lds["identity"] - lds["language"]) > 1e-4)
+
+    # ---- pgd_train_loss: 真实的 backward 测试 (外审第六轮: 评估版返回值 requires_grad=False, 不能训练) ----
+    pe, _ = pgd_worst_loss(logits, M, y, 0.3, steps=5)
+    check("L15 评估版 pgd_worst_loss 的返回值确实脱离计算图 (确认外审的发现)", not pe.requires_grad)
+    lin.zero_grad(); ln.zero_grad()
+    lo2 = lin(ln(x))                                        # 带梯度的 logits
+    M2 = effective_response(head)[0] @ L_
+    lt = pgd_train_loss(lo2, M2, y, 0.3, steps=5)
+    check("L16 训练版 pgd_train_loss 的损失带梯度", lt.requires_grad)
+    lt.backward()
+    check("L17 backward 产生 W 与 gamma 的非零有限梯度", float(lin.weight.grad.abs().max()) > 0
+          and float(ln.weight.grad.abs().max()) > 0 and bool(torch.isfinite(lin.weight.grad).all())
+          and bool(torch.isfinite(ln.weight.grad).all()),
+          f"|dL/dW|max={float(lin.weight.grad.abs().max()):.3e}, |dL/dgamma|max={float(ln.weight.grad.abs().max()):.3e}")
+    ce2 = float(F.cross_entropy(lin(ln(x)).detach(), y))
+    ld2 = float(ld_dro_loss(lin(ln(x)).detach(), M2.detach(), y, 0.3))
+    check("L18 训练版损失在 CE(0) 与 LD-DRO 之间 (固定扰动的 CE 是共享最坏的近似)",
+          ce2 <= float(lt) + 1e-6 <= ld2 + 1e-6, f"{ce2:.4f} <= {float(lt):.4f} <= {ld2:.4f}")
+    # 闭式起点 (评估上界紧致度用): 不低于无闭式起点的搜索, 且链仍成立
+    pc, _ = pgd_worst_loss(logits, M, y, 0.3, steps=10, restarts=2, seed=1, closed_form_starts=True)
+    pn, _ = pgd_worst_loss(logits, M, y, 0.3, steps=10, restarts=2, seed=1)
+    check("L19 闭式起点不降低搜索质量 (>= 无闭式起点)", float(pc) >= float(pn) - 1e-9,
+          f"with={float(pc):.4f} >= without={float(pn):.4f}")
+    ldc = float(ld_dro_loss(logits, M, y, 0.3))
+    check("L20 带闭式起点的链仍成立: CE(0) <= PGD <= LD-DRO", ce <= float(pc) + 1e-6 <= ldc + 1e-6)
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
