@@ -3,6 +3,8 @@ import time
 import json
 import logging
 import random
+import shutil
+import sys
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -15,6 +17,10 @@ os.environ["WANDB_MODE"] = "offline"
 from args import get_args
 from model.cbm_models import clip_cbm_orth, clip_mlp, clip_cbm_subspace
 from data import get_dataset_classes
+from run_status import git_info, jsonable
+
+# --grad_diag 时测量 CE/DDO 梯度统计的 epoch (1 起算, 在该 epoch 训练之前测), 另加训练结束后一次
+GRAD_DIAG_EPOCHS = (1, 5, 10, 20, 30, 50, 75)
 
 
 logging.basicConfig(
@@ -308,6 +314,9 @@ class TrainingSession:
         total_loss = 0.0
         correct = 0
         total = 0
+        # 2026-11-25: 按样本数加权的 epoch 累计量 —— 原先返回的是最后一个 batch 的损失,
+        # 不能用于机制分析 (外审指出)。orth_eq = 未加权的 DDO 损失 (统一评价口径)。
+        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'orth_eq': 0.0, 'kl': 0.0}
 
         progress_bar = tqdm(
             self.train_loader,
@@ -408,6 +417,13 @@ class TrainingSession:
             batch_size = images.size(0)
             total += batch_size
             correct += (main_logits.argmax(dim=1) == labels).sum().item()
+            _reg_u = getattr(self.model, '_reg_unweighted', None)   # 加权之前的 DDO 响应 (模型 forward 内记录)
+            sums['total'] += float(total_loss) * batch_size
+            sums['cls'] += float(cls_loss) * batch_size
+            sums['concept'] += float(concept_loss) * batch_size
+            sums['orth'] += float(orth_loss) * batch_size
+            sums['orth_eq'] += (float(_reg_u.abs().mean()) if _reg_u is not None else float(orth_loss)) * batch_size
+            sums['kl'] += float(kl_loss) * batch_size
 
             progress_bar.set_postfix({
                 'Loss': f"{total_loss.item():.4f}",
@@ -420,11 +436,12 @@ class TrainingSession:
 
         return {
             'train_acc': 100 * correct / total,
-            'train_loss': total_loss.item(),
-            'cls_loss': cls_loss.item(),
-            'concept_loss': concept_loss.item(),
-            'orth_loss': orth_loss.item(),
-            'kl_loss': kl_loss.item()
+            'train_loss': sums['total'] / total,          # 以下均为 epoch 内按样本加权平均
+            'cls_loss': sums['cls'] / total,
+            'concept_loss': sums['concept'] / total,
+            'orth_loss': sums['orth'] / total,
+            'orth_eq_loss': sums['orth_eq'] / total,
+            'kl_loss': sums['kl'] / total,
         }
 
     def _evaluate(self, data_loader, mode='val'):
@@ -432,6 +449,8 @@ class TrainingSession:
         total_loss = 0.0
         correct = 0
         total = 0
+        # 2026-11-25: 按样本数加权的平均 (原先返回最后一个 batch 的损失); cls 即固定验证集上的 CE
+        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'kl': 0.0}
 
         with torch.no_grad():
             for images, labels, attr_labels in tqdm(data_loader, desc=f"{mode.capitalize()} Evaluating"):
@@ -475,32 +494,109 @@ class TrainingSession:
                 batch_size = images.size(0)
                 total += batch_size
                 correct += (main_logits.argmax(dim=1) == labels).sum().item()
+                sums['total'] += float(total_loss) * batch_size
+                sums['cls'] += float(cls_loss) * batch_size
+                sums['concept'] += float(concept_loss) * batch_size
+                sums['orth'] += float(orth_loss) * batch_size
+                sums['kl'] += float(kl_loss) * batch_size
 
         return {
             f'{mode}_acc': 100 * correct / total,
-            f'{mode}_loss': total_loss.item(),
-            f'{mode}_cls_loss': cls_loss.item(),
-            f'{mode}_concept_loss': concept_loss.item(),
-            f'{mode}_orth_loss': orth_loss.item(),
-            f'{mode}_kl_loss': kl_loss.item()
+            f'{mode}_loss': sums['total'] / total,
+            f'{mode}_cls_loss': sums['cls'] / total,       # 该数据集上的平均 CE
+            f'{mode}_concept_loss': sums['concept'] / total,
+            f'{mode}_orth_loss': sums['orth'] / total,
+            f'{mode}_kl_loss': sums['kl'] / total,
         }
 
-    def run(self):
-        logger.info("\n" + "=" * 60)
-        logger.info(f"Starting Training for {self.args.epochs} epochs")
-        logger.info(f"Model selection protocol: {getattr(self.args, 'model_selection', 'final')} "
-                    f"({'严格DG: 目标域不参与选模' if getattr(self.args, 'model_selection', 'final') == 'final' else '历史对照: 按target选模'})")
-        logger.info(f"Dataset: {self.args.dataset}")
-        logger.info(f"Model: {self.args.CBM_type}")
-        logger.info(f"Alpha: {self.args.alpha}, Beta: {self.args.beta}, Lambda_KL: {self.args.lambda_kl}")
-        if self.args.CBM_type == 'clip_cbm_subspace':
-            logger.info(f"Ch4 mode: {getattr(self.args, 'ch4_mode', 'full')}, "
-                        f"tau: {getattr(self.args, 'tau', 0.8)}, "
-                        f"lambda_inv: {getattr(self.args, 'lambda_inv', 1.0)}, Seed: {self.args.seed}")
-        else:
-            logger.info(f"Weight mode: {getattr(self.args, 'weight_mode', 'prior_residual')}, Seed: {self.args.seed}")
-        logger.info("=" * 60 + "\n")
+    def _check_run_conflicts(self):
+        """覆盖保护 (2026-11-25)。同名实验的产物已存在时默认拒绝启动:
+          - 结果 json  logs/results/{run_name}.json
+          - 权重日志目录 logs/weights/{run_name}/ (非空)
+          - 检查点 best_<dataset>*.pth (仅 save_model 时; 按数据集命名, 不区分 run)
+        显式 --overwrite_run 才覆盖: 先删除该 run 的旧结果 json 与权重日志目录。
+        (背景: 11-20 的 1-epoch smoke 覆盖了收敛检查点; 11-25 的回归检查覆盖了同名权重日志。)
+        续训 (--resume) 是另一件事, 本函数不处理。"""
+        result_path = f"logs/results/{self.run_name}.json"
+        wdir = f"logs/weights/{self.run_name}"
+        conflicts = []
+        if os.path.exists(result_path):
+            conflicts.append(result_path)
+        if os.path.isdir(wdir) and os.listdir(wdir):
+            conflicts.append(wdir + "/")
+        if self.args.save_model:
+            for ck in (f"best_{self.args.dataset}.pth",
+                       f"best_{self.args.dataset}_sel{getattr(self.args, 'model_selection', 'final')}.pth"):
+                if os.path.exists(ck):
+                    conflicts.append(ck)
+        if not conflicts:
+            return
+        if not getattr(self.args, "overwrite_run", False):
+            raise RuntimeError(
+                f"拒绝启动: run_name={self.run_name} 的产物已存在 -> {conflicts}。"
+                f"换一个 --run_tag; 不需要保存模型请加 --no_save_model; 确需覆盖请加 --overwrite_run")
+        logger.warning(f"[overwrite_run] 按要求覆盖已存在的产物: {conflicts}")
+        if os.path.exists(result_path):
+            os.remove(result_path)
+        if os.path.isdir(wdir):
+            shutil.rmtree(wdir)
 
+    def _ddo_loss_equal_weight(self):
+        """统一的 DDO 评价指标: 在模型的【原始完整方向集】上不加权地计算 |h(P)| 的均值,
+        与训练时的加权方式、方向集变体、α 都无关 (外审: 横向比较不能用各方法自己的训练损失)。
+        模型不支持 DDO 时返回 None。"""
+        fn = getattr(self.model, "ddo_loss_equal_weight", None)
+        return fn() if fn is not None else None
+
+    def _diag_batch(self):
+        """梯度诊断用的固定批次: 训练集 (缓存特征) 的前 batch_size 个样本。
+        不经过打乱的 DataLoader, 不消耗全局随机数, 因此不影响训练。"""
+        if getattr(self, "_diag_batch_cache", None) is not None:
+            return self._diag_batch_cache
+        ds = self.train_loader.dataset
+        n = min(self.args.batch_size, len(ds))
+        if getattr(ds, "feats", None) is not None:          # main_cached 的 FeatureDataset
+            x, y = ds.feats[:n].to(self.device), ds.labels[:n].to(self.device)
+        else:                                                # 原始图像管线: 用独立 generator, 不动全局随机数
+            loader = DataLoader(ds, batch_size=n, shuffle=False, num_workers=0,
+                                generator=torch.Generator().manual_seed(0))
+            xb, yb = next(iter(loader))[:2]
+            x, y = xb.to(self.device), yb.to(self.device)
+        self._diag_batch_cache = (x, y)
+        return x, y
+
+    def _grad_diag(self, tag):
+        """在固定批次上测量: 分类损失 CE 与【等权】DDO 损失对分类头参数的梯度范数、
+        范数比与夹角余弦。只读取梯度 (autograd.grad), 不写入 .grad, 不改变优化器状态与随机数。"""
+        x, y = self._diag_batch()
+        self.model.eval()
+        params = [p for p in self.model.classifier.parameters() if p.requires_grad]
+        inv = getattr(self.model, "inv_classifier", None)
+        if inv is not None:
+            params += [p for p in inv.parameters() if p.requires_grad]
+        _, cls_preds, _ = self.model(x)
+        if isinstance(cls_preds, tuple):                     # 与训练目标一致的双头 CE
+            logits_ori, logits_inv = cls_preds
+            ce = (self.loss_fns['cls'](logits_ori, y)
+                  + self.args.lambda_inv * self.loss_fns['cls'](logits_inv, y))
+        else:
+            ce = self.loss_fns['cls'](cls_preds, y)
+        g_ce = torch.autograd.grad(ce, params, retain_graph=True)
+        g_ce = torch.cat([g.reshape(-1) for g in g_ce])
+        rec = {'tag': tag, 'ce': float(ce), 'grad_ce_norm': float(g_ce.norm())}
+        ddo = self._ddo_loss_equal_weight()
+        if ddo is not None:
+            g_dd = torch.autograd.grad(ddo, params)
+            g_dd = torch.cat([g.reshape(-1) for g in g_dd])
+            denom = (g_ce.norm() * g_dd.norm()).clamp_min(1e-12)
+            rec.update({'ddo_eq': float(ddo), 'grad_ddo_norm': float(g_dd.norm()),
+                        'grad_norm_ratio_ddo_over_ce': float(g_dd.norm() / g_ce.norm().clamp_min(1e-12)),
+                        'grad_cos_ce_ddo': float((g_ce @ g_dd) / denom)})
+        self.grad_diag_records.append(rec)
+        logger.info("[grad-diag %s] %s" % (tag, json.dumps(
+            {k: round(v, 6) for k, v in rec.items() if isinstance(v, float)})))
+
+    def run(self):
         # run_name: 数据集_方法tag_seed (多 seed 汇总脚本按此命名约定找文件)
         if self.args.CBM_type == 'clip_cbm_subspace':
             method_tag = getattr(self.args, 'ch4_mode', 'full')
@@ -517,6 +613,24 @@ class TrainingSession:
                 and not getattr(self.args, 'run_tag', '') and not method_tag.endswith('_sel'):
             method_tag += '_sel'
         self.run_name = f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
+        # 覆盖保护放在最前面: 产物冲突且未指定 --overwrite_run 时在此抛出 ——
+        # 不打印训练头部、不进入训练
+        self._check_run_conflicts()
+
+        logger.info("\n" + "=" * 60)
+        logger.info(f"Starting Training for {self.args.epochs} epochs")
+        logger.info(f"Model selection protocol: {getattr(self.args, 'model_selection', 'final')} "
+                    f"({'严格DG: 目标域不参与选模' if getattr(self.args, 'model_selection', 'final') == 'final' else '历史对照: 按target选模'})")
+        logger.info(f"Dataset: {self.args.dataset}")
+        logger.info(f"Model: {self.args.CBM_type}")
+        logger.info(f"Alpha: {self.args.alpha}, Beta: {self.args.beta}, Lambda_KL: {self.args.lambda_kl}")
+        if self.args.CBM_type == 'clip_cbm_subspace':
+            logger.info(f"Ch4 mode: {getattr(self.args, 'ch4_mode', 'full')}, "
+                        f"tau: {getattr(self.args, 'tau', 0.8)}, "
+                        f"lambda_inv: {getattr(self.args, 'lambda_inv', 1.0)}, Seed: {self.args.seed}")
+        else:
+            logger.info(f"Weight mode: {getattr(self.args, 'weight_mode', 'prior_residual')}, Seed: {self.args.seed}")
+        logger.info("=" * 60 + "\n")
 
         if self.args.wandb:
             wandb.init(
@@ -526,19 +640,33 @@ class TrainingSession:
             )
             wandb.watch(self.model, log_freq=100)
 
+        # 2026-11-25: 逐 epoch 指标与诊断记录 (写入结果 json, 供机制分析)
+        self.epoch_metrics = []
+        self.grad_diag_records = []
+        self.final_metrics = None
+        self._completed_epochs = 0
+        # --target_eval final_only: 训练期间不访问目标域, 仅在最后一个 epoch 评估 (默认 per_epoch, 行为不变)
+        eval_target_every_epoch = getattr(self.args, 'target_eval', 'per_epoch') == 'per_epoch'
+
         try:
             for epoch in range(self.args.epochs):
                 epoch_start = time.time()
 
+                if getattr(self.args, 'grad_diag', False) and (epoch + 1) in GRAD_DIAG_EPOCHS:
+                    self._grad_diag(f"before_epoch{epoch + 1}")
+
                 train_metrics = self._train_epoch(epoch)
 
                 source_metrics = self._evaluate(self.source_test_loader, 'source')
-                target_metrics = self._evaluate(self.target_test_loader, 'target')
+                is_last = self._selection_epoch(epoch, self.args.epochs)
+                target_metrics = (self._evaluate(self.target_test_loader, 'target')
+                                  if (eval_target_every_epoch or is_last) else None)
 
                 # domain 权重诊断 (每 epoch): r/δ/prior_w/final_w/H(q)/max/min/std/Δw
                 weight_diagnostics = self._log_domain_weights(epoch)
 
-                if target_metrics['target_acc'] > self.best_metrics['target_acc']:
+                if target_metrics is not None and \
+                        target_metrics['target_acc'] > self.best_metrics['target_acc']:
                     self.best_metrics.update({
                         'source_acc': source_metrics['source_acc'],
                         'target_acc': target_metrics['target_acc'],
@@ -551,7 +679,7 @@ class TrainingSession:
                 # ===== F1 选模协议 (2026-11-07, 专家意见): 严格 DG 下目标域不参与选模 =====
                 # model_selection=final  : 固定 epoch (训练结束时的模型), 目标域仅测试 —— 默认
                 # model_selection=target : 旧行为 (按 target_acc 选 best), 仅历史对照用
-                if self._selection_epoch(epoch, self.args.epochs):
+                if is_last:
                     self.selected_metrics = {
                         'source_acc': source_metrics['source_acc'],
                         'target_acc': target_metrics['target_acc'],
@@ -561,6 +689,21 @@ class TrainingSession:
                     if self.args.save_model:
                         torch.save(self.model.state_dict(),
                                    f"best_{self.args.dataset}_sel{self.args.model_selection}.pth")
+                    self.final_metrics = {'source': dict(source_metrics),
+                                          'target': dict(target_metrics)}
+
+                # 2026-11-25: 逐 epoch 的平均损失与源域验证 CE (目标域精度仅在评估过的 epoch 记录)
+                self.epoch_metrics.append({
+                    'epoch': epoch + 1,
+                    'cls': train_metrics['cls_loss'],
+                    'ddo': train_metrics['orth_loss'],          # 训练时实际优化的 DDO 项 (含加权)
+                    'ddo_eq': train_metrics['orth_eq_loss'],    # 同一批次上的等权 DDO 损失
+                    'kl': train_metrics['kl_loss'],
+                    'source_acc': source_metrics['source_acc'],
+                    'source_ce': source_metrics['source_cls_loss'],
+                    'target_acc': target_metrics['target_acc'] if target_metrics is not None else None,
+                })
+                self._completed_epochs = epoch + 1
 
                 epoch_time = time.time() - epoch_start
                 log_data = {
@@ -568,7 +711,7 @@ class TrainingSession:
                     'epoch_time': epoch_time,
                     **train_metrics,
                     **source_metrics,
-                    **target_metrics,
+                    **(target_metrics or {}),
                     **weight_diagnostics
                 }
 
@@ -577,13 +720,20 @@ class TrainingSession:
                 logger.info(f"Time: {epoch_time:.2f}s")
                 logger.info(f"Train Acc: {train_metrics['train_acc']:.2f}%")
                 logger.info(f"Source Acc: {source_metrics['source_acc']:.2f}%")
-                logger.info(f"Target Acc: {target_metrics['target_acc']:.2f}%")
-                logger.info(
-                    f"Best Target Acc: {self.best_metrics['target_acc']:.2f}% @ Epoch {self.best_metrics['epoch'] + 1}")
+                if target_metrics is not None:
+                    logger.info(f"Target Acc: {target_metrics['target_acc']:.2f}%")
+                else:
+                    logger.info("Target Acc: (not evaluated; --target_eval final_only)")
+                if eval_target_every_epoch:
+                    logger.info(
+                        f"Best Target Acc: {self.best_metrics['target_acc']:.2f}% @ Epoch {self.best_metrics['epoch'] + 1}")
                 logger.info("-" * 50)
 
                 if self.args.wandb:
                     wandb.log(log_data)
+
+            if getattr(self.args, 'grad_diag', False):
+                self._grad_diag("final")
 
         except KeyboardInterrupt:
             # 2026-11-25: 中断的 run 不得留下"部分训练"的结果 json; 原样上抛, 由外层处理
@@ -599,6 +749,9 @@ class TrainingSession:
                     title="Training Failed",
                     text=f"Error at epoch {epoch + 1}: {str(e)}"
                 )
+            # 2026-11-25: 继续上抛, 使进程以非零状态退出 (原先异常被吞掉、退出码为 0,
+            # 批处理脚本无法发现失败)。结果 json 由 finally 中的 _training_failed 标记拦住。
+            raise
         finally:
             if self.args.wandb:
                 wandb.summary.update(self.best_metrics)
@@ -622,6 +775,23 @@ class TrainingSession:
             if sel_mode == 'final' and not getattr(self.args, 'run_tag', '') \
                     and not method_tag.endswith('_sel'):
                 method_tag += '_sel'
+            # 2026-11-25: 仅当训练完整跑满 epochs 且未失败时才算完成、才写结果 json
+            completed = (not getattr(self, "_training_failed", False)
+                         and self._completed_epochs == self.args.epochs)
+            result_path = f"logs/results/{self.run_name}.json"
+            final_diag = None
+            if completed:
+                # 最终模型的统一诊断: 固定源域验证集上的 CE / 目标域精度 / 等权 DDO 损失
+                with torch.no_grad():
+                    ddo_eq_final = self._ddo_loss_equal_weight()
+                fm = self.final_metrics or {}
+                final_diag = {
+                    'source_acc': fm.get('source', {}).get('source_acc'),
+                    'source_ce': fm.get('source', {}).get('source_cls_loss'),
+                    'target_acc': fm.get('target', {}).get('target_acc'),
+                    'target_ce': fm.get('target', {}).get('target_cls_loss'),
+                    'ddo_eq': float(ddo_eq_final) if ddo_eq_final is not None else None,
+                }
             sel = self.selected_metrics or {}
             result = {
                 'dataset': self.args.dataset,
@@ -641,26 +811,33 @@ class TrainingSession:
                     'lambda_cal': getattr(self.args, 'lambda_cal', 0.01),
                     'protect_k': getattr(self.args, 'protect_k', 0),
                 },
-                # 2026-11-25: 完整运行配置落盘 (外审要求: ca_beta/先验文件/batch 等
-                # 不能再靠文件名或报告反推)
-                'run_config': {k: getattr(self.args, k, None) for k in (
-                    'weight_mode', 'batch_size', 'epochs', 'ch4_mode', 'tau', 'use_c3_weights',
-                    'ca_beta', 'ca_prior_file', 'grouped_weights', 'cluster_threshold',
-                    'freeze_delta_file', 'redundancy', 'redundancy_topk', 'run_tag')},
+                # 2026-11-25: 完整有效配置 (全部命令行参数, 含 lr / weight_decay / batch_size /
+                # epochs / seed / alpha / 各损失系数) 与代码版本, 外审要求不能再靠文件名反推
+                'run_config': {k: jsonable(v) for k, v in sorted(vars(self.args).items())},
+                'git': git_info(),
+                'status': 'completed' if completed else 'incomplete',
+                'completed_epochs': self._completed_epochs,
+                # 2026-11-25: 机制分析用 —— 逐 epoch 平均损失 (ddo 为训练实际优化的项, ddo_eq 为等权口径)、
+                # 最终模型的统一诊断、梯度诊断 (--grad_diag 时)
+                'epoch_metrics': self.epoch_metrics,
+                'final_diag': final_diag,
+                'grad_diag': (self.grad_diag_records if getattr(self.args, 'grad_diag', False) else None),
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},
                 'target_acc': (sel.get('target_acc', self.best_metrics['target_acc'])
                                if sel_mode == 'final' else self.best_metrics['target_acc']),
             }
-            result_path = f"logs/results/{self.run_name}.json"
-            if getattr(self, "_training_failed", False):
-                logger.error(f"[main] 训练未完成: 不写 {result_path} "
-                             f"(避免被汇总/续跑脚本当作已完成; 同名旧结果如有则保持不动)")
+            if not completed:
+                logger.error(f"[main] 训练未完成 (完成 {self._completed_epochs}/{self.args.epochs} epochs): "
+                             f"不写 {result_path} (避免被汇总/续跑脚本当作已完成; 同名旧结果如有则保持不动)")
             else:
                 with open(result_path, 'w') as f:
                     json.dump(result, f, indent=2)
                 logger.info(f"Result saved to {result_path}")
+                if final_diag:
+                    logger.info("[final-diag] " + json.dumps(
+                        {k: (round(v, 6) if isinstance(v, float) else v) for k, v in final_diag.items()}))
 
             logger.info("\n" + "=" * 60)
             logger.info("Training Completed")
@@ -689,5 +866,8 @@ if __name__ == "__main__":
         session.run()
     except KeyboardInterrupt:
         logger.info("Training interrupted by user")
+        sys.exit(130)
     except Exception as e:
+        # 2026-11-25: 以非零状态退出 (原先只记录日志、退出码为 0, 批处理脚本无法发现失败)
         logger.error(f"Critical error occurred: {str(e)}", exc_info=True)
+        sys.exit(1)

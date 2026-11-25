@@ -51,3 +51,6 @@ experiment_results/*/cls_snapshots/
 data/*.zip
 # 实验驱动的训练日志 (2026-11-25: 体积大, 可由同 seed 复现, 结论在报告与结果 JSON 中)
 experiment_results/**/driver_log.txt
+
+# 实验矩阵驱动脚本的训练日志 (体积大, 可复现; 2026-11-25)
+experiment_results/**/driver_logs/

@@ -399,6 +399,13 @@ class clip_cbm_orth(nn.Module):
             w = Q0[a] * q_in
             return w * (self.num_prompts / w.sum())
 
+    def ddo_loss_equal_weight(self):
+        """统一的等权 DDO 评价指标 (2026-11-25): 在原始完整方向集上不加权地计算 |h(P)| 的均值。
+        与训练时的 weight_mode / 加权 / α 无关, 用于不同方法之间的横向比较。
+        返回带梯度的张量; 只在评估时由调用方包在 no_grad 里。"""
+        P = getattr(self, 'domain_concept_projection_full', self.domain_concept_projection)
+        return self.classifier[1:](P).abs().mean()
+
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):
         visual_features = self.clip_model.encode_image(images).float()
@@ -415,6 +422,8 @@ class clip_cbm_orth(nn.Module):
         # )
 
         weights, _ = self.get_domain_weights()
+        # 2026-11-25: 记录加权之前的 DDO 响应, 供统一评价口径 (等权 DDO 损失) 使用
+        self._reg_unweighted = regularizer.detach()
         if weights is not None:
             if weights.dim() == 2:        # CA-Fixed: (204, C) 逐类别加权
                 regularizer = regularizer * weights.unsqueeze(-1)
@@ -750,6 +759,8 @@ class clip_cbm_subspace(nn.Module):
         if self.inv_classifier is not None:
             reg_inv = torch.abs(self.inv_classifier[1:](ddo_proj))
             regularizer = regularizer + self.eta_ddo_inv * reg_inv
+        # 2026-11-25: 记录加权之前的 DDO 响应, 供统一评价口径 (等权 DDO 损失) 使用
+        self._reg_unweighted = regularizer.detach()
 
         # 2×2 联合实验: 第三章 importance 加权 (C3+C4 组合时启用)
         weights, _ = self.get_domain_weights()
@@ -760,6 +771,12 @@ class clip_cbm_subspace(nn.Module):
                 regularizer = regularizer * weights.view(-1, 1, 1)
 
         return main_concept, cls_preds, regularizer
+
+    def ddo_loss_equal_weight(self):
+        """统一的等权 DDO 评价指标 (2026-11-25): 原始完整方向集、等权、仅主分类头。
+        与训练时的 weight_mode / 双头系数 / P4 校准状态无关 (始终用冻结 E 的原始投影),
+        用于不同方法之间的横向比较。"""
+        return self.classifier[1:](self._domain_projection(self.concept_embeddings)).abs().mean()
 
     def extract_cls_concept(self):
         asso_mat = (self.inv_classifier or self.classifier)[2].weight

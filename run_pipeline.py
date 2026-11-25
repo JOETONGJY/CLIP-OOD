@@ -2,6 +2,7 @@
 可断点续跑的实验总管线 (独立进程运行, 不依赖 ZCode 会话):
 
   - 每个 run 以 logs/results/{run_name}.json 是否存在判断完成, 重复启动自动跳过
+    (2026-11-25 起: 还会校验结果内容 —— status / 完整 epoch / 关键配置)
   - 特征编码以 cache/*.pt 是否存在判断完成
   - 顺序: 编码(缺的) -> 闸门实验 -> 第四章消融 -> 汇总
 
@@ -14,6 +15,8 @@ import subprocess
 import sys
 import time
 
+from run_status import result_is_complete
+
 ROOT = r"F:\CLIP-OOD"
 PY = r"D:\anaconda3\envs\trl4060\python.exe"
 CLIP = r"F:/CLIP-OOD/clip_weights/ViT-L-14.pt"
@@ -24,10 +27,14 @@ RUNS = []  # (run_name_json, [args...])
 
 def add(dataset, tag, extra):
     for seed in (1, 2, 3):
+        # 2026-11-25: --no_save_model —— 管线不需要检查点, 且训练入口现在默认拒绝覆盖已存在的检查点
         args = ["--dataset", dataset, "--epochs", "100", "--batch_size", "256",
                 "--alpha", "1.0", "--beta", "0", "--seed", str(seed),
-                "--CLIP_type", CLIP] + extra
-        RUNS.append((f"{dataset}_{tag}_seed{seed}.json", args))
+                "--CLIP_type", CLIP, "--no_save_model"] + extra
+        # 结果文件名与 main.py 一致: 严格 final 协议 (默认) 且无 --run_tag 时加 _sel 后缀
+        # (旧版漏了后缀, 会把已完成的 run 判成未完成)
+        name_tag = tag if ("--run_tag" in extra or tag.endswith("_sel")) else tag + "_sel"
+        RUNS.append((f"{dataset}_{name_tag}_seed{seed}.json", args))
 
 
 # ===== 闸门实验: 4 组 × {CUB, AWA2} × 3 seeds =====
@@ -65,16 +72,18 @@ def main():
     for ds in ("CUB", "AWA2"):
         encode_missing(ds)
 
+    expect = {"epochs": 100, "batch_size": 256, "alpha": 1.0}
     for i, (json_name, args) in enumerate(RUNS):
         path = os.path.join("logs", "results", json_name)
-        if os.path.exists(path):
+        # 2026-11-25: 完成判定校验结果内容 (status / 完整 epoch / 关键配置), 不再只看文件是否存在
+        if result_is_complete(path, expect):
             print(f"[skip {i+1}/{len(RUNS)}] {json_name}")
             continue
         log = os.path.join("downloads", f"pipe_{json_name.replace('.json', '')}.log")
         print(f"[run  {i+1}/{len(RUNS)}] {json_name}  {time.strftime('%H:%M:%S')}", flush=True)
         r = subprocess.run([PY, "main_cached.py"] + args,
                            stdout=open(log, "w"), stderr=subprocess.STDOUT)
-        ok = os.path.exists(path)
+        ok = result_is_complete(path, expect)
         print(f"       -> {'OK' if ok else 'FAIL(exit %s)' % r.returncode}", flush=True)
         # 每个 run 结束即保存指标 (断点/中断也不丢)
         subprocess.run([PY, "collect_metrics.py"],

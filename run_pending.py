@@ -6,6 +6,7 @@
   阶段 2  双头消融跨数据集: {hardproj, softproj, headonly} × {AWA2, LADA, LADV} × 3 seeds = 27 runs
 
   - 每个 run 以 logs/results/{run_name}.json 是否存在判断完成, 重复启动自动跳过
+    (2026-11-25 起: 还会校验结果内容 —— status / 完整 epoch / 关键配置)
   - 特征缓存 cache/*.pt 已就绪, 无需重新编码
   - 日志写 downloads/pipe_{run_name}.log (collect_metrics.py 按此命名查找)
 
@@ -20,6 +21,8 @@ import subprocess
 import sys
 import time
 
+from run_status import result_is_complete
+
 ROOT = r"F:\CLIP-OOD"
 PY = r"D:\anaconda3\envs\trl4060\python.exe"
 CLIP = r"F:/CLIP-OOD/clip_weights/ViT-L-14.pt"
@@ -29,14 +32,23 @@ TAUS = (0.6, 0.7, 0.9, 0.95)
 DUAL_MODES = ("hardproj", "softproj", "headonly")
 
 
+def result_name(dataset, tag, extra, seed):
+    """结果文件名, 与 main.py 的规则一致: 严格 final 协议 (默认) 且未指定 --run_tag 时,
+    方法 tag 会加 _sel 后缀 (2026-11-25 修正: 旧版此处漏了后缀, dual 阶段会永远判定未完成)。"""
+    if "--run_tag" not in extra and not tag.endswith("_sel"):
+        tag += "_sel"
+    return f"{dataset}_{tag}_seed{seed}.json"
+
+
 def build_runs(stage):
     runs = []  # (run_name_json, [args...])
 
     def add(dataset, tag, extra, seed):
+        # 2026-11-25: --no_save_model —— 管线不需要检查点, 且训练入口现在默认拒绝覆盖已存在的检查点
         args = ["--dataset", dataset, "--epochs", "100", "--batch_size", "256",
                 "--alpha", "1.0", "--beta", "0", "--seed", str(seed),
-                "--CLIP_type", CLIP] + extra
-        runs.append((f"{dataset}_{tag}_seed{seed}.json", args))
+                "--CLIP_type", CLIP, "--no_save_model"] + extra
+        runs.append((result_name(dataset, tag, extra, seed), args))
 
     if stage in ("tau", "all"):
         for tau in TAUS:
@@ -69,7 +81,9 @@ def main():
     done = skipped = failed = 0
     for i, (json_name, args) in enumerate(runs):
         path = os.path.join("logs", "results", json_name)
-        if os.path.exists(path):
+        # 2026-11-25: 完成判定改为校验结果内容 (status / 完整 epoch / 关键配置), 不再只看文件是否存在
+        expect = {"epochs": 100, "batch_size": 256, "alpha": 1.0}
+        if result_is_complete(path, expect):
             skipped += 1
             print(f"[skip {i+1}/{len(runs)}] {json_name}", flush=True)
             continue
@@ -77,7 +91,7 @@ def main():
         print(f"[run  {i+1}/{len(runs)}] {json_name}  {time.strftime('%H:%M:%S')}", flush=True)
         r = subprocess.run([PY, "main_cached.py"] + args,
                            stdout=open(log, "w"), stderr=subprocess.STDOUT)
-        ok = os.path.exists(path)
+        ok = result_is_complete(path, expect)
         if ok:
             done += 1
         else:

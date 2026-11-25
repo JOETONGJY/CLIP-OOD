@@ -92,6 +92,17 @@ def get_args():
     # 1-epoch smoke 正是这样覆盖了 best_CUB.pth。补一个显式关闭开关 (默认行为不变)。
     parser.add_argument("--no_save_model", dest="save_model", action="store_false",
                         help="不写 best_<dataset>*.pth (smoke/诊断 run 应始终使用)")
+    # ---- 2026-11-25 实验可靠性修复 (外审建议) ----
+    parser.add_argument("--overwrite_run", action="store_true", default=False,
+                        help="覆盖保护: 同名结果 json / 权重日志 / 检查点已存在时默认拒绝启动; "
+                             "加上本开关才覆盖 (会先删除该 run 的旧结果与权重日志)")
+    parser.add_argument('--target_eval', type=str, default='per_epoch',
+                        choices=['per_epoch', 'final_only'],
+                        help='目标域评估时机: per_epoch=每个 epoch 都评估 (历史默认); '
+                             'final_only=训练期间不访问目标域, 仅在最后一个 epoch 评估 (严格 final 协议)')
+    parser.add_argument('--grad_diag', action="store_true", default=False,
+                        help='在固定 epoch 与固定批次上测量 CE 与等权 DDO 损失对分类头的梯度范数比与夹角'
+                             ' (只读梯度, 不影响训练)')
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')
