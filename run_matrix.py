@@ -113,6 +113,12 @@ MATRICES = {
     "mechanism": ("DDO-Subspace", [
         ("CUB", f"mech_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a)] + MECH_DIRS[arm])
         for arm in ("proj8", "res8", "split8", "proj32", "res32", "split32") for a in MECH_DOSES[arm]]),
+    # Split 的偏置对照 (§3q): bias-free 的 split 对 bias-free 的 full, k in {8,32} x 4 个剂量 x 3 seeds = 48 个 run
+    "biasfree": ("DDO-Subspace", [
+        ("CUB", f"bf_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a), "--ddo_dirs", dirs, "--ddo_k", str(k)])
+        for arm, dirs, k in (("full8", "full_bf", 8), ("split8", "split_bf", 8),
+                             ("full32", "full_bf", 32), ("split32", "split_bf", 32))
+        for a in ((0.5, 1.0, 2.0, 4.0) if k == 8 else (1.0, 2.0, 4.0, 8.0))]),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -155,6 +161,7 @@ def _self_test_expected():
             assert "alpha" in expected(ex + COMMON), f"矩阵 {name} 的 {tag} 没有 alpha"
     assert len(_subspace_entries()) == 26, len(_subspace_entries())        # 22 预注册 + 4 低剂量配置
     assert len(MATRICES["mechanism"][1]) == 24, len(MATRICES["mechanism"][1])
+    assert len(MATRICES["biasfree"][1]) == 16, len(MATRICES["biasfree"][1])       # 4 臂 x 4 剂量
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}

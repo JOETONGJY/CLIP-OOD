@@ -95,7 +95,18 @@ def main():
     mean_dirs = diffs.mean(dim=1)
     mean_dirs = mean_dirs / (mean_dirs.norm(dim=-1, keepdim=True) + 1e-8)
     M = (mean_dirs @ E.T)                                          # (204, 312): mean 臂约束的方向 (不成对)
-    Qm = torch.linalg.qr(ln0(M).double().T)[0].T                   # 其张成空间的正交基
+    # mean 臂方向 (经 LN0) 的张成空间: QR 给出 204 个正交基向量, 但数值秩未必是 204 ——
+    # 外审第四轮: 需按奇异值容差确认数值秩, 再谈它覆盖了多少类间散度
+    Mln = ln0(M).double()
+    sM = torch.linalg.svdvals(Mln)                                  # (204,) 降序
+    rank_tol = dict(rel_1e3=int((sM > sM[0] * 1e-3).sum()), rel_1e2=int((sM > sM[0] * 1e-2).sum()),
+                    rel_1e1=int((sM > sM[0] * 1e-1).sum()),
+                    eff_rank_entropy=None)
+    p_ = (sM ** 2) / (sM ** 2).sum()
+    rank_tol["eff_rank_entropy"] = round(float(torch.exp(-(p_ * (p_ + 1e-300).log()).sum())), 2)
+    rank_tol["s_over_max"] = [round(float(v), 4) for v in sM[[0, 7, 15, 31, 63, 127, 203]]]
+    Qm = torch.linalg.qr(Mln.T)[0].T                                # 其张成空间的正交基 (204 行)
+    Qm_r = Qm[:rank_tol["rel_1e3"]]                                 # 按数值秩截断 (rel 1e-3)
     g_cache = torch.Generator().manual_seed(0)
     rnd = {}
     for k in KS:
@@ -115,7 +126,10 @@ def main():
            "trace_B_over_total": float(trB / (trB + trW)),
            "note": "事后诊断 (看到正式矩阵结果之后), 仅用源域训练集特征; 不作为判定依据",
            "principal": {}, "random_centered": {str(k): v for k, v in rnd.items()},
-           "mean_dirs_span": {"rank": int(Qm.size(0)), **dict(zip(("capB", "capW"), captured(Qm)))},
+           "mean_dirs_span": {"rank_qr": int(Qm.size(0)), "rank_by_tolerance": rank_tol,
+                              "capB_full_basis": captured(Qm)[0], "capW_full_basis": captured(Qm)[1],
+                              "capB_rank_truncated": captured(Qm_r)[0], "capW_rank_truncated": captured(Qm_r)[1],
+                              "rank_truncated_dim": int(Qm_r.size(0))},
            "principal_eta2_top8": [round(float(v), 5) for v in eta2(Vp[:8])],
            "mean_dirs_eta2": {"mean": round(float(eta2(ln0(M).double()).mean()), 5),
                               "max": round(float(eta2(ln0(M).double()).max()), 5)}}
@@ -134,7 +148,15 @@ def main():
         print(f"{'主方向':8s} k={k:<3d} {p['spectral_energy_cum']:10.3f} {p['capB']:10.3f} {p['capW']:10.3f} "
               f"{r['capB_mean']:12.3f} ± {r['capB_sd']:.3f} {r['capW_mean']:12.3f} {k / (d - 1):10.3f}")
     m = out["mean_dirs_span"]
-    print(f"{'mean 臂':8s} rank={m['rank']:<3d} {'—':>10s} {m['capB']:10.3f} {m['capW']:10.3f} {'—':>22s} {'—':>12s} {m['rank'] / (d - 1):10.3f}")
+    print(f"{'mean 臂':8s} QR 基={m['rank_qr']:<3d} 数值秩(σ/σmax>1e-3)={m['rank_by_tolerance']['rel_1e3']:<3d} "
+          f"类间 {m['capB_full_basis']:.3f} (截断后 {m['capB_rank_truncated']:.3f}) "
+          f"类内 {m['capW_full_basis']:.3f} (截断后 {m['capW_rank_truncated']:.3f})")
+    rt = m["rank_by_tolerance"]
+    print(f"  mean 臂数值秩: σ/σmax > 1e-3: {rt['rel_1e3']} | > 1e-2: {rt['rel_1e2']} | > 1e-1: {rt['rel_1e1']} | "
+          f"有效秩(熵): {rt['eff_rank_entropy']} | σ/σmax@[1,8,16,32,64,128,204]={rt['s_over_max']}")
+    print("\n读法 (外审第四轮修正): 主方向对类间与类内散度的捕获比例相近, 所以准确的说法是"
+          "\"语言域主方向与源域概念空间的高方差结构高度重合\", 不是\"选择性地与类别判别信息重合\"。"
+          "做判别保护时须同时看 B 与 W, 不能简单保护所有高方差方向。")
     print("\n逐方向 eta^2 (类间方差 / 总方差):")
     print("  前 8 个主方向:", out["principal_eta2_top8"])
     print("  204 个类平均方向 (经 LN0): 均值 %.5f, 最大 %.5f" % (out["mean_dirs_eta2"]["mean"], out["mean_dirs_eta2"]["max"]))

@@ -320,8 +320,9 @@ class TrainingSession:
         correct = 0
         total = 0
         # 2026-11-25: 按样本数加权的 epoch 累计量 —— 原先返回的是最后一个 batch 的损失,
-        # 不能用于机制分析 (外审指出)。orth_eq = 未加权的 DDO 损失 (统一评价口径)。
-        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'orth_eq': 0.0, 'kl': 0.0}
+        # 不能用于机制分析 (外审指出)。ddo_own_unw = 本臂训练方向集上的未加权 DDO 损失 (不跨方法可比);
+        # 跨方法可比的统一口径是每个 epoch 结束后在【原始完整方向集】上另算的 ddo_full_eval (见 epoch_metrics)。
+        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'ddo_own_unw': 0.0, 'kl': 0.0}
 
         progress_bar = tqdm(
             self.train_loader,
@@ -422,12 +423,13 @@ class TrainingSession:
             batch_size = images.size(0)
             total += batch_size
             correct += (main_logits.argmax(dim=1) == labels).sum().item()
-            _reg_u = getattr(self.model, '_reg_unweighted', None)   # 加权之前的 DDO 响应 (模型 forward 内记录)
+            _reg_u = getattr(self.model, '_reg_unweighted', None)   # 加权之前、在【本臂训练方向集】上的 DDO 响应
             sums['total'] += float(total_loss) * batch_size
             sums['cls'] += float(cls_loss) * batch_size
             sums['concept'] += float(concept_loss) * batch_size
             sums['orth'] += float(orth_loss) * batch_size
-            sums['orth_eq'] += (float(_reg_u.abs().mean()) if _reg_u is not None else float(orth_loss)) * batch_size
+            # 自身训练方向集上的未加权损失 (不跨方法可比: 方向集随实验臂变化)
+            sums['ddo_own_unw'] += (float(_reg_u.abs().mean()) if _reg_u is not None else float(orth_loss)) * batch_size
             sums['kl'] += float(kl_loss) * batch_size
 
             progress_bar.set_postfix({
@@ -445,7 +447,7 @@ class TrainingSession:
             'cls_loss': sums['cls'] / total,
             'concept_loss': sums['concept'] / total,
             'orth_loss': sums['orth'] / total,
-            'orth_eq_loss': sums['orth_eq'] / total,
+            'ddo_own_unweighted_loss': sums['ddo_own_unw'] / total,
             'kl_loss': sums['kl'] / total,
         }
 
@@ -570,6 +572,12 @@ class TrainingSession:
         self._diag_batch_cache = (x, y)
         return x, y
 
+    def _diag_param_names(self):
+        """梯度诊断所取参数的名字 (与 self._diag_params 同序), 用于记录哪些参数不参与正则项"""
+        mods = [("", self.model.classifier)] if not hasattr(self.model, "inv_classifier") or self.model.inv_classifier is None \
+            else [("", self.model.classifier), ("inv.", self.model.inv_classifier)]
+        return [f"{pre}{n}" for pre, m in mods for n, _ in m.named_parameters() if _.requires_grad]
+
     def _grad_diag(self, tag):
         """在固定批次上测量: 分类损失 CE 与【等权】DDO 损失对分类头参数的梯度范数、
         范数比与夹角余弦。只读取梯度 (autograd.grad), 不写入 .grad, 不改变优化器状态与随机数。"""
@@ -579,6 +587,7 @@ class TrainingSession:
         inv = getattr(self.model, "inv_classifier", None)
         if inv is not None:
             params += [p for p in inv.parameters() if p.requires_grad]
+        self._diag_params = params
         _, cls_preds, reg_loss = self.model(x)
         if isinstance(cls_preds, tuple):                     # 与训练目标一致的双头 CE
             logits_ori, logits_inv = cls_preds
@@ -593,8 +602,12 @@ class TrainingSession:
         if reg_loss is not None:
             alpha = float(self.args.alpha)
             rt = reg_loss.abs().mean()
-            g_rt = torch.autograd.grad(rt, params, retain_graph=True)
-            g_rt = torch.cat([g.reshape(-1) for g in g_rt])
+            # bias-free 的正则 (full_bf / split_bf) 对 LayerNorm.beta 与 Linear.bias 没有梯度 (不在计算图里),
+            # autograd.grad 需 allow_unused, 未参与的参数梯度记为零向量并如实记录是哪些
+            raw = torch.autograd.grad(rt, params, retain_graph=True, allow_unused=True)
+            unused = [n for n, g in zip(self._diag_param_names(), raw) if g is None]
+            g_rt = torch.cat([(g if g is not None else torch.zeros_like(p)).reshape(-1)
+                              for g, p in zip(raw, params)])
             ratio = float(g_rt.norm() / g_ce.norm().clamp_min(1e-12))
             # 外审: 真正作用于优化的是 alpha * 正则梯度, 所以同时记录乘以 alpha 之后的实际范数比
             # (外审: 该比值只描述固定诊断批次、所记录时刻、分类头参数上的测量, 不等于两个目标之间没有冲突)
@@ -602,6 +615,8 @@ class TrainingSession:
                         'grad_norm_ratio_train_over_ce': ratio,
                         'alpha': alpha, 'grad_norm_ratio_train_alpha_over_ce': alpha * ratio,
                         'grad_cos_ce_regtrain': float((g_ce @ g_rt) / (g_ce.norm() * g_rt.norm()).clamp_min(1e-12))})
+            if unused:
+                rec['reg_params_without_grad'] = unused
         # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用
         ddo = self._ddo_loss_equal_weight()
         if ddo is not None:
@@ -725,11 +740,18 @@ class TrainingSession:
                                           'target': dict(target_metrics)}
 
                 # 2026-11-25: 逐 epoch 的平均损失与源域验证 CE (目标域精度仅在评估过的 epoch 记录)
+                # 两个 DDO 字段口径不同 (外审第四轮指出旧字段 ddo_eq 名不副实, 已改名):
+                #   ddo                  训练时实际优化的 DDO 项 (本臂方向集, 含加权)
+                #   ddo_own_unweighted   本臂训练方向集上的未加权损失 —— 方向集随实验臂变化, 不跨方法可比
+                #   ddo_full_eval        epoch 结束后在【原始完整方向集】上的等权损失 —— 统一评价口径, 可跨方法比较
+                with torch.no_grad():
+                    ddo_full = self._ddo_loss_equal_weight()
                 self.epoch_metrics.append({
                     'epoch': epoch + 1,
                     'cls': train_metrics['cls_loss'],
-                    'ddo': train_metrics['orth_loss'],          # 训练时实际优化的 DDO 项 (含加权)
-                    'ddo_eq': train_metrics['orth_eq_loss'],    # 同一批次上的等权 DDO 损失
+                    'ddo': train_metrics['orth_loss'],
+                    'ddo_own_unweighted': train_metrics['ddo_own_unweighted_loss'],
+                    'ddo_full_eval': float(ddo_full) if ddo_full is not None else None,
                     'kl': train_metrics['kl_loss'],
                     'source_acc': source_metrics['source_acc'],
                     'source_ce': source_metrics['source_cls_loss'],

@@ -15,7 +15,7 @@
    "capB": 0.08742665250293966,
    "capW": 0.12651389508463043,
    "spectral_energy_cum": 0.5926508861945103,
-   "eta2_mean": 0.542866323355907
+   "eta2_mean": 0.5428663233559069
   },
   "4": {
    "capB": 0.25378114453249595,
@@ -81,9 +81,27 @@
   }
  },
  "mean_dirs_span": {
-  "rank": 204,
-  "capB": 0.992908253753974,
-  "capW": 0.9913584713409964
+  "rank_qr": 204,
+  "rank_by_tolerance": {
+   "rel_1e3": 185,
+   "rel_1e2": 86,
+   "rel_1e1": 15,
+   "eff_rank_entropy": 7.68,
+   "s_over_max": [
+    181.5667,
+    33.6725,
+    18.1534,
+    9.8172,
+    3.2905,
+    0.752,
+    0.0502
+   ]
+  },
+  "capB_full_basis": 0.992908253753974,
+  "capW_full_basis": 0.9913584713409964,
+  "capB_rank_truncated": 0.9890550556837658,
+  "capW_rank_truncated": 0.9877184393448714,
+  "rank_truncated_dim": 185
  },
  "principal_eta2_top8": [
   0.46917,

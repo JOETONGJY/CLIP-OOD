@@ -39,21 +39,27 @@ OPERATING_BAND = 0.3
 SEEDS = (1, 2, 3)
 ARMS = ["mean", "pca8", "pca32", "rand8", "rand32", "fullsym"]          # §3n 预注册的 6 个臂
 MECH_ARMS = ["proj8", "res8", "split8", "proj32", "res32", "split32"]   # §3p 机制对照的 6 个臂
+BF_ARMS = ["bfull8", "bsplit8", "bfull32", "bsplit32"]                 # §3q 偏置对照的 4 个臂 (bias-free)
 NAMES = {"full": "full（原始方向）", "mean": "mean（类平均方向）", "pca8": "pca8（前 8 个主方向）",
          "pca32": "pca32（前 32 个主方向）", "rand8": "rand8（8 维随机标架）", "rand32": "rand32（32 维随机标架）",
          "fullsym": "full_sym（原始方向 + 相反数）",
          "proj8": "proj8（原始方向在 8 维主子空间的投影）", "res8": "res8（8 维主子空间外的残余）",
          "split8": "split8（投影 + 残余，损失求和）",
          "proj32": "proj32（原始方向在 32 维主子空间的投影）", "res32": "res32（32 维主子空间外的残余）",
-         "split32": "split32（投影 + 残余，损失求和）"}
+         "split32": "split32（投影 + 残余，损失求和）",
+         "bfull8": "full_bf·k=8（完整 LN0 方向，无偏置）", "bsplit8": "split_bf·k=8（无偏置，分量求和）",
+         "bfull32": "full_bf·k=32（完整 LN0 方向，无偏置）", "bsplit32": "split_bf·k=32（无偏置，分量求和）"}
 EXPECT_DIRS = {"full": ("full", None, 32, 0), "mean": ("mean", None, 32, 0), "fullsym": ("full_sym", None, 32, 0),
                "pca8": ("pca", "ln0", 8, 0), "pca32": ("pca", "ln0", 32, 0), "rand8": ("random", "ln0", 8, None),
                "rand32": ("random", "ln0", 32, None),
                "proj8": ("projected", "ln0", 8, 0), "proj32": ("projected", "ln0", 32, 0),
                "res8": ("residual", "ln0", 8, 0), "res32": ("residual", "ln0", 32, 0),
-               "split8": ("split", "ln0", 8, 0), "split32": ("split", "ln0", 32, 0)}
+               "split8": ("split", "ln0", 8, 0), "split32": ("split", "ln0", 32, 0),
+               "bfull8": ("full_bf", "ln0", 8, 0), "bsplit8": ("split_bf", "ln0", 8, 0),
+               "bfull32": ("full_bf", "ln0", 32, 0), "bsplit32": ("split_bf", "ln0", 32, 0)}
 EXPECT_ROWS = {"full": 40800, "mean": 204, "fullsym": 81600, "pca8": 16, "pca32": 64, "rand8": 16, "rand32": 64,
-               "proj8": 40800, "proj32": 40800, "res8": 40800, "res32": 40800, "split8": 81600, "split32": 81600}
+               "proj8": 40800, "proj32": 40800, "res8": 40800, "res32": 40800, "split8": 81600, "split32": 81600,
+               "bfull8": 40800, "bsplit8": 81600, "bfull32": 40800, "bsplit32": 81600}
 # 外审第三轮后追加的低剂量 run (RESULTS §3p): 描述性, 不进入 §3n 的判定配对 —— §3n 的判定集合保持 66 run 不变
 POST_HOC = {("pca8", 0.125), ("pca8", 0.25), ("pca32", 0.125), ("pca32", 0.25)}
 GD_TAGS = ["before_epoch1", "before_epoch10", "before_epoch30", "final"]
@@ -71,7 +77,10 @@ def jobs_of(matrix):
         for seed in SEEDS:
             ex = extra(seed) if callable(extra) else extra
             alpha = float([ex[i + 1] for i, t in enumerate(ex) if t == "--alpha"][-1])
-            arm = tag.split("_")[1] if tag.startswith(("sub_", "mech_")) else "full"
+            if tag.startswith("bf_"):                       # bf_full8 / bf_split32 ... -> bfull8 / bsplit32
+                arm = "b" + tag.split("_")[1]
+            else:
+                arm = tag.split("_")[1] if tag.startswith(("sub_", "mech_")) else "full"
             out.append((arm, alpha, ds, tag, seed, ex))
     return out
 
@@ -100,9 +109,10 @@ class Data:
         self.r = {}                       # (arm, alpha, seed) -> json
         self.checks = []                  # (名称, 是否通过, 说明)
         by_name = {}
-        jobs = jobs_of("subspace") + jobs_of("mechanism") + jobs_of("dose")
+        jobs = jobs_of("subspace") + jobs_of("mechanism") + jobs_of("biasfree") + jobs_of("dose")
         want_sub = sum(1 for j in jobs_of("subspace"))
         want_mech = sum(1 for j in jobs_of("mechanism"))
+        want_bf = sum(1 for j in jobs_of("biasfree"))
         for arm, alpha, ds, tag, seed, ex in jobs:
             path = os.path.join(results_dir, f"{ds}_{tag}_seed{seed}.json")
             if not os.path.exists(path):
@@ -116,6 +126,8 @@ class Data:
         n_mech = sum(1 for k in self.r if k[0] in {a for a, *_ in jobs_of("mechanism")})
         self.checks.append((f"机制对照矩阵（§3p）的 {want_mech} 个结果文件都存在", n_mech == want_mech,
                             f"{n_mech} / {want_mech}"))
+        n_bf = sum(1 for k in self.r if k[0] in set(BF_ARMS))
+        self.checks.append((f"偏置对照矩阵（§3q）的 {want_bf} 个结果文件都存在", n_bf == want_bf, f"{n_bf} / {want_bf}"))
         bad = [k for k, (path, ex, ds, tag, seed) in by_name.items()
                if not result_is_complete(path, expected(ex + COMMON, ds, seed, tag))]
         self.checks.append(("全部 run 在驱动的完成判据下为完成 (status / 100 epochs / 命令行全部配置逐项匹配)",
@@ -129,8 +141,10 @@ class Data:
             cond = ((src is None or rc["ddo_pca_src"] == src) and rc["ddo_dirs"] == d and rc["ddo_k"] == k
                     and (dseed is None or rc["ddo_dirs_seed"] == dseed)
                     and info.get("rows") == EXPECT_ROWS[arm] and len(info.get("sha256", "")) == 64)
-            if arm in ("proj8", "proj32", "res8", "res32", "split8", "split32"):
-                cond = cond and "loss_path" in info          # 这些臂必须走"不再逐行归一化"的损失路径
+            if arm in MECH_ARMS:
+                cond = cond and "loss_path" in info and "无" not in info.get("bias", "保留")   # 带偏置的机制臂
+            if arm in BF_ARMS:
+                cond = cond and "无 (bias-free" in info.get("bias", "")                        # 无偏置臂
             if arm.startswith("rand"):
                 cond = cond and rc["ddo_dirs_seed"] == seed and (info.get("seed") == seed)
             if not cond:
@@ -277,7 +291,7 @@ def main():
 
     # ---------- 1. 剂量曲线 (目标域精度; 统一口径的源域验证 CE 与最终等权 DDO 损失) ----------
     all_a = sorted({a for arm in ARMS + MECH_ARMS + ["full"] for a in d.alphas(arm)})
-    curve_arms = ARMS + MECH_ARMS + ["full"]
+    curve_arms = ARMS + MECH_ARMS + BF_ARMS + ["full"]
     curves = {arm: {str(a): {"target_acc": {"seeds": [round(float(v), 3) for v in get(arm, a, "target_acc")],
                                          "mean": round(ms(get(arm, a, "target_acc"))[0], 3),
                                          "sd": round(ms(get(arm, a, "target_acc"))[1], 3)},
@@ -313,6 +327,18 @@ def main():
         q_proj_vs_pca[f"k={k}"] = {**summary(p), "verdict": label_effect(p)}
     out["q_mech_vs_full"], out["q_mech_proj_vs_pca"] = q_mech, q_proj_vs_pca
 
+    # ---------- §3q: Split 的偏置对照 (主比较只判定 split_bf − full_bf) ----------
+    q_bf = {}
+    for k in (8, 32):
+        p = paired(d, f"bsplit{k}", f"bfull{k}")
+        q_bf[f"split_bf − full_bf（k={k}）"] = {**summary(p), "verdict": label_effect(p)}
+    for k in (8, 32):                                        # 辅助比较: 只报告, 不判定
+        for name, a, b in ((f"full_bf − full（k={k}）", f"bfull{k}", "full"),
+                           (f"split − split_bf（k={k}）", f"split{k}", f"bsplit{k}")):
+            p = paired(d, a, b)
+            q_bf[name] = {**summary(p), "verdict": "辅助，不判定"}
+    out["q_biasfree"] = q_bf
+
     # ---------- ③ ----------
     p3 = paired(d, "fullsym", "full")
     p3b = {f"k={k}": {str(a): {str(s): round(d.get(f"pca{k}", a, s, "target_acc") - d.get("fullsym", a, s, "target_acc"), 3)
@@ -323,14 +349,17 @@ def main():
     # ---------- ④: 相对 full 的 CE–DDO 曲线残差 ----------
     full_a = [a for a in d.alphas("full") if has("full", a)]
     fx = [d.get("full", a, s, "ddo_eq") for a in d.alphas("full") for s in SEEDS if d.has("full", a, s)]
-    x_lo, x_hi = (min(fx), max(fx)) if fx else (float("nan"), float("nan"))
     cx = np.array([np.mean(get("full", a, "ddo_eq")) for a in full_a])
     cy_acc = np.array([np.mean(get("full", a, "target_acc")) for a in full_a])
     cy_ce = np.array([np.mean(get("full", a, "source_ce")) for a in full_a])
     order = np.argsort(cx)
     cx, cy_acc, cy_ce = cx[order], cy_acc[order], cy_ce[order]
+    # 有效范围 = 实际插值节点 (各剂量 3 seeds 均值) 的最小/最大值 —— np.interp 在节点范围之外会截断到端点,
+    # 那不是插值。外审第四轮指出旧代码用全部 21 个 run 的极值, 比节点范围略宽 (本轮无 run 受影响)
+    x_lo, x_hi = (float(cx.min()), float(cx.max())) if len(cx) else (float("nan"), float("nan"))
     out["full_curve"] = {"ddo_eq": cx.tolist(), "target_acc": cy_acc.tolist(), "source_ce": cy_ce.tolist(),
-                         "range_all_runs": [x_lo, x_hi]}
+                         "interp_node_range": [x_lo, x_hi],
+                         "all_runs_range": [min(fx), max(fx)] if fx else None}
     q4 = {}
     for arm in ARMS:
         res_acc, res_ce, n_out, rows = {}, [], 0, []
@@ -369,7 +398,7 @@ def main():
                      "drop_to_highest_alpha": round(max(m) - m[-1], 3) if m else None}
     out["dose_sensitivity"] = sens
     grad = {}
-    for arm in ARMS + MECH_ARMS + ["full"]:
+    for arm in ARMS + MECH_ARMS + BF_ARMS + ["full"]:
         grad[arm] = {}
         for a in d.alphas(arm):
             rs = [d.r[(arm, a, s)] for s in SEEDS if d.has(arm, a, s)]
@@ -462,7 +491,8 @@ def main():
         L.append(f"| {a} | " + " | ".join(cells) + " |")
     L += ["", "## 6. ④ 相对 full 的 CE–DDO 曲线残差", "",
           "横轴为最终模型在原始完整方向集上的等权 DDO 损失，纵轴为目标域精度与源域验证 CE。曲线取 full 各剂量 3 seeds 均值的线性插值"
-          f"（横坐标范围 {x_lo:.3f}～{x_hi:.3f}，即 full 全部 21 个 run 的范围）。残差 = 实际值 − 曲线在同一 DDO 损失处的值。", "",
+          f"（有效横坐标范围 {x_lo:.3f}～{x_hi:.3f}，即 full 各剂量 3 seeds 均值这 7 个插值节点的范围；"
+          "节点范围之外的 run 不参与插值，单独计数）。残差 = 实际值 − 曲线在同一 DDO 损失处的值。", "",
           "| 臂 | 范围内 run 数 | 范围外 run 数 | 目标域精度残差（均值；逐 seed 均值） | 源域 CE 残差均值 | 判定 |", "|---|---|---|---|---|---|"]
     for arm in ARMS:
         q = q4[arm]
@@ -484,10 +514,35 @@ def main():
                  + f" | {s_['range']:.2f} | {s_['drop_to_highest_alpha']:.2f} |")
     L += ["", "乘以 α 之后的实际梯度范数比（α·‖∇正则‖/‖∇CE‖，固定批次、分类头参数，3 seeds 均值）：", "",
           "| 臂 | α | " + " | ".join(GD_TAGS) + " |", "|---|---|" + "---|" * len(GD_TAGS)]
-    for arm in ["full"] + ARMS + MECH_ARMS:
+    for arm in ["full"] + ARMS + MECH_ARMS + BF_ARMS:
         for a in d.alphas(arm):
             g = grad[arm][str(a)]
             L.append(f"| {NAMES[arm]} | {a:g} | " + " | ".join("—" if g[t] is None else f"{g[t]:.3f}" for t in GD_TAGS) + " |")
+    # ---- §3q: Split 的偏置对照 ----
+    bf_cols = ["full", "bfull8", "bsplit8", "bfull32", "bsplit32"]
+    have_bf = any(d.alphas(a) for a in BF_ARMS)
+    L += ["", "## 8b. Split 的偏置对照（§3q，预注册于运行之前）", ""]
+    if have_bf:
+        L += ["§3p 的 split 对两个分量各计一次有效偏置 c = W·β + b；\"偏置只计一次的 split\" 恒等于 full，"
+              "所以去掉该混杂的配对是 bias-free 的 split（split_bf）对 bias-free 的 full（full_bf）。**主比较只判定 split_bf − full_bf。**", "",
+              "| α | " + " | ".join(NAMES[a] for a in bf_cols) + " |",
+              "|---|" + "---|" * len(bf_cols)]
+        for a in all_a:
+            cells = []
+            for arm in bf_cols:
+                c = curves[arm].get(str(a))
+                cells.append(f"{c['target_acc']['mean']:.2f} ± {c['target_acc']['sd']:.2f}" if c else "—")
+            L.append(f"| {a:g} | " + " | ".join(cells) + " |")
+        L += ["", "| 比较 | 配对数 | 均值 | seed 均值 | 判定 |", "|---|---|---|---|---|"]
+        for name, q in q_bf.items():
+            if q["n_pairs"]:
+                L.append(f"| {name} | {q['n_pairs']} | {q['mean']:+.2f} | "
+                         + " / ".join(f"{v:+.2f}" for v in q["seed_means"].values()) + f" | **{q['verdict']}** |")
+        L += ["", "辅助比较的解读边界：full_bf − full 是偏置本身的贡献（即 Stage 1B 的 Bias-Free × L1 一格）；"
+              "split − split_bf 是截距重复处理的贡献。bias-free 只解除对截距项的直接惩罚，"
+              "不保证训练中有效截距 W·β + b 不变（W、γ 仍在更新）。", ""]
+    else:
+        L += ["偏置对照矩阵尚未运行。", ""]
     L += ["", "## 8. 机制对照（§3p，预注册于机制矩阵运行之前）", "",
           "外审第三轮的分析：PCA 臂的失败可能不是因为保留了错误的子空间，而是用等权正交标架替换了原始经验方向分布、"
           "改变了 L1 正则化的几何。下面的臂把每个原始方向（经 LN0）投影到同一个主子空间内（projected）、"
@@ -612,6 +667,9 @@ def main():
                                                     for arm, q in q_mech.items() if q["n_pairs"]))
         print("  §3p proj − pca: " + "; ".join(f"{k}: {q['verdict']} (均值 {q['mean']:+.2f})"
                                                for k, q in q_proj_vs_pca.items() if q["n_pairs"]))
+    if any(q["n_pairs"] for q in q_bf.values()):
+        print("  §3q 偏置对照: " + "; ".join(f"{name}: {q['verdict']} (均值 {q['mean']:+.2f})"
+                                           for name, q in q_bf.items() if q["n_pairs"]))
     print(f"\n[saved] {os.path.join(opt.out_dir, 'subspace_cub.json')} / subspace_cub.md")
 
 

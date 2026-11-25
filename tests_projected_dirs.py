@@ -80,5 +80,27 @@ for k in KS:
           float(loss(U)) <= float(loss(Um)) + float(loss(Ur)) + 1e-6,
           f"full={loss(U):.4f} <= proj+res={float(loss(Um)) + float(loss(Ur)):.4f}")
 
+# ---- bias-free 路径 (外审第四轮) ----
+bf = lambda x: clip_cbm_orth._affine_linear(x, ln, lin, with_bias=False)
+manual = (U * ln.weight) @ lin.weight.T                               # 手算 W·diag(gamma)·u (不含 beta 与 b)
+check("BF1 with_bias=False 的输出 == W·diag(gamma)·u (不含 W·beta + b)",
+      torch.allclose(bf(U), manual, atol=1e-4), f"max|diff|={float((bf(U) - manual).abs().max()):.2e}")
+c = lin.bias[None, :] + ln.bias[None, :] @ lin.weight.T             # 有效偏置 W·beta + b
+check("BF2 with_bias=True 的输出 == with_bias=False 的输出 + (W·beta + b)",
+      torch.allclose(clip_cbm_orth._affine_linear(U, ln, lin, with_bias=True), bf(U) + c, atol=1e-4),
+      f"max|diff|={float((clip_cbm_orth._affine_linear(U, ln, lin, with_bias=True) - bf(U) - c).abs().max()):.2e}")
+check("BF3 偏置非零 (否则 bias-free 对照没有意义)", float(c.abs().max()) > 1e-3, f"max|c|={float(c.abs().max()):.3f}")
+split_bias = float(clip_cbm_orth._affine_linear(torch.cat([Um, Ur], 0), ln, lin, with_bias=True).abs().mean() * 2)
+split_bf = float(bf(torch.cat([Um, Ur], 0)).abs().mean() * 2)
+check("BF4 split(偏置各计一次) != split_bf(无偏置) —— 二者之差就是外审指出的混杂因素",
+      abs(split_bias - split_bf) > 1e-3, f"split={split_bias:.4f}, split_bf={split_bf:.4f}")
+# 梯度层面: bias-free 正则对 beta 与 b 没有直接梯度 —— 它们根本不在计算图里 (autograd.grad 返回 None)
+reg = clip_cbm_orth._affine_linear(U[:20], ln, lin, with_bias=False).abs().mean()
+g_ln_w, g_ln_b, g_w, g_b = torch.autograd.grad(
+    reg, [ln.weight, ln.bias, lin.weight, lin.bias], allow_unused=True)
+check("BF5 bias-free 正则对 LayerNorm.beta 与 Linear.bias 没有直接梯度 (不在计算图里)",
+      g_ln_b is None and g_b is None)
+check("BF6 bias-free 正则对 gamma 与 W 仍有非零梯度", float(g_ln_w.abs().max()) > 0 and float(g_w.abs().max()) > 0)
+
 print("TESTS_PROJECTED_DIRS:", "PASS" if ok else "FAIL")
 sys.exit(0 if ok else 1)

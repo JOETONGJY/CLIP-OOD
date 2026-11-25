@@ -538,6 +538,27 @@ class clip_cbm_orth(nn.Module):
                                            'loss_path': 'affine_linear (LN0 已施加, 不再逐行归一化)',
                                            'bias': '保留 (含 W·beta + b, 与 full 的有效响应一致)',
                                            'cum_spectral_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
+            elif ddo_dirs in ('full_bf', 'split_bf'):
+                # 外审第四轮 (2026-11-25): split 的 |A·u_p + c| + |A·u_r + c| 把有效偏置 c = W·beta + b 计了两次,
+                # split 与 full 的差异里混入了"截距重复处理"这个因素。注意"偏置只计一次的 split"恒等于 full
+                # (u_p + u_r = u), 所以正确的配对是 bias-free 的 split |A·u_p| + |A·u_r| 对 bias-free 的 full |A·u|:
+                # full_bf  = 完整 LN0 方向 (不分解), 无偏置
+                # split_bf = 两分量分别求损失后相加, 无偏置
+                A = (self.diffs @ E.T).reshape(-1, E.size(0))       # (N*C, 312)
+                U = (A - A.mean(-1, keepdim=True)) / torch.sqrt(A.var(-1, unbiased=False, keepdim=True) + 1e-5)
+                if ddo_dirs == 'full_bf':
+                    P = U
+                    self.ddo_dirs_info.update({'pairing': 'none'})
+                else:
+                    V, ev = self._principal_rows(U, k)
+                    Proj = V.T @ V
+                    P = torch.cat([U @ Proj, U - U @ Proj], 0)
+                    self._ddo_split_scale = 2.0
+                    self.ddo_dirs_info.update({'pairing': 'none', 'k': k})
+                self._ddo_dirs_ln_free = True
+                self._ddo_bias_free = True
+                self.ddo_dirs_info.update({'loss_path': 'affine_linear (LN0 已施加, 不再逐行归一化)',
+                                           'bias': '无 (bias-free: 不含 W·beta + b)'})
             elif ddo_dirs == 'random':
                 g = torch.Generator().manual_seed(seed)              # 独立 generator, 不动全局随机数
                 R = torch.randn(E.size(0), k, generator=g)
@@ -553,12 +574,20 @@ class clip_cbm_orth(nn.Module):
         return P.float().to(self.device)
 
     @staticmethod
-    def _affine_linear(x, ln, lin):
+    def _affine_linear(x, ln, lin, with_bias=True):
         """只做 LayerNorm 的 affine + Linear, 不做逐行归一化: W·(gamma⊙x + beta) + b。
         用于 projected / residual / split 臂 —— 方向已经过 LN0, 再过分类头的 LayerNorm 会把投影幅值
         重新归一化 (外审明确要求避免: 低能量残差会被人为放大)。与 full 的有效响应
-        W·diag(gamma)·LN0(u) + W·beta + b 中 gamma/beta/b 的处理一致。"""
-        return lin(x * ln.weight + ln.bias)
+        W·diag(gamma)·LN0(u) + W·beta + b 中 gamma/beta/b 的处理一致。
+        with_bias=False 时只算方向响应 W·(gamma⊙x), 不含 W·beta + b —— 用于 bias-free 对照:
+        split 的 |A·u_p + c| + |A·u_r + c| 把有效偏置 c 计了两次 (外审第四轮指出), 要去掉这个混杂,
+        正确的配对是 bias-free 的 split |A·u_p| + |A·u_r| 对 bias-free 的 full |A·u|。
+        注意 nn.Linear 自带 bias, 所以无偏置路径必须用 F.linear(x·gamma, W, bias=None),
+        不能只去掉 beta (tests_projected_dirs.py 的 BF1/BF2/BF5 钉住这一点)。"""
+        import torch.nn.functional as F
+        if with_bias:
+            return lin(x * ln.weight + ln.bias)
+        return F.linear(x * ln.weight, lin.weight, None)
 
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):
@@ -568,11 +597,12 @@ class clip_cbm_orth(nn.Module):
         concept_activations = visual_features @ self.concept_embeddings.T
 
         if getattr(self, '_ddo_dirs_ln_free', False):
-            # projected / residual / split: 方向已 LN0, 绕过分类头的 LayerNorm (保留投影幅值)
+            # projected / residual / split / bias-free full: 方向已 LN0, 绕过分类头的 LayerNorm (保留投影幅值)
             regularizer = self._affine_linear(self.domain_concept_projection,
-                                              self.classifier[1], self.classifier[2])
+                                              self.classifier[1], self.classifier[2],
+                                              with_bias=not getattr(self, '_ddo_bias_free', False))
             if getattr(self, '_ddo_split_scale', 1.0) != 1.0:
-                regularizer = regularizer * self._ddo_split_scale   # split: abs().mean() x 2 = 两分量之和
+                regularizer = regularizer * self._ddo_split_scale   # split: abs().mean() x 2 = 两个分量之和
         else:
             regularizer = self.classifier[1:](
                 self.domain_concept_projection
