@@ -164,6 +164,11 @@ class TrainingSession:
                     if getattr(self.args, 'grouped_weights', False) else None),
                 ca_prior=ca_prior,
                 ca_beta=getattr(self.args, "ca_beta", 1.0),
+                # DDO-Subspace (2026-11-25): 训练时约束的方向集 (默认 full = 原始行为)
+                ddo_dirs=getattr(self.args, "ddo_dirs", "full"),
+                ddo_k=getattr(self.args, "ddo_k", 32),
+                ddo_pca_src=getattr(self.args, "ddo_pca_src", "ln0"),
+                ddo_dirs_seed=getattr(self.args, "ddo_dirs_seed", 0),
             ).to(self.device)
         # print("Model domain_weights:", getattr(self.model, "domain_weights", None), flush=True)
         # if hasattr(self.model, "domain_weights") and self.model.domain_weights is not None:
@@ -574,7 +579,7 @@ class TrainingSession:
         inv = getattr(self.model, "inv_classifier", None)
         if inv is not None:
             params += [p for p in inv.parameters() if p.requires_grad]
-        _, cls_preds, _ = self.model(x)
+        _, cls_preds, reg_loss = self.model(x)
         if isinstance(cls_preds, tuple):                     # 与训练目标一致的双头 CE
             logits_ori, logits_inv = cls_preds
             ce = (self.loss_fns['cls'](logits_ori, y)
@@ -584,6 +589,15 @@ class TrainingSession:
         g_ce = torch.autograd.grad(ce, params, retain_graph=True)
         g_ce = torch.cat([g.reshape(-1) for g in g_ce])
         rec = {'tag': tag, 'ce': float(ce), 'grad_ce_norm': float(g_ce.norm())}
+        # (a) 本模型训练时实际优化的正则项 (含其加权方式 / 方向集变体; 不含 alpha) —— 强度匹配用
+        if reg_loss is not None:
+            rt = reg_loss.abs().mean()
+            g_rt = torch.autograd.grad(rt, params, retain_graph=True)
+            g_rt = torch.cat([g.reshape(-1) for g in g_rt])
+            rec.update({'reg_train': float(rt), 'grad_reg_train_norm': float(g_rt.norm()),
+                        'grad_norm_ratio_train_over_ce': float(g_rt.norm() / g_ce.norm().clamp_min(1e-12)),
+                        'grad_cos_ce_regtrain': float((g_ce @ g_rt) / (g_ce.norm() * g_rt.norm()).clamp_min(1e-12))})
+        # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用
         ddo = self._ddo_loss_equal_weight()
         if ddo is not None:
             g_dd = torch.autograd.grad(ddo, params)

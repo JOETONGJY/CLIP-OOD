@@ -185,7 +185,11 @@ class clip_cbm_orth(nn.Module):
             grouped_weights=False,
             descriptor_clusters=None,
             ca_prior=None,
-            ca_beta=1.0
+            ca_beta=1.0,
+            ddo_dirs='full',
+            ddo_k=32,
+            ddo_pca_src='ln0',
+            ddo_dirs_seed=0
     ):
         # def __init__(self, args, class_names, concept_names, domain_diffs,init_with_class_embedding=False):
         super(clip_cbm_orth, self).__init__()
@@ -308,6 +312,18 @@ class clip_cbm_orth(nn.Module):
         # 改动时间26.4.29-----------------------------------
         self.domain_concept_projection = self.diffs @ self.concept_embeddings.T
 
+        # ===== DDO-Subspace (2026-11-25): 训练时约束的方向集可替换 =====
+        # 原始完整方向集 (N 个描述符 x C 个文本类别) 始终保留在 domain_concept_projection_full,
+        # 供统一评价指标 ddo_loss_equal_weight() 使用; ddo_dirs != 'full' 时只替换训练用的方向集。
+        # 不消耗全局随机数 (随机标架用独立 generator) => 同 seed 下各臂的分类头初始化完全相同。
+        self.domain_concept_projection_full = self.domain_concept_projection
+        self.ddo_dirs_info = {'ddo_dirs': ddo_dirs}
+        if ddo_dirs != 'full':
+            if weight_mode not in ('none',):
+                raise ValueError("ddo_dirs 变体仅在等权 DDO (weight_mode='none') 下定义")
+            self.domain_concept_projection = self._build_direction_set(
+                ddo_dirs, int(ddo_k), ddo_pca_src, int(ddo_dirs_seed))
+
         # classifer
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -405,6 +421,58 @@ class clip_cbm_orth(nn.Module):
         返回带梯度的张量; 只在评估时由调用方包在 no_grad 里。"""
         P = getattr(self, 'domain_concept_projection_full', self.domain_concept_projection)
         return self.classifier[1:](P).abs().mean()
+
+    def _build_direction_set(self, ddo_dirs, k, pca_src, seed):
+        """DDO-Subspace: 构造训练时约束的方向集 (M, 312), 每行是分类头 LayerNorm 之前的概念空间方向。
+
+        ddo_dirs:
+          'mean'   204 个描述符的类平均方向经概念投影          (M = 204)
+          'pca'    主方向, ± 成对 (L1 与 bias 使符号不对称)     (M = 2k)
+                   pca_src='ln0'     : 对 LN0(D E^T) 做 SVD —— 分类头实际看到的约束输入 (无 affine)
+                   pca_src='concept' : 对 D E^T 做 SVD —— 未经 LayerNorm 的概念投影
+                   pca_src='mean'    : 对归一化类平均方向 (204x768) 做 SVD 得到 B (与第四章同一构造),
+                                        再经 E 映射到概念空间 —— 两章机制关联实验用的"同一个 B"
+          'random' 概念空间 (312 维) 中的随机正交标架, ± 成对   (M = 2k)
+        LayerNorm 会逐行归一化, 所以行的尺度无关, 只有方向有意义。
+        """
+        E = self.concept_embeddings
+        with torch.no_grad():
+            if ddo_dirs == 'mean':
+                dirs = self.diffs.mean(dim=1)
+                dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+                P = dirs @ E.T                                        # (204, 312)
+                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'none'})
+            elif ddo_dirs == 'pca':
+                A = (self.diffs @ E.T).reshape(-1, E.size(0))       # (N*C, 312)
+                if pca_src == 'ln0':
+                    A = (A - A.mean(-1, keepdim=True)) / torch.sqrt(A.var(-1, unbiased=False, keepdim=True) + 1e-5)
+                    X = A
+                elif pca_src == 'concept':
+                    X = A
+                elif pca_src == 'mean':
+                    dirs = self.diffs.mean(dim=1)
+                    dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
+                    X = dirs
+                else:
+                    raise ValueError(f"未知 ddo_pca_src='{pca_src}' (ln0 / concept / mean)")
+                _, S, Vh = torch.linalg.svd(X, full_matrices=False)
+                ev = (S ** 2)
+                cum = torch.cumsum(ev, 0) / ev.sum()
+                V = Vh[:k]                                            # (k, d): 主方向作为行
+                P = (V @ E.T) if pca_src == 'mean' else V              # 'mean' 的主方向在 768 维, 经 E 映射
+                P = torch.cat([P, -P], 0)                             # ± 成对
+                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'plus_minus',
+                                           'pca_src': pca_src, 'k': k,
+                                           'cum_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
+            elif ddo_dirs == 'random':
+                g = torch.Generator().manual_seed(seed)              # 独立 generator, 不动全局随机数
+                R = torch.linalg.qr(torch.randn(E.size(0), k, generator=g))[0].T   # (k, 312) 随机正交标架
+                P = torch.cat([R, -R], 0).to(self.device)
+                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'plus_minus', 'k': k, 'seed': seed})
+            else:
+                raise ValueError(f"未知 ddo_dirs='{ddo_dirs}' (full / mean / pca / random)")
+        print(f"[DDO-Subspace] 训练用方向集: {self.ddo_dirs_info} -> 投影形状 {tuple(P.shape)}")
+        return P.float().to(self.device)
 
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):
