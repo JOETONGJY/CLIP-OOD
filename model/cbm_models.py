@@ -508,6 +508,36 @@ class clip_cbm_orth(nn.Module):
                                            'pca_src': pca_src, 'k': k,
                                            # 奇异值平方的累计占比 (谱能量), 不是 L1 约束的覆盖率
                                            'cum_spectral_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
+            elif ddo_dirs in ('projected', 'residual', 'split'):
+                # 外审第三轮 (2026-11-25): 分离子空间截断与方向分布重构。
+                # u = LN0(A) 的行 (分解在 LN 后、affine 前的统一空间); P_k = V V^T;
+                # projected 约束 P u, residual 约束 (I-P) u, split 对两个分量分别求损失后相加
+                # (由 _ddo_split_scale=2 与外层 abs().mean() 实现)。注意 |A u| != |A P u| + |A (I-P) u|,
+                # 两个分量可能相互抵消或互补 —— 这正是该对照要回答的问题。
+                # 方向不重新逐行归一化 (外审要求保留投影幅值; 损失路径见 forward 的 _ddo_dirs_ln_free 分支)。
+                if pca_src != 'ln0':
+                    raise ValueError("projected / residual / split 仅支持 pca_src='ln0' (分解与约束都在 LN0 后的空间)")
+                A = (self.diffs @ E.T).reshape(-1, E.size(0))       # (N*C, 312)
+                U = (A - A.mean(-1, keepdim=True)) / torch.sqrt(A.var(-1, unbiased=False, keepdim=True) + 1e-5)
+                V, ev = self._principal_rows(U, k)
+                cum = torch.cumsum(ev, 0) / ev.sum()
+                assert float(V.mean(-1).abs().max()) < 1e-4, "ln0 主方向不在零均值超平面内"
+                assert float((V @ V.T - torch.eye(k, device=V.device)).abs().max()) < 1e-4, "主方向不正交"
+                Proj = V.T @ V                                       # (312, 312) 正交投影
+                assert float((Proj @ Proj - Proj).abs().max()) < 1e-4, "投影算子不幂等"
+                Um, Ur = U @ Proj, U - U @ Proj
+                if ddo_dirs == 'projected':
+                    P = Um                                           # (N*C, 312), 保留投影幅值
+                elif ddo_dirs == 'residual':
+                    P = Ur
+                else:
+                    P = torch.cat([Um, Ur], 0)                       # (2*N*C, 312)
+                    self._ddo_split_scale = 2.0                      # abs().mean() x 2 = 两个分量损失之和
+                self._ddo_dirs_ln_free = True
+                self.ddo_dirs_info.update({'pairing': 'none', 'k': k,
+                                           'loss_path': 'affine_linear (LN0 已施加, 不再逐行归一化)',
+                                           'bias': '保留 (含 W·beta + b, 与 full 的有效响应一致)',
+                                           'cum_spectral_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
             elif ddo_dirs == 'random':
                 g = torch.Generator().manual_seed(seed)              # 独立 generator, 不动全局随机数
                 R = torch.randn(E.size(0), k, generator=g)
@@ -522,6 +552,14 @@ class clip_cbm_orth(nn.Module):
                 raise ValueError(f"未知 ddo_dirs='{ddo_dirs}' (full / mean / pca / random / full_sym)")
         return P.float().to(self.device)
 
+    @staticmethod
+    def _affine_linear(x, ln, lin):
+        """只做 LayerNorm 的 affine + Linear, 不做逐行归一化: W·(gamma⊙x + beta) + b。
+        用于 projected / residual / split 臂 —— 方向已经过 LN0, 再过分类头的 LayerNorm 会把投影幅值
+        重新归一化 (外审明确要求避免: 低能量残差会被人为放大)。与 full 的有效响应
+        W·diag(gamma)·LN0(u) + W·beta + b 中 gamma/beta/b 的处理一致。"""
+        return lin(x * ln.weight + ln.bias)
+
     # 改动时间26.4.29-----------------------------------
     def forward(self, images):
         visual_features = self.clip_model.encode_image(images).float()
@@ -529,9 +567,16 @@ class clip_cbm_orth(nn.Module):
 
         concept_activations = visual_features @ self.concept_embeddings.T
 
-        regularizer = self.classifier[1:](
-            self.domain_concept_projection
-        )
+        if getattr(self, '_ddo_dirs_ln_free', False):
+            # projected / residual / split: 方向已 LN0, 绕过分类头的 LayerNorm (保留投影幅值)
+            regularizer = self._affine_linear(self.domain_concept_projection,
+                                              self.classifier[1], self.classifier[2])
+            if getattr(self, '_ddo_split_scale', 1.0) != 1.0:
+                regularizer = regularizer * self._ddo_split_scale   # split: abs().mean() x 2 = 两分量之和
+        else:
+            regularizer = self.classifier[1:](
+                self.domain_concept_projection
+            )
         # 这里改动的原因是避免每次forward都算遍，速度慢了25倍
         # regularizer = self.classifier[1:](
         #     self.diffs @ self.concept_embeddings.T

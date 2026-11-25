@@ -37,14 +37,25 @@ REPO = os.path.dirname(os.path.abspath(__file__))
 MIN_EFFECT = 0.5
 OPERATING_BAND = 0.3
 SEEDS = (1, 2, 3)
-ARMS = ["mean", "pca8", "pca32", "rand8", "rand32", "fullsym"]
+ARMS = ["mean", "pca8", "pca32", "rand8", "rand32", "fullsym"]          # §3n 预注册的 6 个臂
+MECH_ARMS = ["proj8", "res8", "split8", "proj32", "res32", "split32"]   # §3p 机制对照的 6 个臂
 NAMES = {"full": "full（原始方向）", "mean": "mean（类平均方向）", "pca8": "pca8（前 8 个主方向）",
          "pca32": "pca32（前 32 个主方向）", "rand8": "rand8（8 维随机标架）", "rand32": "rand32（32 维随机标架）",
-         "fullsym": "full_sym（原始方向 + 相反数）"}
+         "fullsym": "full_sym（原始方向 + 相反数）",
+         "proj8": "proj8（原始方向在 8 维主子空间的投影）", "res8": "res8（8 维主子空间外的残余）",
+         "split8": "split8（投影 + 残余，损失求和）",
+         "proj32": "proj32（原始方向在 32 维主子空间的投影）", "res32": "res32（32 维主子空间外的残余）",
+         "split32": "split32（投影 + 残余，损失求和）"}
 EXPECT_DIRS = {"full": ("full", None, 32, 0), "mean": ("mean", None, 32, 0), "fullsym": ("full_sym", None, 32, 0),
                "pca8": ("pca", "ln0", 8, 0), "pca32": ("pca", "ln0", 32, 0), "rand8": ("random", "ln0", 8, None),
-               "rand32": ("random", "ln0", 32, None)}
-EXPECT_ROWS = {"full": 40800, "mean": 204, "fullsym": 81600, "pca8": 16, "pca32": 64, "rand8": 16, "rand32": 64}
+               "rand32": ("random", "ln0", 32, None),
+               "proj8": ("projected", "ln0", 8, 0), "proj32": ("projected", "ln0", 32, 0),
+               "res8": ("residual", "ln0", 8, 0), "res32": ("residual", "ln0", 32, 0),
+               "split8": ("split", "ln0", 8, 0), "split32": ("split", "ln0", 32, 0)}
+EXPECT_ROWS = {"full": 40800, "mean": 204, "fullsym": 81600, "pca8": 16, "pca32": 64, "rand8": 16, "rand32": 64,
+               "proj8": 40800, "proj32": 40800, "res8": 40800, "res32": 40800, "split8": 81600, "split32": 81600}
+# 外审第三轮后追加的低剂量 run (RESULTS §3p): 描述性, 不进入 §3n 的判定配对 —— §3n 的判定集合保持 66 run 不变
+POST_HOC = {("pca8", 0.125), ("pca8", 0.25), ("pca32", 0.125), ("pca32", 0.25)}
 GD_TAGS = ["before_epoch1", "before_epoch10", "before_epoch30", "final"]
 
 
@@ -60,7 +71,8 @@ def jobs_of(matrix):
         for seed in SEEDS:
             ex = extra(seed) if callable(extra) else extra
             alpha = float([ex[i + 1] for i, t in enumerate(ex) if t == "--alpha"][-1])
-            out.append((tag.split("_")[1] if tag.startswith("sub_") else "full", alpha, ds, tag, seed, ex))
+            arm = tag.split("_")[1] if tag.startswith(("sub_", "mech_")) else "full"
+            out.append((arm, alpha, ds, tag, seed, ex))
     return out
 
 
@@ -88,15 +100,22 @@ class Data:
         self.r = {}                       # (arm, alpha, seed) -> json
         self.checks = []                  # (名称, 是否通过, 说明)
         by_name = {}
-        for arm, alpha, ds, tag, seed, ex in jobs_of("subspace") + jobs_of("dose"):
+        jobs = jobs_of("subspace") + jobs_of("mechanism") + jobs_of("dose")
+        want_sub = sum(1 for j in jobs_of("subspace"))
+        want_mech = sum(1 for j in jobs_of("mechanism"))
+        for arm, alpha, ds, tag, seed, ex in jobs:
             path = os.path.join(results_dir, f"{ds}_{tag}_seed{seed}.json")
             if not os.path.exists(path):
                 continue
             j = json.load(open(path, encoding="utf-8"))
             self.r[(arm, alpha, seed)] = j
             by_name[(arm, alpha, seed)] = (path, ex, ds, tag, seed)
-        n_sub = sum(1 for k in self.r if k[0] != "full")
-        self.checks.append(("66 个子空间 run 的结果文件都存在", n_sub == 66, f"{n_sub} / 66"))
+        n_sub = sum(1 for k in self.r if k[0] in {a for a, *_ in jobs_of("subspace")})
+        self.checks.append((f"子空间矩阵的 {want_sub} 个结果文件都存在（§3n 预注册 66 + §3p 追加低剂量 12）",
+                            n_sub == want_sub, f"{n_sub} / {want_sub}"))
+        n_mech = sum(1 for k in self.r if k[0] in {a for a, *_ in jobs_of("mechanism")})
+        self.checks.append((f"机制对照矩阵（§3p）的 {want_mech} 个结果文件都存在", n_mech == want_mech,
+                            f"{n_mech} / {want_mech}"))
         bad = [k for k, (path, ex, ds, tag, seed) in by_name.items()
                if not result_is_complete(path, expected(ex + COMMON, ds, seed, tag))]
         self.checks.append(("全部 run 在驱动的完成判据下为完成 (status / 100 epochs / 命令行全部配置逐项匹配)",
@@ -110,12 +129,14 @@ class Data:
             cond = ((src is None or rc["ddo_pca_src"] == src) and rc["ddo_dirs"] == d and rc["ddo_k"] == k
                     and (dseed is None or rc["ddo_dirs_seed"] == dseed)
                     and info.get("rows") == EXPECT_ROWS[arm] and len(info.get("sha256", "")) == 64)
+            if arm in ("proj8", "proj32", "res8", "res32", "split8", "split32"):
+                cond = cond and "loss_path" in info          # 这些臂必须走"不再逐行归一化"的损失路径
             if arm.startswith("rand"):
                 cond = cond and rc["ddo_dirs_seed"] == seed and (info.get("seed") == seed)
             if not cond:
                 wrong.append(f"{arm} a{alpha} s{seed}")
-        self.checks.append(("每个子空间 run 的方向集与设计一致 (类型 / PCA 来源 / k / 方向种子 / 方向数 / 摘要)", not wrong,
-                            "; ".join(wrong[:5]) if wrong else "通过"))
+        self.checks.append(("每个子空间/机制 run 的方向集与设计一致 (类型 / PCA 来源 / k / 方向种子 / 方向数 / 摘要 / 损失路径)",
+                            not wrong, "; ".join(wrong[:5]) if wrong else "通过"))
         sha = {}
         for (arm, alpha, seed), j in self.r.items():
             if arm == "full":
@@ -142,7 +163,8 @@ class Data:
         for c in commits:
             changed |= set(x for x in _git("diff", "--name-only", c, "HEAD")[1].splitlines() if x)
         non_code = all(x.startswith(("experiment_results/", "doc/")) or x in
-                       ("ddo_subspace_report.py", "tests_subspace_report.py", "ddo_dose_report.py") for x in changed)
+                       ("ddo_subspace_report.py", "tests_subspace_report.py", "tests_projected_dirs.py",
+                        "ddo_dose_report.py", "ddo_principal_class_relevance.py") for x in changed)
         self.checks.append(("子空间 run 的提交与当前 HEAD 之间只有分析脚本与报告不同, 训练代码逐字节相同", non_code,
                             "; ".join(sorted(changed))[:300] if changed else "没有差异"))
         ref = sorted({j["git"]["commit"][:7] for (arm, _, _), j in self.r.items()
@@ -166,10 +188,13 @@ def ms(x):
     return float(np.mean(x)), (float(np.std(x, ddof=1)) if len(x) > 1 else 0.0)
 
 
-def paired(d, arm_a, arm_b, key="target_acc"):
-    """arm_a − arm_b, 同 α、同训练 seed。返回 {alpha: {seed: diff}} (只含两边都有的组合)"""
+def paired(d, arm_a, arm_b, key="target_acc", skip=frozenset()):
+    """arm_a − arm_b, 同 α、同训练 seed。返回 {alpha: {seed: diff}} (只含两边都有的组合)。
+    skip: {(arm, alpha)} 集合 —— arm_a 在这些 (臂, α) 上的 run 不参与配对 (§3p 追加的低剂量不进 §3n 的判定)。"""
     out = {}
     for a in sorted(set(d.alphas(arm_a)) & set(d.alphas(arm_b))):
+        if (arm_a, a) in skip:
+            continue
         for s in SEEDS:
             if d.has(arm_a, a, s) and d.has(arm_b, a, s):
                 out.setdefault(a, {})[s] = d.get(arm_a, a, s, key) - d.get(arm_b, a, s, key)
@@ -245,14 +270,15 @@ def main():
            "thresholds": {"min_effect": MIN_EFFECT, "operating_band": OPERATING_BAND}}
 
     # ---------- 1. 剂量曲线 (目标域精度; 统一口径的源域验证 CE 与最终等权 DDO 损失) ----------
-    all_a = sorted({a for arm in ARMS + ["full"] for a in d.alphas(arm)})
+    all_a = sorted({a for arm in ARMS + MECH_ARMS + ["full"] for a in d.alphas(arm)})
+    curve_arms = ARMS + MECH_ARMS + ["full"]
     curves = {arm: {str(a): {"target_acc": {"seeds": [round(float(v), 3) for v in get(arm, a, "target_acc")],
                                          "mean": round(ms(get(arm, a, "target_acc"))[0], 3),
                                          "sd": round(ms(get(arm, a, "target_acc"))[1], 3)},
                              "source_ce": round(float(np.mean(get(arm, a, "source_ce"))), 4),
                              "source_acc": round(float(np.mean(get(arm, a, "source_acc"))), 3),
                              "ddo_eq": round(float(np.mean(get(arm, a, "ddo_eq"))), 4)}
-                   for a in d.alphas(arm) if has(arm, a)} for arm in ARMS + ["full"]}
+                   for a in d.alphas(arm) if has(arm, a)} for arm in curve_arms}
     out["curves"] = curves
 
     # ---------- ① / ② ----------
@@ -266,9 +292,20 @@ def main():
         p = paired(d, f"pca{k}", f"rand{k}")
         q1[f"k={k}"] = {**summary(p), "verdict": label_effect(p)}
     for arm in ("pca8", "pca32", "mean"):
-        p = paired(d, arm, "full")
+        p = paired(d, arm, "full", skip=POST_HOC)
         q2[arm] = {**summary(p), "verdict": label_effect(p)}
     out["q1_pca_vs_random"], out["q2_lowdim_vs_full"] = q1, q2
+
+    # ---------- §3p: 机制对照 (projected / residual / split) ----------
+    q_mech = {}
+    for arm in MECH_ARMS:
+        p = paired(d, arm, "full")
+        q_mech[arm] = {**summary(p), "verdict": label_effect(p)}
+    q_proj_vs_pca = {}
+    for k in (8, 32):
+        p = paired(d, f"proj{k}", f"pca{k}")
+        q_proj_vs_pca[f"k={k}"] = {**summary(p), "verdict": label_effect(p)}
+    out["q_mech_vs_full"], out["q_mech_proj_vs_pca"] = q_mech, q_proj_vs_pca
 
     # ---------- ③ ----------
     p3 = paired(d, "fullsym", "full")
@@ -292,6 +329,8 @@ def main():
     for arm in ARMS:
         res_acc, res_ce, n_out, rows = {}, [], 0, []
         for a in d.alphas(arm):
+            if (arm, a) in POST_HOC:                # §3p 追加的低剂量不进入 §3n 的判定
+                continue
             for s in SEEDS:
                 if not d.has(arm, a, s):
                     continue
@@ -324,7 +363,7 @@ def main():
                      "drop_to_highest_alpha": round(max(m) - m[-1], 3) if m else None}
     out["dose_sensitivity"] = sens
     grad = {}
-    for arm in ARMS + ["full"]:
+    for arm in ARMS + MECH_ARMS + ["full"]:
         grad[arm] = {}
         for a in d.alphas(arm):
             rs = [d.r[(arm, a, s)] for s in SEEDS if d.has(arm, a, s)]
@@ -336,10 +375,12 @@ def main():
     out["grad_ratio_alpha_scaled"] = grad
 
     # ---------- Markdown ----------
-    L = ["# DDO-Subspace 正式矩阵（CUB，3 seeds，66 个 run，2026-11-25）", "",
+    L = ["# DDO-Subspace 矩阵报告（CUB，3 seeds；§3n 预注册 66 run + §3p 追加 84 run，2026-11-25）", "",
          "**设计**：第三章入口 + 等权 DDO，batch 256、100 epochs，严格 final 协议（目标域不参与训练与选模，特征缓存在最终评估时才读入）。",
-         "**判定规则预注册于 `RESULTS.md` §3n**（最小关心效应 +0.5；\"只改变工作点\"的残差带宽 ±0.3），由 `ddo_subspace_report.py` 计算。"
-         "随机标架的种子与训练 seed 配对。数据 `subspace_cub.json`，图 `fig_subspace_curve.png`、`fig_subspace_tradeoff.png`。", "",
+         "**判定规则预注册于 `RESULTS.md` §3n（66 run）与 §3p（机制对照 72 run + 低剂量补充 12 run）**"
+         "（最小关心效应 +0.5；\"只改变工作点\"的残差带宽 ±0.3），由 `ddo_subspace_report.py` 计算，"
+         "该脚本及规则在读取任何子空间结果之前提交。随机标架的种子与训练 seed 配对。"
+         "数据 `subspace_cub.json`，图 `fig_subspace_curve.png`、`fig_subspace_tradeoff.png`。", "",
          "## 0. 完整性核对", "", "| 核对项 | 结果 | 说明 |", "|---|---|---|"]
     for n, ok, det in d.checks:
         L.append(f"| {n} | {'通过' if ok else '**未通过**'} | {det} |")
@@ -437,17 +478,64 @@ def main():
                  + f" | {s_['range']:.2f} | {s_['drop_to_highest_alpha']:.2f} |")
     L += ["", "乘以 α 之后的实际梯度范数比（α·‖∇正则‖/‖∇CE‖，固定批次、分类头参数，3 seeds 均值）：", "",
           "| 臂 | α | " + " | ".join(GD_TAGS) + " |", "|---|---|" + "---|" * len(GD_TAGS)]
-    for arm in ["full"] + ARMS:
+    for arm in ["full"] + ARMS + MECH_ARMS:
         for a in d.alphas(arm):
             g = grad[arm][str(a)]
             L.append(f"| {NAMES[arm]} | {a:g} | " + " | ".join("—" if g[t] is None else f"{g[t]:.3f}" for t in GD_TAGS) + " |")
-    L += ["", "## 8. 读法与限制", "",
+    L += ["", "## 8. 机制对照（§3p，预注册于机制矩阵运行之前）", "",
+          "外审第三轮的分析：PCA 臂的失败可能不是因为保留了错误的子空间，而是用等权正交标架替换了原始经验方向分布、"
+          "改变了 L1 正则化的几何。下面的臂把每个原始方向（经 LN0）投影到同一个主子空间内（projected）、"
+          "或只约束子空间外的余量（residual）、或对两个分量分别求损失后相加（split，因此其有效强度约为同剂量 projected 与 residual 之和）。"
+          "方向不重新逐行归一化（保留投影幅值），损失路径绕过分类头的 LayerNorm。判定规则与 §3n 相同（+0.5 / 配对同 α 同训练 seed）。",
+          "", "剂量曲线（目标域精度，3 seeds 均值 ± sd）：", "",
+          "| α | " + " | ".join(NAMES[a] for a in ["full"] + MECH_ARMS) + " |",
+          "|---|" + "---|" * (1 + len(MECH_ARMS))]
+    for a in all_a:
+        cells = []
+        for arm in ["full"] + MECH_ARMS:
+            c = curves[arm].get(str(a))
+            cells.append(f"{c['target_acc']['mean']:.2f} ± {c['target_acc']['sd']:.2f}" if c else "—")
+        L.append(f"| {a:g} | " + " | ".join(cells) + " |")
+    L += ["", "| 比较 | 配对数 | 均值 | seed 均值 | 判定 |", "|---|---|---|---|---|"]
+    for arm in MECH_ARMS:
+        q = q_mech[arm]
+        if q["n_pairs"]:
+            L.append(f"| {NAMES[arm]} − full | {q['n_pairs']} | {q['mean']:+.2f} | "
+                     + " / ".join(f"{v:+.2f}" for v in q["seed_means"].values()) + f" | **{q['verdict']}** |")
+    for k, q in q_proj_vs_pca.items():
+        if q["n_pairs"]:
+            L.append(f"| proj − pca（{k}，同 α） | {q['n_pairs']} | {q['mean']:+.2f} | "
+                     + " / ".join(f"{v:+.2f}" for v in q["seed_means"].values()) + f" | **{q['verdict']}** |")
+    L += ["", "逐 α 的配对差值：", ""]
+    for arm in MECH_ARMS:
+        block(f"{NAMES[arm]} − {NAMES['full']}", q_mech[arm], "规则同 §3n ①。")
+    for k, q in q_proj_vs_pca.items():
+        kk = k.split("=")[1]
+        block(f"proj − pca（{k}）", q, "规则同 §3n ①。回答：同一子空间上，原始方向分布与等权正交标架哪个更重要。")
+    L += ["**事后解释框架（不是判定）**：Projected 接近 Full 而 PCA-Basis 差 → 方向分布比标架重要（→ L1 感知压缩）；"
+          "Projected 与 PCA-Basis 都差而 Residual 较好 → 主方向过度携带类别语义（→ 残差约束与判别保护）；"
+          "Projected 与 Residual 都差 → 主方向与长尾互补（→ 多尺度联合约束）；Split 优于/差于 Full → 分量间抵消有害/有益。",
+          "", "## 9. 低剂量补充（外审后追加，描述性，不进入 §3n 的判定配对）", "",
+          "外审指出 pca8 / pca32 都在各自最低的非零剂量处最好，不能在剂量覆盖不足时断言任何非零剂量下都有害。"
+          "以下 12 个 run（α=0.125 / 0.25）按外审建议追加，只用于补全剂量曲线的下端：", "",
+          "| 臂 | α | 目标域精度（3 seeds） | 对 full 同 α 的逐 seed 差值 | 最终等权 DDO 损失 |", "|---|---|---|---|---|"]
+    for arm in ("pca8", "pca32"):
+        for a in (0.125, 0.25):
+            if not has(arm, a):
+                continue
+            t = get(arm, a, "target_acc")
+            diff = " / ".join(f"{d.get(arm, a, s, 'target_acc') - d.get('full', a, s, 'target_acc'):+.2f}" for s in SEEDS)
+            L.append(f"| {NAMES[arm]} | {a:g} | {np.mean(t):.2f} ± {ms(t)[1]:.2f} | {diff} | "
+                     f"{np.mean(get(arm, a, 'ddo_eq')):.4f} |")
+    L += ["", "## 10. 读法与限制", "",
           "- 3 个 seed、仅 CUB。CUB 是方法探索基准：这里的效应量要在未参与方法设计的数据集上独立确认之后才能当作结论。",
           "- 本矩阵不用于挑选 α，也不直接决定方法。所有比较都是同 α、同训练 seed 的配对，不拿各臂最好的 α 互比。",
           "- 同一问题在 k=8 与 k=32 上分别判定，只在一个 k 上得到\"支持\"时照实写，不合并。",
           "- 谱能量占比（k=8 为 80.0%，k=32 为 96.7%）是奇异值平方的累计，不等于 L1-DDO 约束的覆盖率。",
           "- 梯度比只在固定批次、所列时刻、分类头参数上测量，不代表两个目标之间没有冲突。",
-          "- 判定阈值是预先写定的描述性规则，不是统计检验；四类比较一共 11 次判定，没有做多重比较校正。",
+          "- 判定阈值是预先写定的描述性规则，不是统计检验；§3n 与 §3p 两轮合计 17 次判定，没有做多重比较校正。",
+          "- §3p 的机制对照与低剂量补充都写于运行之前（RESULTS §3p）；低剂量 run 不进入 §3n 的判定配对，§3n 的判定集合保持 66 run 不变。",
+          "- 事后解释框架（第 8 节末）与 2.1/2.2 节的机制解释都是看到结果之后的分析，不能当作独立验证。",
           ""]
     with open(os.path.join(opt.out_dir, "subspace_cub.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))
@@ -513,6 +601,11 @@ def main():
         f"{arm}: {q['verdict']} (精度残差 {q['mean_res_target_acc']:+.2f}, 范围外 {q['n_out_of_range']})"
         if q["mean_res_target_acc"] is not None else f"{arm}: {q['verdict']} (全部 {q['n_out_of_range']} 个 run 在范围外)"
         for arm, q in q4.items()))
+    if any(q["n_pairs"] for q in q_mech.values()):
+        print("  §3p 机制对照 − full: " + "; ".join(f"{arm}: {q['verdict']} (均值 {q['mean']:+.2f})"
+                                                    for arm, q in q_mech.items() if q["n_pairs"]))
+        print("  §3p proj − pca: " + "; ".join(f"{k}: {q['verdict']} (均值 {q['mean']:+.2f})"
+                                               for k, q in q_proj_vs_pca.items() if q["n_pairs"]))
     print(f"\n[saved] {os.path.join(opt.out_dir, 'subspace_cub.json')} / subspace_cub.md")
 
 

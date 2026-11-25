@@ -42,16 +42,19 @@ CH3 = ["--CBM_type", "clip_cbm", "--lambda_kl", "0.01", "--lambda_graph", "0"]
 A1 = ["--alpha", "1.0"]
 
 # ---- DDO-Subspace 正式矩阵 (2026-11-25, 外审确认后的版本) ----
-# 各臂的剂量: k=32 的臂初始化正则强度约为完整方向集的 0.44 倍, 需要更高的 alpha 才覆盖同样的强度范围
+# 各臂的剂量: k=32 的臂初始化正则强度约为完整方向集的 0.44 倍, 需要更高的 alpha 才能覆盖同样的强度范围
 SUB_DOSES = {"mean": (0.5, 1.0, 2.0, 4.0), "pca8": (0.5, 1.0, 2.0, 4.0), "pca32": (1.0, 2.0, 4.0, 8.0),
              "rand8": (0.5, 1.0, 2.0, 4.0), "rand32": (1.0, 2.0, 4.0, 8.0), "fullsym": (1.0, 2.0)}
+# 外审第三轮 (2026-11-25) 后追加的低剂量 (描述性, 不参与 §3n 的判定配对, 见 RESULTS §3p):
+# pca 两臂都在各自最低非零剂量处最好, 不能在剂量覆盖不足时断言任何非零剂量都有害
+SUB_POST_HOC = {"pca8": (0.125, 0.25), "pca32": (0.125, 0.25)}
 SUB_DIRS = {"mean": ["--ddo_dirs", "mean"],
             "pca8": ["--ddo_dirs", "pca", "--ddo_pca_src", "ln0", "--ddo_k", "8"],
             "pca32": ["--ddo_dirs", "pca", "--ddo_pca_src", "ln0", "--ddo_k", "32"],
             # full_sym: 完整方向集 + 相反数。pca / random 臂相对完整方向集同时改了方向空间、方向分布、
             # 符号分布三个因素, 这一臂只改符号分布
             "fullsym": ["--ddo_dirs", "full_sym"]}
-ATAG = {0.5: "0p5", 1.0: "1", 2.0: "2", 4.0: "4", 8.0: "8"}
+ATAG = {0.125: "0p125", 0.25: "0p25", 0.5: "0p5", 1.0: "1", 2.0: "2", 4.0: "4", 8.0: "8"}
 
 
 def _random_dirs(k):
@@ -67,7 +70,22 @@ def _subspace_entries():
         for a in SUB_DOSES[arm]:
             base = EQUAL + ["--alpha", str(a)]
             out.append(("CUB", f"sub_{arm}_a{ATAG[a]}", (lambda s, b=base, d=dirs: b + d(s)) if callable(dirs) else base + dirs))
+    for arm, doses in SUB_POST_HOC.items():
+        for a in doses:
+            out.append(("CUB", f"sub_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a)] + SUB_DIRS[arm]))
     return out
+
+
+# ---- 机制对照矩阵 (2026-11-25, 外审第三轮; 设计与判定规则预注册于 RESULTS §3p) ----
+# projected / residual / split: 分离子空间截断与方向分布重构 (GPT 的分析: PCA 臂的失败可能不是保留了
+# 错误的子空间, 而是用等权正交标架替换了原始经验方向分布)。分解在 LN0 后、affine 前, 不重新逐行归一化
+MECH_DIRS = {"proj8": ["--ddo_dirs", "projected", "--ddo_k", "8"],
+             "proj32": ["--ddo_dirs", "projected", "--ddo_k", "32"],
+             "res8": ["--ddo_dirs", "residual", "--ddo_k", "8"],
+             "res32": ["--ddo_dirs", "residual", "--ddo_k", "32"],
+             "split8": ["--ddo_dirs", "split", "--ddo_k", "8"],
+             "split32": ["--ddo_dirs", "split", "--ddo_k", "32"]}
+MECH_DOSES = {arm: ((0.5, 1.0, 2.0, 4.0) if arm.endswith("8") else (1.0, 2.0, 4.0, 8.0)) for arm in MECH_DIRS}
 
 
 # 目录 -> [(dataset, run_tag, 额外参数 或 由 seed 生成额外参数的函数)]
@@ -87,9 +105,14 @@ MATRICES = {
     "weights_dose": ("DDO-Dose", [
         ("CUB", f"w_rwddo_a{t}", CH3 + ["--weight_mode", "prior_residual", "--alpha", str(a)])
         for a, t in [(0.5, "0p5"), (2.0, "2"), (4.0, "4")]]),
-    # DDO-Subspace: 5 个子空间臂 x 4 个剂量 + 完整方向集对称化对照 x 2 个剂量, CUB x 3 seeds = 66 个 run
-    # (完整方向集 full 的剂量曲线已在 dose 矩阵里). 评价口径见 RESULTS.md §3n (矩阵运行前写定)
+    # DDO-Subspace: 5 个子空间臂 x 4 个剂量 + 完整方向集对称化对照 x 2 个剂量 + 外审后追加的低剂量
+    # (CUB x 3 seeds = 78 个 run; 其中 66 个为 §3n 预注册集合, 12 个低剂量为 §3p 的描述性补充)。
+    # full 的剂量曲线已在 dose 矩阵里。判定口径见 RESULTS.md §3n / §3p
     "subspace": ("DDO-Subspace", _subspace_entries()),
+    # 机制对照: projected / residual / split x k in {8,32} x 4 个剂量, CUB x 3 seeds = 72 个 run
+    "mechanism": ("DDO-Subspace", [
+        ("CUB", f"mech_{arm}_a{ATAG[a]}", EQUAL + ["--alpha", str(a)] + MECH_DIRS[arm])
+        for arm in ("proj8", "res8", "split8", "proj32", "res32", "split32") for a in MECH_DOSES[arm]]),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -130,7 +153,8 @@ def _self_test_expected():
         for ds, tag, extra in entries:
             ex = extra(1) if callable(extra) else extra
             assert "alpha" in expected(ex + COMMON), f"矩阵 {name} 的 {tag} 没有 alpha"
-    assert len(_subspace_entries()) == 22, len(_subspace_entries())
+    assert len(_subspace_entries()) == 26, len(_subspace_entries())        # 22 预注册 + 4 低剂量配置
+    assert len(MATRICES["mechanism"][1]) == 24, len(MATRICES["mechanism"][1])
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
