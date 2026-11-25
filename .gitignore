@@ -46,3 +46,8 @@ experiment_results.7z
 # 训练中间快照 (诊断 JSON 已含曲线摘要, 同 seed 可复现, 本地保留不入库)
 experiment_results/*/runs/
 experiment_results/*/cls_snapshots/
+
+# 数据集压缩包 (2026-11-25 取消跟踪: 代码只读解压后的目录, 不读 zip; 19 MB 且不可压缩)
+data/*.zip
+# 实验驱动的训练日志 (2026-11-25: 体积大, 可由同 seed 复现, 结论在报告与结果 JSON 中)
+experiment_results/**/driver_log.txt
