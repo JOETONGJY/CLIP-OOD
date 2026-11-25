@@ -1538,7 +1538,7 @@
   "0B": {
    "full_frac": 0.0,
    "ce_frac": 0.0,
-   "ratio": Infinity,
+   "ratio": null,
    "n_seed_pairs": 6,
    "all_directions_consistent": false,
    "verdict": "现象不存在"

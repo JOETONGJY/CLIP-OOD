@@ -92,26 +92,25 @@ def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0, closed_form_s
     def ce_of(q):                                           # 逐样本的 CE, (B,)
         return F.cross_entropy(logits + torch.einsum("bcr,br->bc", Mb, q), y, reduction="none")
 
-    best = ce_of(torch.zeros(B, r, device=device)).detach()             # 候选: 零扰动
-    best_q = torch.zeros(B, r, device=device)
+    # dtype 继承: torch.zeros/randn 默认 float32, 输入 float64 时会 dtype 不匹配 (外审第七轮)
+    dt = logits.dtype
+    best = ce_of(torch.zeros(B, r, device=device, dtype=dt)).detach()     # 候选: 零扰动
+    best_q = torch.zeros(B, r, device=device, dtype=dt)
     g = torch.Generator(device=device).manual_seed(int(seed))
-    # 固定起点: 零起点始终参与迭代 (不只是静态候选); closed_form_starts=True 时追加逐竞争类闭式
-    # 最坏方向 q = eps·(M_k − M_y)/‖M_k − M_y‖ (k 取 r_yk 最大的竞争类)。随机重启在其之上叠加,
-    # 因此加闭式起点只会扩大候选集 —— 搜索结果单调不降 (L19 钉住)。
-    starts = [torch.zeros(B, r, device=device)]
+    starts = [torch.zeros(B, r, device=device, dtype=dt)]
     if closed_form_starts and eps > 0:
         with torch.no_grad():
             d = Mb - Mb[torch.arange(B, device=device), y][:, None, :]  # (B, C, r): M_k − M_y
             dn = d.norm(dim=-1)                                          # (B, C) = r_yk
             dn[torch.arange(B, device=device), y] = -1.0                 # 排除真实类
             kstar = dn.argmax(dim=-1)                                    # (B,): r_yk 最大的竞争类
-            dsel = d[torch.arange(B, device=device), kstar]              # (B, r)
+            dsel = d[torch.arange(B, device=device), kstar].to(dt)       # (B, r)
             starts.append(dsel / (dsel.norm(dim=-1, keepdim=True) + 1e-12) * eps)
     for rs in range(len(starts) + int(restarts)):           # restarts = 额外的随机重启次数
         if rs < len(starts):
             q = starts[rs].clone()
         else:
-            q = torch.randn(B, r, generator=g, device=device)
+            q = torch.randn(B, r, generator=g, device=device, dtype=dt)
             q = q / (q.norm(dim=-1, keepdim=True) + 1e-12) * eps
         q = q.requires_grad_(True)
         with torch.no_grad():                               # 初始点本身也是候选 (外审第六轮)
@@ -120,8 +119,10 @@ def pgd_worst_loss(logits, M, y, eps, steps=5, restarts=1, seed=0, closed_form_s
             best = torch.where(better, cur, best)
             best_q = torch.where(better[:, None], q.detach(), best_q)
         for _ in range(int(steps)):
-            loss = ce_of(q).sum()
-            (gq,) = torch.autograd.grad(loss, q)
+            # 外审第七轮: 评估代码常包在 no_grad 里, 但 PGD 搜索本身需要对扰动的梯度 —— 显式 enable_grad
+            with torch.enable_grad():
+                loss = ce_of(q).sum()
+                (gq,) = torch.autograd.grad(loss, q)
             with torch.no_grad():
                 step = 2.0 * eps / max(steps, 1)
                 q = q + step * gq / (gq.norm(dim=-1, keepdim=True) + 1e-12)

@@ -180,9 +180,13 @@ def verdicts(res):
     full_med = float(np.mean([med(t, "rho_abs_class_median") for t in FULL_ARMS]))
     ce_med = med(CE_ARM, "rho_abs_class_median")
     gap = full_med - ce_med
+    # 双向 (外审第七轮: §3r 原文"相差 10 倍以上"是双向的; 场景1 的 CE 幅值比 67.6 >> Full 0.81 也应触发)
     amp_full = max(med(t, "amp_ratio_global") for t in FULL_ARMS)
     amp_ce = med(CE_ARM, "amp_ratio_global")
-    amp_ratio = amp_full / amp_ce if amp_ce > 0 else float("inf")
+    if amp_ce > 0 and amp_full > 0:
+        amp_ratio = max(amp_full / amp_ce, amp_ce / amp_full)     # 双向取大
+    else:
+        amp_ratio = float("inf")                                   # 零幅值比: 无法比较, 视为触发
     if amp_ratio > A_DOWNGRADE_AMP_RATIO:                     # §3r 预注册的降级条件 (外审第六轮前未执行)
         va = "不确定（按 §3r 降级：CE 与 DDO 的幅值比相差 >10×）"
     elif full_med >= A_EXIST_MIN and gap >= A_EXIST_GAP:
@@ -195,7 +199,13 @@ def verdicts(res):
     f_frac = [p["cancel_frac"] for t in FULL_ARMS for p in a[t]["per_seed"]]
     c_frac = [p["cancel_frac"] for p in a[CE_ARM]["per_seed"]]
     fm, cm = float(np.mean(f_frac)), float(np.mean(c_frac))
-    ratio = fm / cm if cm > 0 else float("inf")
+    # 外审第七轮: 0/0 不是 inf —— 分子分母都为 0 时比值记 None ("不适用"); 只有分母为 0 才是 inf
+    if cm > 0:
+        ratio = fm / cm
+    elif fm > 0:
+        ratio = float("inf")
+    else:
+        ratio = None
     dirs = []
     for t in FULL_ARMS:
         for p in a[t]["per_seed"]:
@@ -203,7 +213,7 @@ def verdicts(res):
             if cs:
                 dirs.append(p["cancel_frac"] > cs[0])
     consistent = all(dirs) and len(dirs) >= 4
-    if ratio >= B_EXIST_RATIO and consistent and fm >= B_EXIST_MIN_ABS:
+    if ratio is not None and ratio >= B_EXIST_RATIO and consistent and fm >= B_EXIST_MIN_ABS:
         vb = "现象存在"
     elif abs(fm - cm) < B_NONE_MAX_DIFF or not consistent:
         vb = "现象不存在"
@@ -267,7 +277,8 @@ def self_test():
     print(f"  [场景1] Full: 逐类 rho 中位 {fa['rho_abs_class_median'][0]:.3f}, 全局 rho {fa['rho_abs_global'][0]:.3f}, "
           f"幅值比 {fa['amp_ratio_global'][0]:.2f} | CE: 逐类 rho {ca['rho_abs_class_median'][0]:.3f}, "
           f"幅值比 {ca['amp_ratio_global'][0]:.2f} | 抵消型比例 {fa['cancel_frac'][0] * 100:.1f}%")
-    for name, cond in (("S1 0A 判定为'存在' (逐类中位数 >= 0.5 且差 >= 0.25)", v["0A"]["verdict"] == "偏置吸收存在"),
+    # 场景1 的 CE 是 big_orthogonal (幅值比 ~67), 双向判据下也触发降级 (外审第七轮的发现)
+    for name, cond in (("S1 0A 判定为'不确定' (双向幅值比: CE 67.6 vs Full 0.81, 相差 83 倍)", v["0A"]["verdict"].startswith("不确定")),
                        ("S2 全局与逐类指标都已计算且数值不同 (分开命名有意义)",
                         fa["rho_abs_global"][0] != fa["rho_abs_class_median"][0]),
                        ("S3 0B 判定为'现象存在'", v["0B"]["verdict"] == "现象存在"),
@@ -401,8 +412,9 @@ def main():
                          f"{g['cancel_frac_ci_only'][0] * 100:.1f}% | {g['median_pcr_quantile'][0]:.3f} | "
                          f"{g['median_ci_exact'][0]:.3f} | {g['median_ci_rms'][0]:.3f} | {g['median_dep_energy'][0]:.2f} |")
         v = res["verdicts"]["0B"]
+        ratio_str = "不适用（两者都为 0%）" if v["ratio"] is None else f"{v['ratio']:.2f}"
         L += ["", f"**判定：{v['verdict']}**（Full {v['full_frac'] * 100:.2f}%，CE-Only {v['ce_frac'] * 100:.2f}%，"
-              f"比值 {v['ratio']:.2f}；{v['n_seed_pairs']} 个 seed 配对方向一致 = {v['all_directions_consistent']}）。", "",
+              f"比值 {ratio_str}；{v['n_seed_pairs']} 个 seed 配对方向一致 = {v['all_directions_consistent']}）。", "",
               "## 绝对量（外审第六轮要求补充；相对依赖 0.93 附近的解读需要这些）", "",
               "| 臂 | wᵀGw 中位 | wᵀD̃w 中位 | ‖w‖² 中位 | PCR-Global |", "|---|---|---|---|---|"]
         for tag, name in ARMS:
