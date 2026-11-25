@@ -76,8 +76,9 @@ QS = (0.005, 0.01, 0.025, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.975, 0.99,
 
 
 def random_baseline(G, n=20000, seed=0):
-    """同一个 G 上各向同性随机权重的 PCR 分布 (经验基线)。返回 dict: 键 "q" + 三位千分 (q005, q010, ..., q995)。
+    """同一个 G 上各向同性随机权重的 PCR 分布 (经验基线)。返回 (info dict, 排序后的样本张量)。
 
+    info 的分位数键为 "q" + 三位千分 (q005, q010, ..., q995)；排序样本供 pcr_quantile 做经验 CDF。
     **基线可能很宽**: 分母参考 D~ = K/(K-1) H diag(G) H 用的是 diag(G); 若少数概念高度域敏感
     (真实 CUB: diag(G) 最大值是中位数的 10 倍), 随机权重在这些概念上多一点, PCR 就低很多。
     实测真实 CUB 的 G: 中位数 0.80, 5%~95% 为 [0.36, 2.34]。所以
@@ -95,16 +96,17 @@ def random_baseline(G, n=20000, seed=0):
     out.update({"mean": float(pcr.mean()), "sd": float(pcr.std()), "n": int(pcr.numel()),
                 "E_num_over_E_den": float(num.mean() / den.mean()),
                 "diag_max_over_median": float(torch.diagonal(G).max() / torch.diagonal(G).median())})
-    return out
+    return out, torch.sort(pcr).values                      # 升序样本: 经验 CDF 用
 
 
-def pcr_quantile(pcr_values, base):
-    """把观测到的 PCR 换算成"在随机基线中的分位" (越小越异常)。
-    本环境的 torch 没有 interp, 用分位点做离散分位: 返回"不超过该值的分位点里最大的那个" (保守)。"""
-    qs = torch.tensor(QS, dtype=torch.float64, device=pcr_values.device)                   # 升序
-    vs = torch.tensor([base[f"q{int(round(p * 1000)):03d}"] for p in QS], dtype=torch.float64,
-                      device=pcr_values.device)                                            # 升序
-    return qs[(torch.searchsorted(vs, pcr_values.double().clamp_min(float(vs[0]))) - 1).clamp_min(0)]
+def pcr_quantile(pcr_values, baseline_samples):
+    """观测 PCR 在随机基线中的**经验分位** (越小越异常)。
+
+    外审第六轮指出: 早期版本只保留 13 个离散分位点再向下映射, 真实分位 0.10~0.49 的值都会被标成
+    0.005~0.10 —— "分位 <= 0.10" 实际纳入了远多于最低 10% 的对。正确做法是保留基线的全部样本,
+    用经验 CDF: F(t) = (#{PCR_j <= t}) / N。baseline_samples 是 random_baseline 返回的升序张量。"""
+    s = baseline_samples.to(pcr_values.device)
+    return torch.searchsorted(s, pcr_values.double().reshape(-1), right=True).double().div(s.numel()).reshape(pcr_values.shape)
 
 
 def pcr_pair(A, gam, pairs, G, Dt):
@@ -158,7 +160,7 @@ def self_test():
     cr, ci, E_net, E_sum = cr_ci(ws, U)
     num, den = quad(ws, G), quad(ws, Dt)
     pcr = num / den
-    base = random_baseline(G, n=20000, seed=0)
+    base, base_samples = random_baseline(G, n=20000, seed=0)
     # 依赖能量基线: 与 w 同范数的随机权重 (超平面内) 的分母 w^T D~ w 的期望, 用于区分"抵消型"与"放弃型"
     # (两者 PCR 都低; 区别在绝对依赖 —— 这正是 C 文件三态图里 状态 B 与 状态 C 的区别)
     g = torch.Generator().manual_seed(1)
@@ -174,13 +176,15 @@ def self_test():
     # 判定用"在随机基线中的分位", 不用固定阈值: 基线可能很宽 (合成数据 5%~95% 跨 [0.05, 3.2]),
     # 这时抵消型的 PCR (0.048) 只落在基线的 ~5% 分位附近 —— 单看 PCR 的确很难把它与随机权重分开,
     # 必须结合"依赖能量"与"CI"一起看 (这正是 C 文件三态图 / G3 "PCR 不是越低越好"的含义)。
-    qtl = pcr_quantile(pcr, base)
+    qtl = pcr_quantile(pcr, base_samples)
     print(f"  在随机基线中的分位: 抵消型 {float(qtl[0]):.3f} | 同号型 {float(qtl[1]):.3f} | 放弃型 {float(qtl[2]):.3f} | 依赖型 {float(qtl[3]):.3f}")
     check("T4 抵消型: PCR 落在基线的低尾 (分位 < 0.10)", float(qtl[0]) < 0.10, f"PCR={float(pcr[0]):.3f}, 分位={float(qtl[0]):.3f}")
     check("T5 抵消型: CI 高 (加权和相对绝对和很小)", float(ci[0]) > 0.8, f"CI={float(ci[0]):.3f}")
     check("T6 抵消型: 依赖能量远高于同范数随机权重 (仍在重度依赖域敏感概念)", float(dep_energy[0]) > 3.0, f"{float(dep_energy[0]):.1f}x")
-    check("T7 放弃型: PCR 也低, 但依赖能量低于随机 (两个都低 => 是'放弃'不是'抵消')",
-          float(qtl[2]) < 0.20 and float(dep_energy[2]) < 1.0, f"PCR={float(pcr[2]):.3f}, 分位={float(qtl[2]):.3f}, 依赖={float(dep_energy[2]):.2f}x")
+    check("T7 放弃型: 依赖能量低于随机; PCR 分位低于中位但不必在极端低尾 (旧断言 <0.20 是按有偏离散分位校准的)",
+          float(qtl[2]) < 0.30 and float(dep_energy[2]) < 1.0, f"PCR={float(pcr[2]):.3f}, 分位={float(qtl[2]):.3f}, 依赖={float(dep_energy[2]):.2f}x")
+    check("T7b 抵消型的分位远低于放弃型 (极端低尾是抵消型的特征)", float(qtl[0]) < 0.25 * float(qtl[2]),
+          f"抵消型 {float(qtl[0]):.3f} vs 放弃型 {float(qtl[2]):.3f}")
     check("T8 抵消型与放弃型靠'依赖能量'区分开 (单看 PCR 分不开)", float(pcr[0]) < 0.3 and float(pcr[2]) < 0.3
           and float(dep_energy[0]) > 5 * float(dep_energy[2]))
     check("T9 同号型: PCR 高于基线中位数 (同相相加, 无抵消)", float(pcr[1]) > base["q500"], f"{float(pcr[1]):.3f}")
@@ -202,8 +206,14 @@ def self_test():
     gl = pcr_global(pp)
     check("T16 PCR-Global = 分子和 / 分母和 (介于各对的 min 与 max 之间)", float(pp["pcr"].min()) <= gl <= float(pp["pcr"].max()), f"{gl:.3f}")
     check("T17 报告了分子与分母 (不只报比值)", "num" in pp and "den" in pp and float(pp["num"].min()) >= 0)
-    check("T18 随机基线可复现", random_baseline(G, n=20000, seed=0) == base)
-    b_other = random_baseline(G, n=20000, seed=7)
+    b2info, b2s = random_baseline(G, n=20000, seed=0)
+    check("T18 随机基线可复现 (info 与样本都相同)", b2info == base and torch.equal(b2s, base_samples))
+    # 经验分位的精确性: 基线样本自身的分位应精确返回 (外审第六轮: 旧的离散映射把真实 0.10~0.49 都标成 <=0.10)
+    probe = torch.tensor([0.05, 0.10, 0.20, 0.49, 0.75], dtype=torch.float64)
+    got = pcr_quantile(torch.quantile(base_samples, probe), base_samples)
+    check("T18b 经验分位精确 (探针分位与返回一致, 容差 0.01)", float((got - probe).abs().max()) < 0.01,
+          f"probe={probe.tolist()}, got={[round(float(v), 3) for v in got]}")
+    b_other, _ = random_baseline(G, n=20000, seed=7)
     check("T19 不同 seed 的基线不同 (是经验分布, 不是常数 1)", b_other["q050"] != base["q050"])
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
