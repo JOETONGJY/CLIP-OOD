@@ -99,21 +99,24 @@ def get_args():
     parser.add_argument('--target_eval', type=str, default='per_epoch',
                         choices=['per_epoch', 'final_only'],
                         help='目标域评估时机: per_epoch=每个 epoch 都评估 (历史默认); '
-                             'final_only=训练期间不访问目标域, 仅在最后一个 epoch 评估 (严格 final 协议)')
+                             'final_only=目标域不参与训练与选模, 仅在最后一个 epoch 评估一次 (严格 final 协议; '
+                             'main_cached 入口在此模式下把目标域特征缓存延迟到最终评估时才读入)')
     parser.add_argument('--grad_diag', action="store_true", default=False,
-                        help='在固定 epoch 与固定批次上测量 CE 与等权 DDO 损失对分类头的梯度范数比与夹角'
-                             ' (只读梯度, 不影响训练)')
+                        help='在固定 epoch 与固定批次上测量 CE 与本模型正则项、等权 DDO 损失对分类头的梯度范数比'
+                             ' (含乘以 alpha 之后的实际范数比) 与夹角 (只读梯度, 不影响训练)')
     # ---- DDO-Subspace (2026-11-25): 训练时约束的方向集; 统一评价指标始终用原始完整方向集 ----
     parser.add_argument('--ddo_dirs', type=str, default='full',
-                        choices=['full', 'mean', 'pca', 'random'],
+                        choices=['full', 'mean', 'pca', 'random', 'full_sym'],
                         help='full=原始全部类别条件方向(默认); mean=204 个描述符类平均方向; '
-                             'pca=主方向(±成对); random=同维随机正交标架(±成对)。仅 weight_mode=none 下可用')
+                             'pca=主方向(±成对); random=零均值超平面内的同维随机正交标架(±成对); '
+                             'full_sym=完整方向集+其相反数 (只改符号分布的对照臂)。仅 weight_mode=none 下可用')
     parser.add_argument('--ddo_pca_src', type=str, default='ln0',
                         choices=['ln0', 'concept', 'mean'],
                         help='pca 的分解对象: ln0=LN0(D E^T) (分类头实际约束输入); concept=D E^T; '
                              'mean=归一化类平均方向 (与第四章同一子空间 B, 经 E 映射)')
     parser.add_argument('--ddo_k', type=int, default=32, help='DDO-Subspace: pca / random 的维数 k')
-    parser.add_argument('--ddo_dirs_seed', type=int, default=0, help='DDO-Subspace: 随机标架的种子')
+    parser.add_argument('--ddo_dirs_seed', type=int, default=0,
+                        help='DDO-Subspace: 随机标架的种子 (与训练 seed 相互独立; 同一标架的不同剂量实验之间保持不变)')
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')

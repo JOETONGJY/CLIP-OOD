@@ -100,7 +100,9 @@ def main():
             cos = [gd(j, g, "grad_cos_ce_ddo") for j in rs]
             if all(v is not None for v in ratio):
                 row["grad"][g] = {"ratio": round(float(np.mean(ratio)), 5), "ratio_sd": round(float(np.std(ratio, ddof=1)), 5) if len(ratio) > 1 else 0.0,
-                                  "cos": round(float(np.mean(cos)), 4), "cos_sd": round(float(np.std(cos, ddof=1)), 4) if len(cos) > 1 else 0.0}
+                                  "cos": round(float(np.mean(cos)), 4), "cos_sd": round(float(np.std(cos, ddof=1)), 4) if len(cos) > 1 else 0.0,
+                                  # 外审 (2026-11-25): 训练中实际作用的是 alpha * 正则梯度, 所以同时给出乘以 alpha 之后的范数比
+                                  "ratio_alpha": round(float(np.mean(ratio)) * a, 5)}
         dose_rows.append(row)
     base_tag = "dose_a1"
     for row in dose_rows:
@@ -185,9 +187,11 @@ def main():
 
     # ---------- Markdown ----------
     L = ["# DDO-Dose：正则强度扫描（CUB，3 seeds，2026-11-25）", "",
-         "**配置**：第三章入口 `clip_cbm`、等权 DDO（`weight_mode=none`）、batch 256、100 epochs、严格 final 协议；"
-         "训练期间不访问目标域（`--target_eval final_only`），仅在最后一个 epoch 评估一次。"
-         "所有 α 的其余配置完全一致。α=1 即第三章的等权 DDO 基线（本次重跑）。", "",
+         "**配置**：第三章入口 `clip_cbm`、等权 DDO（`weight_mode=none`）、batch 256、100 epochs、严格 final 协议"
+         "（目标域不参与训练与选模；`--target_eval final_only`，仅在最后一个 epoch 评估一次）。"
+         "所有 α 的其余配置完全一致。α=1 即第三章的等权 DDO 基线（本次重跑）。"
+         "（关于目标域数据的读取：这 42 个 run 运行时，目标域特征缓存在初始化阶段就已读入内存，训练中不使用；"
+         "2026-11-25 之后 `main_cached` 在该模式下改为最终评估时才读入，不影响已有数值。）", "",
          "## 1. 剂量曲线", "",
          "| α | 目标域精度（逐 seed） | 均值 ± sd | 相对 α=1（逐 seed） | 均值 | 源域精度 | 源域验证 CE | 最终等权 DDO 损失 |",
          "|---|---|---|---|---|---|---|---|"]
@@ -201,14 +205,17 @@ def main():
         L.append(f"| {r['alpha']} | {seeds_s} | **{t['mean']:.2f}** ± {t['sd']:.2f} | {pair_s} | {mean_s} | "
                  f"{r['source_acc']['mean']:.2f} | {r['source_ce']['mean']:.4f} | {r['ddo_eq_final']['mean']:.4f} |")
     L += ["", "配对差值按相同 seed 相减（正数表示该 α 优于 α=1）。", "", "## 2. 梯度诊断", "",
-          "固定批次（训练集前 256 个样本）上，等权 DDO 损失与分类损失对分类头参数的梯度：范数比 ‖∇DDO‖/‖∇CE‖ 与夹角余弦。下表为 3 seeds 均值。", "",
-          "| α | " + " | ".join(f"{g.replace('before_epoch', 'epoch ')} 比 / cos" for g in GD_TAGS) + " |",
+          "固定批次（训练集前 256 个样本）上，等权 DDO 损失与分类损失对**分类头参数**的梯度，每个时刻依次给出："
+          "α·‖∇DDO‖/‖∇CE‖（训练中实际作用的强度）、未乘 α 的范数比 ‖∇DDO‖/‖∇CE‖、夹角余弦。下表为 3 seeds 均值。"
+          "**适用范围**：这些数只描述该批次、这些记录时刻（所列 epoch 开始之前与训练结束时）、这组参数上的测量；"
+          "不能据此说两个目标在训练过程中不存在冲突。", "",
+          "| α | " + " | ".join(f"{g.replace('before_epoch', 'epoch ')} 前" for g in GD_TAGS[:-1]) + " | 训练结束时 |",
           "|---|" + "---|" * len(GD_TAGS)]
     for r in dose_rows:
         cells = []
         for g in GD_TAGS:
             v = r["grad"].get(g)
-            cells.append(f"{v['ratio']:.3f} / {v['cos']:+.3f}" if v else "—")
+            cells.append(f"{v['ratio_alpha']:.3f} / {v['ratio']:.3f} / {v['cos']:+.3f}" if v else "—")
         L.append(f"| {r['alpha']} | " + " | ".join(cells) + " |")
     L += ["", "## 3. 加权变体（统一评价口径）", "",
           "这些 run 与剂量扫描共用同一套配置（同协议、同 batch、同 seed），只是加权方式不同。", "",
@@ -250,6 +257,8 @@ def main():
           "- α=1 的等权基线、RW-DDO 等加权变体都是本次在 `--target_eval final_only` 下重跑的；"
           "与此前逐 epoch 评估目标域的历史 run（如 E1 的 RW-DDO 56.02）数值不完全可比，因为训练期间的随机数消耗不同。",
           "- 曲线插值是线性的，曲线上相邻点间距不大；残差的量级应与 seed 间波动（约 ±0.3–0.5）一起看。",
+          "- CUB 上的目标域结果已经多次用于调整研究方向（门控判据、方向的取舍、剂量范围的确定）。"
+          "因此 CUB 是**方法探索基准**：在 CUB 上得到的效应量，要在未参与方法设计的数据集上做独立确认之后才能当作结论。",
           ""]
     with open(os.path.join(OUT_DIR, "dose_cub.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))

@@ -57,31 +57,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.0
     },
     "before_epoch10": {
      "ratio": 0.09592,
      "ratio_sd": 0.00099,
      "cos": -0.017,
-     "cos_sd": 0.0056
+     "cos_sd": 0.0056,
+     "ratio_alpha": 0.0
     },
     "before_epoch30": {
      "ratio": 0.11334,
      "ratio_sd": 0.00165,
      "cos": -0.0169,
-     "cos_sd": 0.0048
+     "cos_sd": 0.0048,
+     "ratio_alpha": 0.0
     },
     "before_epoch50": {
      "ratio": 0.15025,
      "ratio_sd": 0.00119,
      "cos": -0.0143,
-     "cos_sd": 0.0035
+     "cos_sd": 0.0035,
+     "ratio_alpha": 0.0
     },
     "final": {
      "ratio": 0.26358,
      "ratio_sd": 0.00265,
      "cos": -0.0087,
-     "cos_sd": 0.002
+     "cos_sd": 0.002,
+     "ratio_alpha": 0.0
     }
    },
    "target_diff_vs_alpha1": {
@@ -132,31 +137,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.01186
     },
     "before_epoch10": {
      "ratio": 0.08051,
      "ratio_sd": 0.00088,
      "cos": -0.0236,
-     "cos_sd": 0.0049
+     "cos_sd": 0.0049,
+     "ratio_alpha": 0.01006
     },
     "before_epoch30": {
      "ratio": 0.08451,
      "ratio_sd": 0.00083,
      "cos": -0.0265,
-     "cos_sd": 0.0028
+     "cos_sd": 0.0028,
+     "ratio_alpha": 0.01056
     },
     "before_epoch50": {
      "ratio": 0.10134,
      "ratio_sd": 0.00055,
      "cos": -0.0252,
-     "cos_sd": 0.0018
+     "cos_sd": 0.0018,
+     "ratio_alpha": 0.01267
     },
     "final": {
      "ratio": 0.13531,
      "ratio_sd": 0.00082,
      "cos": -0.0203,
-     "cos_sd": 0.0006
+     "cos_sd": 0.0006,
+     "ratio_alpha": 0.01691
     }
    },
    "target_diff_vs_alpha1": {
@@ -207,31 +217,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.02373
     },
     "before_epoch10": {
      "ratio": 0.0668,
      "ratio_sd": 0.00079,
      "cos": -0.0309,
-     "cos_sd": 0.0039
+     "cos_sd": 0.0039,
+     "ratio_alpha": 0.0167
     },
     "before_epoch30": {
      "ratio": 0.068,
      "ratio_sd": 0.00049,
      "cos": -0.0342,
-     "cos_sd": 0.0019
+     "cos_sd": 0.0019,
+     "ratio_alpha": 0.017
     },
     "before_epoch50": {
      "ratio": 0.0785,
      "ratio_sd": 0.00044,
      "cos": -0.0326,
-     "cos_sd": 0.0013
+     "cos_sd": 0.0013,
+     "ratio_alpha": 0.01962
     },
     "final": {
      "ratio": 0.10102,
      "ratio_sd": 0.00053,
      "cos": -0.0257,
-     "cos_sd": 0.0004
+     "cos_sd": 0.0004,
+     "ratio_alpha": 0.02525
     }
    },
    "target_diff_vs_alpha1": {
@@ -282,31 +297,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.04745
     },
     "before_epoch10": {
      "ratio": 0.05025,
      "ratio_sd": 0.00033,
      "cos": -0.0437,
-     "cos_sd": 0.0025
+     "cos_sd": 0.0025,
+     "ratio_alpha": 0.02512
     },
     "before_epoch30": {
      "ratio": 0.05288,
      "ratio_sd": 0.0003,
      "cos": -0.044,
-     "cos_sd": 0.0012
+     "cos_sd": 0.0012,
+     "ratio_alpha": 0.02644
     },
     "before_epoch50": {
      "ratio": 0.05946,
      "ratio_sd": 0.00029,
      "cos": -0.0409,
-     "cos_sd": 0.0012
+     "cos_sd": 0.0012,
+     "ratio_alpha": 0.02973
     },
     "final": {
      "ratio": 0.07383,
      "ratio_sd": 0.0003,
      "cos": -0.0321,
-     "cos_sd": 0.0006
+     "cos_sd": 0.0006,
+     "ratio_alpha": 0.03691
     }
    },
    "target_diff_vs_alpha1": {
@@ -357,31 +377,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.0949
     },
     "before_epoch10": {
      "ratio": 0.0385,
      "ratio_sd": 0.00011,
      "cos": -0.059,
-     "cos_sd": 0.0019
+     "cos_sd": 0.0019,
+     "ratio_alpha": 0.0385
     },
     "before_epoch30": {
      "ratio": 0.04037,
      "ratio_sd": 0.00019,
      "cos": -0.0559,
-     "cos_sd": 0.0013
+     "cos_sd": 0.0013,
+     "ratio_alpha": 0.04037
     },
     "before_epoch50": {
      "ratio": 0.04394,
      "ratio_sd": 0.00018,
      "cos": -0.0509,
-     "cos_sd": 0.0016
+     "cos_sd": 0.0016,
+     "ratio_alpha": 0.04394
     },
     "final": {
      "ratio": 0.05201,
      "ratio_sd": 0.00015,
      "cos": -0.0414,
-     "cos_sd": 0.0008
+     "cos_sd": 0.0008,
+     "ratio_alpha": 0.05201
     }
    },
    "target_diff_vs_alpha1": {
@@ -432,31 +457,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.1898
     },
     "before_epoch10": {
      "ratio": 0.02949,
      "ratio_sd": 8e-05,
      "cos": -0.0757,
-     "cos_sd": 0.0016
+     "cos_sd": 0.0016,
+     "ratio_alpha": 0.05898
     },
     "before_epoch30": {
      "ratio": 0.03041,
      "ratio_sd": 0.00011,
      "cos": -0.0711,
-     "cos_sd": 0.0021
+     "cos_sd": 0.0021,
+     "ratio_alpha": 0.06082
     },
     "before_epoch50": {
      "ratio": 0.03177,
      "ratio_sd": 9e-05,
      "cos": -0.0651,
-     "cos_sd": 0.0023
+     "cos_sd": 0.0023,
+     "ratio_alpha": 0.06353
     },
     "final": {
      "ratio": 0.03472,
      "ratio_sd": 8e-05,
      "cos": -0.0556,
-     "cos_sd": 0.0008
+     "cos_sd": 0.0008,
+     "ratio_alpha": 0.06945
     }
    },
    "target_diff_vs_alpha1": {
@@ -507,31 +537,36 @@
      "ratio": 0.0949,
      "ratio_sd": 0.0009,
      "cos": 0.0114,
-     "cos_sd": 0.0087
+     "cos_sd": 0.0087,
+     "ratio_alpha": 0.3796
     },
     "before_epoch10": {
      "ratio": 0.02221,
      "ratio_sd": 0.0001,
      "cos": -0.0875,
-     "cos_sd": 0.003
+     "cos_sd": 0.003,
+     "ratio_alpha": 0.08882
     },
     "before_epoch30": {
      "ratio": 0.02226,
      "ratio_sd": 5e-05,
      "cos": -0.0899,
-     "cos_sd": 0.0024
+     "cos_sd": 0.0024,
+     "ratio_alpha": 0.08905
     },
     "before_epoch50": {
      "ratio": 0.02228,
      "ratio_sd": 2e-05,
      "cos": -0.0839,
-     "cos_sd": 0.0024
+     "cos_sd": 0.0024,
+     "ratio_alpha": 0.08914
     },
     "final": {
      "ratio": 0.02254,
      "ratio_sd": 4e-05,
      "cos": -0.0746,
-     "cos_sd": 0.0007
+     "cos_sd": 0.0007,
+     "ratio_alpha": 0.09014
     }
    },
    "target_diff_vs_alpha1": {

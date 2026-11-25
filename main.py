@@ -17,7 +17,7 @@ os.environ["WANDB_MODE"] = "offline"
 from args import get_args
 from model.cbm_models import clip_cbm_orth, clip_mlp, clip_cbm_subspace
 from data import get_dataset_classes
-from run_status import git_info, jsonable
+from run_status import RunLock, git_info, jsonable
 
 # --grad_diag 时测量 CE/DDO 梯度统计的 epoch (1 起算, 在该 epoch 训练之前测), 另加训练结束后一次
 GRAD_DIAG_EPOCHS = (1, 5, 10, 20, 30, 50, 75)
@@ -591,11 +591,16 @@ class TrainingSession:
         rec = {'tag': tag, 'ce': float(ce), 'grad_ce_norm': float(g_ce.norm())}
         # (a) 本模型训练时实际优化的正则项 (含其加权方式 / 方向集变体; 不含 alpha) —— 强度匹配用
         if reg_loss is not None:
+            alpha = float(self.args.alpha)
             rt = reg_loss.abs().mean()
             g_rt = torch.autograd.grad(rt, params, retain_graph=True)
             g_rt = torch.cat([g.reshape(-1) for g in g_rt])
+            ratio = float(g_rt.norm() / g_ce.norm().clamp_min(1e-12))
+            # 外审: 真正作用于优化的是 alpha * 正则梯度, 所以同时记录乘以 alpha 之后的实际范数比
+            # (外审: 该比值只描述固定诊断批次、所记录时刻、分类头参数上的测量, 不等于两个目标之间没有冲突)
             rec.update({'reg_train': float(rt), 'grad_reg_train_norm': float(g_rt.norm()),
-                        'grad_norm_ratio_train_over_ce': float(g_rt.norm() / g_ce.norm().clamp_min(1e-12)),
+                        'grad_norm_ratio_train_over_ce': ratio,
+                        'alpha': alpha, 'grad_norm_ratio_train_alpha_over_ce': alpha * ratio,
                         'grad_cos_ce_regtrain': float((g_ce @ g_rt) / (g_ce.norm() * g_rt.norm()).clamp_min(1e-12))})
         # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用
         ddo = self._ddo_loss_equal_weight()
@@ -611,6 +616,14 @@ class TrainingSession:
             {k: round(v, 6) for k, v in rec.items() if isinstance(v, float)})))
 
     def run(self):
+        """训练入口。同名 run 的运行锁 (2026-11-25, 外审要求): 另一个进程正在跑同一个 run_name 时
+        拒绝启动, 防止两个进程互相覆盖结果与权重日志; 正常结束、异常、中断都会释放锁。"""
+        self.run_name = self._make_run_name()
+        self._lock = RunLock(f"logs/locks/{self.run_name}.lock", what=f"run_name={self.run_name}")
+        with self._lock:
+            self._run()
+
+    def _make_run_name(self):
         # run_name: 数据集_方法tag_seed (多 seed 汇总脚本按此命名约定找文件)
         if self.args.CBM_type == 'clip_cbm_subspace':
             method_tag = getattr(self.args, 'ch4_mode', 'full')
@@ -626,9 +639,11 @@ class TrainingSession:
         if getattr(self.args, 'model_selection', 'final') == 'final' \
                 and not getattr(self.args, 'run_tag', '') and not method_tag.endswith('_sel'):
             method_tag += '_sel'
-        self.run_name = f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
+        return f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
+
+    def _run(self):
         # 覆盖保护放在最前面: 产物冲突且未指定 --overwrite_run 时在此抛出 ——
-        # 不打印训练头部、不进入训练
+        # 不打印训练头部、不进入训练 (运行锁已在 run() 中取得, 先于覆盖检查)
         self._check_run_conflicts()
 
         logger.info("\n" + "=" * 60)
@@ -659,11 +674,14 @@ class TrainingSession:
         self.grad_diag_records = []
         self.final_metrics = None
         self._completed_epochs = 0
-        # --target_eval final_only: 训练期间不访问目标域, 仅在最后一个 epoch 评估 (默认 per_epoch, 行为不变)
+        # --target_eval final_only: 目标域不参与训练与选模, 仅在最后一个 epoch 评估一次 (默认 per_epoch, 行为不变)。
+        # 措辞上的区分 (外审): 本开关保证的是"不评估"; main_cached 入口在此模式下把目标域特征缓存
+        # 延迟到最终评估时才读入内存 (见 main_cached._LazyTargetLoader)。
         eval_target_every_epoch = getattr(self.args, 'target_eval', 'per_epoch') == 'per_epoch'
 
         try:
             for epoch in range(self.args.epochs):
+                self._lock.heartbeat()                     # 运行锁心跳: 每个 epoch 一次
                 epoch_start = time.time()
 
                 if getattr(self.args, 'grad_diag', False) and (epoch + 1) in GRAD_DIAG_EPOCHS:
@@ -836,6 +854,9 @@ class TrainingSession:
                 'epoch_metrics': self.epoch_metrics,
                 'final_diag': final_diag,
                 'grad_diag': (self.grad_diag_records if getattr(self.args, 'grad_diag', False) else None),
+                # 2026-11-25 (外审): 实际构造的训练方向集 (类型 / 行数 / k / 谱能量占比 / 随机标架种子)
+                # 与方向张量的 sha256 —— 不能只凭命令行参数反推模型里约束的是哪一组方向
+                'ddo_dirs_info': getattr(self.model, 'ddo_dirs_info', None),
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},

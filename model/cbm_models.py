@@ -317,12 +317,19 @@ class clip_cbm_orth(nn.Module):
         # 供统一评价指标 ddo_loss_equal_weight() 使用; ddo_dirs != 'full' 时只替换训练用的方向集。
         # 不消耗全局随机数 (随机标架用独立 generator) => 同 seed 下各臂的分类头初始化完全相同。
         self.domain_concept_projection_full = self.domain_concept_projection
-        self.ddo_dirs_info = {'ddo_dirs': ddo_dirs}
+        self.ddo_dirs_info = {'ddo_dirs': ddo_dirs, 'pairing': 'none'}
         if ddo_dirs != 'full':
             if weight_mode not in ('none',):
                 raise ValueError("ddo_dirs 变体仅在等权 DDO (weight_mode='none') 下定义")
             self.domain_concept_projection = self._build_direction_set(
                 ddo_dirs, int(ddo_k), ddo_pca_src, int(ddo_dirs_seed))
+        # 实际构造的方向集的行数 / 形状 / 内容摘要 (写入结果 json): 不能只凭命令行参数反推模型约束的是哪组方向。
+        # 完整方向集是三维的 (N 个描述符 x C 个类别 x 312), 所以行数按"方向向量个数"计, 不用 size(0)
+        P = self.domain_concept_projection
+        self.ddo_dirs_info.update({'rows': int(P.numel() // P.shape[-1]), 'shape': list(P.shape),
+                                   'sha256': self._directions_sha256(P)})
+        if ddo_dirs != 'full':
+            print(f"[DDO-Subspace] 训练用方向集: {self.ddo_dirs_info}")
 
         # classifer
         self.classifier = nn.Sequential(
@@ -422,18 +429,49 @@ class clip_cbm_orth(nn.Module):
         P = getattr(self, 'domain_concept_projection_full', self.domain_concept_projection)
         return self.classifier[1:](P).abs().mean()
 
+    @staticmethod
+    def _directions_sha256(p):
+        """方向张量的内容摘要 (float32 连续内存的 sha256)"""
+        import hashlib
+        return hashlib.sha256(p.detach().float().cpu().contiguous().numpy().tobytes()).hexdigest()
+
+    @staticmethod
+    def _principal_rows(X, k):
+        """X (n, d) 的前 k 个右奇异向量 (按行, 奇异值降序) 与全部奇异值的平方。
+        用 float64 的 Gram 矩阵特征分解 —— 与准备分析脚本 ddo_subspace_spectra.svd_rows 是同一个算法。
+        (此前用 float32 GPU 的 torch.linalg.svd, 向量的正交性只有约 1e-4, 2026-11-25 由断言发现;
+        两者给出同一个子空间, 逐方向一致到 1e-3 以内。)"""
+        X = X.double()
+        if X.size(0) >= X.size(1):
+            lam, vec = torch.linalg.eigh(X.T @ X)             # 升序
+            s = lam.clamp_min(0).sqrt().flip(0)
+            V = vec.flip(1)                                   # 列向量, 降序
+        else:
+            lam, U = torch.linalg.eigh(X @ X.T)
+            s = lam.clamp_min(0).sqrt().flip(0)
+            V = (X.T @ U.flip(1)) / s.clamp_min(1e-30)
+        return V.T[:k].float(), (s ** 2)
+
     def _build_direction_set(self, ddo_dirs, k, pca_src, seed):
         """DDO-Subspace: 构造训练时约束的方向集 (M, 312), 每行是分类头 LayerNorm 之前的概念空间方向。
 
         ddo_dirs:
-          'mean'   204 个描述符的类平均方向经概念投影          (M = 204)
-          'pca'    主方向, ± 成对 (L1 与 bias 使符号不对称)     (M = 2k)
-                   pca_src='ln0'     : 对 LN0(D E^T) 做 SVD —— 分类头实际看到的约束输入 (无 affine)
-                   pca_src='concept' : 对 D E^T 做 SVD —— 未经 LayerNorm 的概念投影
-                   pca_src='mean'    : 对归一化类平均方向 (204x768) 做 SVD 得到 B (与第四章同一构造),
-                                        再经 E 映射到概念空间 —— 两章机制关联实验用的"同一个 B"
-          'random' 概念空间 (312 维) 中的随机正交标架, ± 成对   (M = 2k)
+          'mean'      204 个描述符的类平均方向经概念投影          (M = 204, 不成对)
+          'pca'       主方向, ± 成对                               (M = 2k)
+                      pca_src='ln0'     : 对 LN0(D E^T) 做 SVD —— 分类头实际看到的约束输入 (无 affine)
+                      pca_src='concept' : 对 D E^T 做 SVD —— 未经 LayerNorm 的概念投影
+                      pca_src='mean'    : 对归一化类平均方向 (204x768) 做 SVD 得到 B (与第四章同一构造),
+                                          再经 E 映射到概念空间 —— 两章机制关联实验用的"同一个 B"
+          'random'    概念空间零均值超平面内的随机正交标架, ± 成对  (M = 2k)
+          'full_sym'  原始完整方向集 + 其相反数                     (M = 2NC)
         LayerNorm 会逐行归一化, 所以行的尺度无关, 只有方向有意义。
+
+        2026-11-25 外审后的两点修正:
+          - 谱能量占比是奇异值平方的累计 (L2 口径)。DDO 实际优化的是 L1 响应, 二者没有等价关系,
+            这里的占比只描述矩阵本身的谱, 不代表"保留了同样比例的约束信息"。
+          - ± 成对不是简单地把方向复制一份: 分类头带偏置 b 时 (|a+b| + |-a+b|)/2 = max(|a|, |b|)。
+            所以相对完整方向集, pca / random 臂同时改变了方向空间、方向分布和符号分布三个因素;
+            'full_sym' 是只改符号分布的对照臂。
         """
         E = self.concept_embeddings
         with torch.no_grad():
@@ -441,7 +479,10 @@ class clip_cbm_orth(nn.Module):
                 dirs = self.diffs.mean(dim=1)
                 dirs = dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
                 P = dirs @ E.T                                        # (204, 312)
-                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'none'})
+                self.ddo_dirs_info.update({'pairing': 'none'})
+            elif ddo_dirs == 'full_sym':
+                P = torch.cat([self.domain_concept_projection_full, -self.domain_concept_projection_full], 0)
+                self.ddo_dirs_info.update({'pairing': 'plus_minus'})
             elif ddo_dirs == 'pca':
                 A = (self.diffs @ E.T).reshape(-1, E.size(0))       # (N*C, 312)
                 if pca_src == 'ln0':
@@ -455,23 +496,30 @@ class clip_cbm_orth(nn.Module):
                     X = dirs
                 else:
                     raise ValueError(f"未知 ddo_pca_src='{pca_src}' (ln0 / concept / mean)")
-                _, S, Vh = torch.linalg.svd(X, full_matrices=False)
-                ev = (S ** 2)
+                V, ev = self._principal_rows(X, k)
                 cum = torch.cumsum(ev, 0) / ev.sum()
-                V = Vh[:k]                                            # (k, d): 主方向作为行
+                if pca_src == 'ln0':
+                    # LN0 的行都在零均值超平面里, 其右奇异向量也应如此 (与 random 标架的构造空间一致)
+                    assert float(V.mean(-1).abs().max()) < 1e-4, "ln0 主方向不在零均值超平面内"
+                assert float((V @ V.T - torch.eye(k, device=V.device)).abs().max()) < 1e-4, "主方向不正交"
                 P = (V @ E.T) if pca_src == 'mean' else V              # 'mean' 的主方向在 768 维, 经 E 映射
                 P = torch.cat([P, -P], 0)                             # ± 成对
-                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'plus_minus',
+                self.ddo_dirs_info.update({'pairing': 'plus_minus',
                                            'pca_src': pca_src, 'k': k,
-                                           'cum_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
+                                           # 奇异值平方的累计占比 (谱能量), 不是 L1 约束的覆盖率
+                                           'cum_spectral_energy_at_k': round(float(cum[min(k, cum.numel()) - 1]), 4)})
             elif ddo_dirs == 'random':
                 g = torch.Generator().manual_seed(seed)              # 独立 generator, 不动全局随机数
-                R = torch.linalg.qr(torch.randn(E.size(0), k, generator=g))[0].T   # (k, 312) 随机正交标架
-                P = torch.cat([R, -R], 0).to(self.device)
-                self.ddo_dirs_info.update({'rows': int(P.size(0)), 'pairing': 'plus_minus', 'k': k, 'seed': seed})
+                R = torch.randn(E.size(0), k, generator=g)
+                R = R - R.mean(dim=0, keepdim=True)                  # 先中心化: 落在零均值超平面 (外审)
+                R = torch.linalg.qr(R)[0].T                          # (k, 312) 超平面内的随机正交标架
+                assert float(R.mean(-1).abs().max()) < 1e-4, "随机标架不在零均值超平面内"
+                assert float((R @ R.T - torch.eye(k)).abs().max()) < 1e-4, "随机标架不正交"
+                P = torch.cat([R, -R], 0)
+                self.ddo_dirs_info.update({'pairing': 'plus_minus', 'k': k, 'seed': seed,
+                                           'frame': 'centered_orthonormal'})
             else:
-                raise ValueError(f"未知 ddo_dirs='{ddo_dirs}' (full / mean / pca / random)")
-        print(f"[DDO-Subspace] 训练用方向集: {self.ddo_dirs_info} -> 投影形状 {tuple(P.shape)}")
+                raise ValueError(f"未知 ddo_dirs='{ddo_dirs}' (full / mean / pca / random / full_sym)")
         return P.float().to(self.device)
 
     # 改动时间26.4.29-----------------------------------

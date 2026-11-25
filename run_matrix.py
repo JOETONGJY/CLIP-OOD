@@ -1,25 +1,30 @@
 """实验矩阵驱动 (2026-11-25): 顺序跑一组配置。
 
-  - 以结果 json 的完成状态判定跳过 (status / 完整 epoch / 关键配置), 不只看文件是否存在
-  - 检查子进程退出码 (训练入口在失败时返回非零)
+  - 以结果 json 的完成状态判定跳过 (status / 完整 epoch / 命令行里出现的每一个配置项), 不只看文件是否存在
+  - 成功 = 子进程退出码为 0 且结果完整且配置匹配, 三者缺一即失败
+  - 只在显式 --overwrite_run 时才把覆盖开关传给训练入口; 否则同名的不完整 / 不匹配结果会让训练入口
+    拒绝启动, 驱动把它记为失败 (不静默覆盖)
+  - 矩阵级运行锁 logs/locks/matrix_<name>.lock: 同一个矩阵不允许两个驱动同时跑 (训练入口另有逐 run 的锁)
   - 每个训练的 stdout 写到 experiment_results/<目录>/driver_logs/ (已加入 .gitignore, 不入库)
-  - 公共配置与 2026-11-25 之后的全部新实验保持一致: 严格 final 协议, 训练期间不访问目标域,
-    固定 epoch 梯度诊断, 不保存模型
+  - 公共配置与 2026-11-25 之后的全部新实验保持一致: 严格 final 协议 (目标域不参与训练与选模, 仅最终评估一次;
+    main_cached 入口在该模式下把目标域特征缓存延迟到最终评估时读入), 固定 epoch 梯度诊断, 不保存模型
 
-用法:
+用法 (只想看进度时必须加 --dry_run; 2026-11-25 漏加过一次, 同一组 run 被两个进程同时跑):
   python run_matrix.py dose      [--seeds 1 2 3] [--dry_run] [--overwrite_run]
-  python run_matrix.py weights   ...
+  python run_matrix.py subspace  ...
 """
 import argparse
+import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable
 sys.path.insert(0, ROOT)
-from run_status import result_is_complete  # noqa: E402
+from run_status import RunLock, result_is_complete  # noqa: E402
 
 CLIP = os.path.join(ROOT, "clip_weights", "ViT-L-14.pt")
 CA_PRIOR = os.path.join(ROOT, "experiment_results", "CA-Diagnostic", "ca_prior_cub.pt")
@@ -36,7 +41,36 @@ EQUAL = ["--CBM_type", "clip_cbm", "--weight_mode", "none", "--lambda_kl", "0", 
 CH3 = ["--CBM_type", "clip_cbm", "--lambda_kl", "0.01", "--lambda_graph", "0"]
 A1 = ["--alpha", "1.0"]
 
-# 目录 -> [(dataset, run_tag, 额外参数)]
+# ---- DDO-Subspace 正式矩阵 (2026-11-25, 外审确认后的版本) ----
+# 各臂的剂量: k=32 的臂初始化正则强度约为完整方向集的 0.44 倍, 需要更高的 alpha 才覆盖同样的强度范围
+SUB_DOSES = {"mean": (0.5, 1.0, 2.0, 4.0), "pca8": (0.5, 1.0, 2.0, 4.0), "pca32": (1.0, 2.0, 4.0, 8.0),
+             "rand8": (0.5, 1.0, 2.0, 4.0), "rand32": (1.0, 2.0, 4.0, 8.0), "fullsym": (1.0, 2.0)}
+SUB_DIRS = {"mean": ["--ddo_dirs", "mean"],
+            "pca8": ["--ddo_dirs", "pca", "--ddo_pca_src", "ln0", "--ddo_k", "8"],
+            "pca32": ["--ddo_dirs", "pca", "--ddo_pca_src", "ln0", "--ddo_k", "32"],
+            # full_sym: 完整方向集 + 相反数。pca / random 臂相对完整方向集同时改了方向空间、方向分布、
+            # 符号分布三个因素, 这一臂只改符号分布
+            "fullsym": ["--ddo_dirs", "full_sym"]}
+ATAG = {0.5: "0p5", 1.0: "1", 2.0: "2", 4.0: "4", 8.0: "8"}
+
+
+def _random_dirs(k):
+    # 随机标架的种子与训练 seed 配对 (seed 1/2/3 各用一个标架), 同一标架在不同剂量之间保持不变:
+    # 这样每个训练 seed 都有配对的随机对照, 同时覆盖三个不同的随机子空间, 而不是只验证一个
+    return lambda seed: ["--ddo_dirs", "random", "--ddo_k", str(k), "--ddo_dirs_seed", str(seed)]
+
+
+def _subspace_entries():
+    out = []
+    for arm in ("mean", "pca8", "pca32", "rand8", "rand32", "fullsym"):
+        dirs = _random_dirs(8 if arm == "rand8" else 32) if arm.startswith("rand") else SUB_DIRS[arm]
+        for a in SUB_DOSES[arm]:
+            base = EQUAL + ["--alpha", str(a)]
+            out.append(("CUB", f"sub_{arm}_a{ATAG[a]}", (lambda s, b=base, d=dirs: b + d(s)) if callable(dirs) else base + dirs))
+    return out
+
+
+# 目录 -> [(dataset, run_tag, 额外参数 或 由 seed 生成额外参数的函数)]
 MATRICES = {
     # DDO-Dose: 第三章入口 + 等权 DDO, CUB x 3 seeds x 7 个 alpha
     "dose": ("DDO-Dose", [("CUB", tag, EQUAL + ["--alpha", str(a)]) for a, tag in DOSE]),
@@ -53,29 +87,69 @@ MATRICES = {
     "weights_dose": ("DDO-Dose", [
         ("CUB", f"w_rwddo_a{t}", CH3 + ["--weight_mode", "prior_residual", "--alpha", str(a)])
         for a, t in [(0.5, "0p5"), (2.0, "2"), (4.0, "4")]]),
+    # DDO-Subspace: 5 个子空间臂 x 4 个剂量 + 完整方向集对称化对照 x 2 个剂量, CUB x 3 seeds = 66 个 run
+    # (完整方向集 full 的剂量曲线已在 dose 矩阵里). 评价口径见 RESULTS.md §3n (矩阵运行前写定)
+    "subspace": ("DDO-Subspace", _subspace_entries()),
 }
 
+# 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
+STORE_TRUE = {"--grad_diag": "grad_diag", "--overwrite_run": "overwrite_run", "--grouped_weights": "grouped_weights"}
+STORE_FALSE = {"--no_save_model": "save_model"}
 
-def expected(extra):
-    """完成判定用的关键配置 (同一参数出现多次时取最后一个, 与 argparse 一致)"""
-    out = {"epochs": 100, "batch_size": 256}
-    for k, name in (("--alpha", "alpha"), ("--weight_mode", "weight_mode"), ("--batch_size", "batch_size"),
-                    ("--epochs", "epochs")):
-        if k in extra:
-            v = extra[len(extra) - extra[::-1].index(k)]        # 最后一次出现后的那个值
-            out[name] = float(v) if k == "--alpha" else (int(v) if k in ("--batch_size", "--epochs") else v)
+
+def expected(extra, ds=None, seed=None, tag=None):
+    """完成判定用的配置: 命令行里出现的每一个参数 (同一参数出现多次时取最后一个, 与 argparse 一致),
+    外加 dataset / seed / run_tag。由 run_status.result_is_complete 与结果 json 的 run_config 逐项比对
+    (数值按数值比较)。--overwrite_run 由驱动控制、与训练结果无关, 不参与比对。"""
+    out, toks = {}, list(extra)
+    for i, t in enumerate(toks):
+        if t in STORE_TRUE:
+            out[STORE_TRUE[t]] = True
+        elif t in STORE_FALSE:
+            out[STORE_FALSE[t]] = False
+        elif t.startswith("--"):
+            assert i + 1 < len(toks) and not toks[i + 1].startswith("--"), f"参数 {t} 缺少取值"
+            out[t[2:]] = toks[i + 1]
+    out.pop("overwrite_run", None)
+    if ds is not None:
+        out.update(dataset=ds, seed=seed, run_tag=tag)
     return out
 
 
 def _self_test_expected():
-    """导入时的自检: 2026-11-25 weights_dose 矩阵曾因 alpha 出现两次而被误判为失败"""
-    e = expected(CH3 + A1 + ["--weight_mode", "prior_residual", "--alpha", "2.0"] + COMMON)
-    assert e == {"epochs": 100, "batch_size": 256, "weight_mode": "prior_residual", "alpha": 2.0}, e
+    """导入时的自检。2026-11-25 weights_dose 矩阵曾因 alpha 出现两次而被误判为失败;
+    同日外审指出 expected() 只核验少数字段、成功判定不看退出码、epoch 判据对 0/None 不设防。"""
+    e = expected(CH3 + A1 + ["--weight_mode", "prior_residual", "--alpha", "2.0"] + COMMON, "CUB", 2, "w_rwddo_a2")
+    assert e["alpha"] == "2.0" and e["weight_mode"] == "prior_residual" and e["epochs"] == "100", e
+    assert (e["grad_diag"] is True and e["save_model"] is False and e["target_eval"] == "final_only"
+            and e["model_selection"] == "final" and e["lr"] == "0.0001" and "overwrite_run" not in e), e
+    assert (e["dataset"], e["seed"], e["run_tag"]) == ("CUB", 2, "w_rwddo_a2"), e
     e = expected(EQUAL + ["--alpha", "0.125"] + COMMON)
-    assert e["alpha"] == 0.125 and e["weight_mode"] == "none", e
+    assert e["alpha"] == "0.125" and e["weight_mode"] == "none" and e["lambda_kl"] == "0", e
     for name, (out_dir, entries) in MATRICES.items():
-        for _ds, tag, extra in entries:
-            assert "alpha" in expected(extra + COMMON), f"矩阵 {name} 的 {tag} 没有 alpha"
+        for ds, tag, extra in entries:
+            ex = extra(1) if callable(extra) else extra
+            assert "alpha" in expected(ex + COMMON), f"矩阵 {name} 的 {tag} 没有 alpha"
+    assert len(_subspace_entries()) == 22, len(_subspace_entries())
+    # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
+    base = {"status": "completed", "completed_epochs": 2, "run_config": {
+        "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
+    want = expected(["--epochs", "2", "--lambda_kl", "0", "--alpha", "1.0", "--grad_diag", "--no_save_model",
+                     "--ddo_k", "8"])
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "r.json")
+
+        def verdict(res):
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(res, f)
+            return result_is_complete(p, want)
+
+        assert verdict(base) is True                                  # 命令行的 "0" 与 json 的 0.0 视为相同
+        assert verdict({**base, "completed_epochs": 1}) is False
+        assert verdict({**base, "status": "incomplete"}) is False
+        assert verdict({**base, "run_config": {**base["run_config"], "ddo_k": 32}}) is False
+        assert verdict({"status": "completed", "completed_epochs": 0, "run_config": {"epochs": 0}}) is False
+        assert verdict({"status": "completed", "run_config": {}}) is False      # None == None 不算完成
 
 
 _self_test_expected()
@@ -85,45 +159,72 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("matrix", choices=sorted(MATRICES))
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
-    ap.add_argument("--dry_run", action="store_true")
-    ap.add_argument("--overwrite_run", action="store_true")
+    ap.add_argument("--dry_run", action="store_true", help="只打印每个 run 的配置与完成状态, 不训练、不加锁")
+    ap.add_argument("--overwrite_run", action="store_true",
+                    help="全部重跑: 不跳过已完成的 run, 并把覆盖开关传给训练入口")
     opt = ap.parse_args()
 
     out_dir, entries = MATRICES[opt.matrix]
-    log_dir = os.path.join(ROOT, "experiment_results", out_dir, "driver_logs")
-    os.makedirs(log_dir, exist_ok=True)
-    jobs = [(ds, tag, extra, seed) for ds, tag, extra in entries for seed in opt.seeds]
+    jobs = []
+    for ds, tag, extra in entries:
+        for seed in opt.seeds:
+            jobs.append((ds, tag, extra(seed) if callable(extra) else extra, seed))
+
+    def path_of(ds, tag, seed):
+        return os.path.join(ROOT, "logs", "results", f"{ds}_{tag}_seed{seed}.json")
+
     print(f"[matrix {opt.matrix}] {len(entries)} 个配置 x {len(opt.seeds)} seeds = {len(jobs)} runs", flush=True)
     if opt.dry_run:
+        n_done = 0
         for ds, tag, extra, seed in jobs:
-            print(f"  {ds}_{tag}_seed{seed}: {extra}")
+            done = result_is_complete(path_of(ds, tag, seed), expected(extra + COMMON, ds, seed, tag))
+            n_done += done
+            print(f"  {'[完成] ' if done else '[待跑] '}{ds}_{tag}_seed{seed}: {' '.join(extra)}")
+        print(f"已完成 {n_done} / {len(jobs)}", flush=True)
         return
 
+    log_dir = os.path.join(ROOT, "experiment_results", out_dir, "driver_logs")
+    os.makedirs(log_dir, exist_ok=True)
+    lock = RunLock(os.path.join(ROOT, "logs", "locks", f"matrix_{opt.matrix}.lock"), what=f"实验矩阵 {opt.matrix}")
+    try:
+        with lock:
+            _drive(jobs, opt, log_dir, path_of, lock)
+    except RuntimeError as e:
+        print(f"{e}\n(只看进度请用 --dry_run)", flush=True)
+        sys.exit(2)
+
+
+def _drive(jobs, opt, log_dir, path_of, lock):
+    os.makedirs(log_dir, exist_ok=True)
     t0 = time.time()
     done = skipped = failed = 0
     failures = []
     for i, (ds, tag, extra, seed) in enumerate(jobs):
+        lock.heartbeat()
         run_name = f"{ds}_{tag}_seed{seed}"
-        path = os.path.join(ROOT, "logs", "results", run_name + ".json")
-        exp = expected(extra + COMMON)
+        path = path_of(ds, tag, seed)
+        exp = expected(extra + COMMON, ds, seed, tag)
         if result_is_complete(path, exp) and not opt.overwrite_run:
             skipped += 1
             print(f"[skip {i + 1}/{len(jobs)}] {run_name}", flush=True)
             continue
-        cmd = [PY, "-u", "main_cached.py", "--dataset", ds, "--seed", str(seed), "--run_tag", tag,
-               "--overwrite_run"] + COMMON + extra
+        cmd = [PY, "-u", "main_cached.py", "--dataset", ds, "--seed", str(seed), "--run_tag", tag]
+        cmd += COMMON + extra + (["--overwrite_run"] if opt.overwrite_run else [])
         log = os.path.join(log_dir, run_name + ".log")
         print(f"[run  {i + 1}/{len(jobs)}] {run_name}  {time.strftime('%H:%M:%S')}", flush=True)
         with open(log, "w", encoding="utf-8") as f:
             r = subprocess.run(cmd, cwd=ROOT, stdout=f, stderr=subprocess.STDOUT,
                                env=dict(os.environ, PYTHONIOENCODING="utf-8"))
-        ok = result_is_complete(path, exp)
+        # 成功必须同时满足: 退出码为 0, 且结果完整并与命令行配置逐项匹配
+        ok = r.returncode == 0 and result_is_complete(path, exp)
         if ok:
             done += 1
         else:
             failed += 1
             failures.append(run_name)
-        print(f"       -> {'OK' if ok else 'FAIL(exit %s)' % r.returncode}", flush=True)
+        why = "" if ok else (f"exit={r.returncode}" if r.returncode != 0
+                             else "exit=0, 但结果不完整或与命令行配置不匹配")
+        print(f"       -> {'OK' if ok else 'FAIL ' + why}  (日志 {os.path.relpath(log, ROOT)})", flush=True)
 
     print(f"\n新完成 {done} | 跳过 {skipped} | 失败 {failed} | 耗时 {(time.time() - t0) / 60:.1f} 分钟", flush=True)
     if failures:

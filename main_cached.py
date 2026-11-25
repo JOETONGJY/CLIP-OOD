@@ -44,6 +44,32 @@ class FeatureDataset(Dataset):
         return self.feats[idx], int(self.labels[idx]), self.attrs[idx]
 
 
+class _LazyTargetLoader:
+    """--target_eval final_only 下, 目标域特征缓存延迟到第一次 (也是唯一一次) 评估时才读入内存
+    (2026-11-25, 外审: 此前缓存在初始化阶段就已加载, "训练期间不访问目标域"的表述不准确)。
+    对外接口与 DataLoader 相同 (__iter__ / __len__ / dataset); torch.load 不消耗随机数, 不影响训练结果。"""
+    def __init__(self, cache_path, batch_size):
+        self._path, self._bs, self._loader = cache_path, batch_size, None
+
+    def _get(self):
+        if self._loader is None:
+            self._loader = DataLoader(FeatureDataset(self._path), batch_size=self._bs,
+                                      shuffle=False, num_workers=0)
+            from main import logger
+            logger.info(f"[cached] 目标域特征缓存此刻才读入 (final_only): {self._path}")
+        return self._loader
+
+    @property
+    def dataset(self):
+        return self._get().dataset
+
+    def __len__(self):
+        return len(self._get())
+
+    def __iter__(self):
+        return iter(self._get())
+
+
 class CachedTrainingSession(TrainingSession):
     def _prepare_datasets(self):
         # 原管线构建(文本侧: reliability/domain_diffs 计算, 不读图片)
@@ -67,14 +93,20 @@ class CachedTrainingSession(TrainingSession):
         self.source_test_loader = DataLoader(
             FeatureDataset(os.path.join("cache", f"{name}_source_test.pt")),
             batch_size=self.args.batch_size, shuffle=False, num_workers=0)
-        self.target_test_loader = DataLoader(
-            FeatureDataset(os.path.join("cache", f"{name}_target_test.pt")),
-            batch_size=self.args.batch_size, shuffle=False, num_workers=0)
+        target_cache = os.path.join("cache", f"{name}_target_test.pt")
+        if getattr(self.args, 'target_eval', 'per_epoch') == 'final_only':
+            # 目标域不参与训练与选模: 特征缓存也等到最终评估时才读 (见 _LazyTargetLoader)。
+            # 目标域数据集对象 (划分表与属性标签) 仍由上面 get_dataset_classes 构建。
+            self.target_test_loader = _LazyTargetLoader(target_cache, self.args.batch_size)
+            target_note = "延迟读取 (final_only, 仅最终评估时载入)"
+        else:
+            self.target_test_loader = DataLoader(
+                FeatureDataset(target_cache), batch_size=self.args.batch_size, shuffle=False, num_workers=0)
+            target_note = f"{len(self.target_test_loader.dataset):,}"
 
         from main import logger
         logger.info(f"[cached] Train samples: {len(self.train_loader.dataset):,} | "
-                    f"Source test: {len(self.source_test_loader.dataset):,} | "
-                    f"Target test: {len(self.target_test_loader.dataset):,}")
+                    f"Source test: {len(self.source_test_loader.dataset):,} | Target test: {target_note}")
 
     def _init_model(self):
         super()._init_model()          # 原逻辑: 真 CLIP 编码文本/concept/SVD
