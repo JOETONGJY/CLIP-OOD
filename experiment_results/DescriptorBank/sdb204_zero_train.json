@@ -1,7 +1,7 @@
 {
- "created": "2026-11-26 18:19:46",
+ "created": "2026-11-26 19:55:01",
  "code": {
-  "commit": "6d01edbc775b0037434c5daaeaed593717e4f82b",
+  "commit": "d0ad1f6341ea1cb8a28cc4a8bf6ab563041c5fa3",
   "dirty": false
  },
  "device": "cuda",
@@ -276,9 +276,9 @@
    },
    "axes": {
     "first_axis_cos_uniform_vs_rw": 0.9999813213407194,
-    "uniform_vs_rw_top32_min_cos": 0.9858470322892268,
-    "uniform_vs_group_top32_min_cos": 0.6305947375170962,
-    "rw_vs_group_top32_min_cos": 0.6363001142852137
+    "uniform_vs_rw_top32_min_cos": 0.9984909065095084,
+    "uniform_vs_group_top32_min_cos": 0.9930971003662675,
+    "rw_vs_group_top32_min_cos": 0.991479265778958
    }
   },
   "sdb204": {
@@ -323,15 +323,15 @@
    },
    "axes": {
     "first_axis_cos_uniform_vs_rw": 0.9999912670813226,
-    "uniform_vs_rw_top32_min_cos": 0.9976940622206052,
-    "uniform_vs_group_top32_min_cos": 0.9402766671113112,
-    "rw_vs_group_top32_min_cos": 0.9482439507380309
+    "uniform_vs_rw_top32_min_cos": 0.9993511843407179,
+    "uniform_vs_group_top32_min_cos": 0.9939335948493567,
+    "rw_vs_group_top32_min_cos": 0.9927171606296125
    }
   },
   "cross_bank": {
-   "first_axis_cos": 0.9306656660528609,
-   "top32_min_pair_cos": 0.08623149222264875,
-   "top32_median_pair_cos": 0.5633820201565408,
+   "first_axis_cos": 0.9999146380729342,
+   "top32_min_pair_cos": 0.14409443827268975,
+   "top32_median_pair_cos": 0.989570356280568,
    "uniform_tr_ratio_sdb_over_orig": 1.0024425861214332,
    "eff_rank_ratio": 0.5161960930414611
   }
@@ -579,5 +579,5 @@
  },
  "head_response_note": "词库无关的参照量 (现有 s0 头对视觉 Δu 的每扰动平均响应)",
  "all_checks_passed": true,
- "elapsed_seconds": 376.4
+ "elapsed_seconds": 360.0
 }
