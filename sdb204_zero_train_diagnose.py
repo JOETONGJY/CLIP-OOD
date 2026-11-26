@@ -380,8 +380,8 @@ def main():
         cov = {}
         for n in AUGS:
             sq, resid = whiten_radius_sq(L, DU[n])
-            cov[n] = {"eps_vis_median": float(torch.sqrt(q(sq, 0.5))), "eps_vis_q25": float(torch.sqrt(q(sq, 0.25))),
-                      "eps_vis_q75": float(torch.sqrt(q(sq, 0.75))), "resid_mean": float(resid.mean())}
+            cov[n] = {"eps_vis_median": float(np.sqrt(q(sq, 0.5))), "eps_vis_q25": float(np.sqrt(q(sq, 0.25))),
+                      "eps_vis_q75": float(np.sqrt(q(sq, 0.75))), "resid_mean": float(resid.mean())}
         banks[name]["vis_coverage"] = cov
         print(f"  [D5 {name}] Δu 白化半径中位 (7 扰动均值): "
               f"{float(np.mean([cov[n]['eps_vis_median'] for n in AUGS])):.2f}, 值域外能量均值 "
@@ -403,7 +403,7 @@ def main():
         h = torch.load(f"logs/heads/CUB_s0_{arm}_seed1.pt", map_location="cpu", weights_only=False)
         W, lnw, lnb, linb = (h["classifier"]["2.weight"], h["classifier"]["1.weight"],
                              h["classifier"]["1.bias"], h["classifier"]["2.bias"])
-        A, cc = W * lnw[None, :], W @ lnb + linb
+        A, cc = (W * lnw[None, :]).double(), (W @ lnb + linb).double()
         lg = u_clean @ A.T + cc
         per = []
         for n in AUGS:

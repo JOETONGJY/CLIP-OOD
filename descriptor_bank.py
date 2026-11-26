@@ -92,6 +92,7 @@ def load_descriptor_bank(spec="original"):
             raise ValueError(f"{path}: descriptor_categories 的长度 ({len(cats)}) 与 target_text_prompts ({len(tgt)}) 不一致")
         meta.update({k: d.get(k) for k in ("id", "version", "created", "generator", "generation_record", "notes")})
         meta["n_categories"] = len(set(cats)) if cats else None
+        meta["descriptor_categories"] = list(cats) if cats else None   # 逐描述符的类别标注 (与 target 等长; 诊断按类分组用)
         meta["file_sha256"] = hashlib.sha256(open(path, "rb").read()).hexdigest()
     elif path.lower().endswith(".py"):
         import importlib.util
@@ -194,7 +195,9 @@ def self_test():
         with open(p, "w", encoding="utf-8") as f:
             json.dump(good, f, ensure_ascii=False)
         bj = load_descriptor_bank(p)
-        check("B6 JSON 词库: 加载、计数、分类数、身份", bj["n_target"] == 2 and bj["meta"]["n_categories"] == 2
+        check("B6 JSON 词库: 加载、计数、分类数、身份、逐描述符类别标注",
+              bj["n_target"] == 2 and bj["meta"]["n_categories"] == 2
+              and bj["meta"]["descriptor_categories"] == ["绘画", "线条"]
               and bj["id"] == "toy" and len(bj["bank_sha256"]) == 64 and bj["bank_sha256"] == load_descriptor_bank(p)["bank_sha256"])
         with open(p, "w", encoding="utf-8") as f:
             json.dump({**good, "descriptor_categories": ["只有一类"]}, f, ensure_ascii=False)
