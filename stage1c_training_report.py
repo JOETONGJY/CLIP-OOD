@@ -147,9 +147,10 @@ def selection(runs, cal_sha):
                      "alpha_hat_strength": argbest(mean, "max"),
                      "per_seed_strength": [argbest({m: per_seed_acc[m][i] for m in STRENGTHS}, "max") for i in range(len(SEEDS))],
                      "secondary": {"clean_acc": argbest(clean, "max"), "mean_aug_ce": argbest(aug_ce, "min")}}
-    singles = {t: {"label": lb, "mean_aug_acc": [runs[f"CUB_s1c_{t}_seed{s}"]["mean_aug_acc"] for s in SEEDS],
-                   "clean_acc": [runs[f"CUB_s1c_{t}_seed{s}"]["clean_acc"] for s in SEEDS],
-                   "elapsed": [runs[f"CUB_s1c_{t}_seed{s}"]["elapsed"] for s in SEEDS]} for t, lb in SINGLE_ARMS}
+    _rtag = lambda t: f"s1c_{t}" + ("_x1" if t == "pgd" else "")          # pgd 的矩阵 tag 带 MTAG
+    singles = {t: {"label": lb, "mean_aug_acc": [runs[f"CUB_{_rtag(t)}_seed{s}"]["mean_aug_acc"] for s in SEEDS],
+                   "clean_acc": [runs[f"CUB_{_rtag(t)}_seed{s}"]["clean_acc"] for s in SEEDS],
+                   "elapsed": [runs[f"CUB_{_rtag(t)}_seed{s}"]["elapsed"] for s in SEEDS]} for t, lb in SINGLE_ARMS}
     return {"scan": scan, "singles": singles, "primary": PRIMARY,
             "rule": "3 seeds 均值最大; 并列取较小强度 (P1 冻结的规则)",
             "thresholds": {"GATE_PP": GATE_PP, "GATE_POS": GATE_POS},
@@ -176,8 +177,8 @@ def selected_target(sel, tgt):
         m = s["alpha_hat_strength"]
         out[tag] = {"strength": m, "eps_or_lam": s["anchor"] * float(m),
                     "target_acc": [tgt[_tag_of(tag, m, se)] for se in SEEDS]}
-    if any(k.startswith("CUB_s1c_pgd_seed") for k in tgt):        # PGD 是固定锚点, 不参与选择; 缺席时跳过 (自测用)
-        out["pgd"] = {"strength": "1 (锚点)", "target_acc": [tgt[f"CUB_s1c_pgd_seed{se}"] for se in SEEDS]}
+    if any(k.startswith("CUB_s1c_pgd_x1_seed") for k in tgt):     # PGD 是固定锚点, 不参与选择; 缺席时跳过 (自测用)
+        out["pgd"] = {"strength": "1 (锚点)", "target_acc": [tgt[f"CUB_s1c_pgd_x1_seed{se}"] for se in SEEDS]}
     return out
 
 
@@ -359,7 +360,7 @@ def stage_final():
     x1 = [T_all[f"CUB_s1c_langfull_x1_seed{s}"] for s in SEEDS]
     fin["fixed_anchor"] = {
         "langfull_x1_vs_randfull_same": _paired(x1, [T_all[f"CUB_s1c_randfull_same_seed{s}"] for s in SEEDS]),
-        "langfull_x1_vs_pgd_x1": _paired(x1, [T_all[f"CUB_s1c_pgd_seed{s}"] for s in SEEDS]),
+        "langfull_x1_vs_pgd_x1": _paired(x1, [T_all[f"CUB_s1c_pgd_x1_seed{s}"] for s in SEEDS]),
         "langfull_x1_vs_identity_x1": _paired(x1, [T_all[f"CUB_s1c_identity_x1_seed{s}"] for s in SEEDS]),
         "langfull_x1_vs_isda_x1": _paired(x1, [T_all[f"CUB_s1c_isda_x1_seed{s}"] for s in SEEDS]),
         "langfull_x1_vs_DDO_a2": _paired(x1, B["a2"]),
@@ -385,7 +386,7 @@ def _pgd_quality():
     """PGD 臂的搜索质量抽查汇总 (预注册 §3z): grad_diag 的 pgd_search_quality 记录。"""
     recs = []
     for s in SEEDS:
-        with open(f"logs/results/CUB_s1c_pgd_seed{s}.json", encoding="utf-8") as f:
+        with open(f"logs/results/CUB_s1c_pgd_x1_seed{s}.json", encoding="utf-8") as f:
             r = json.load(f)
         for g in r["grad_diag"]:
             if "pgd_search_quality" in g:
