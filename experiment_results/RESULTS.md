@@ -1714,3 +1714,62 @@ Full α = 2（CE / LD / PGD / gap 全部来自前 300 个样本的同一子集�
 - 全部 45 个（分类头, 椭球）上 worstcomp ÷ bind 为 0.386 ~ 0.678（均值 0.479）：平均最大类别对惩罚**高估**了决定鲁棒间隔的那个竞争类所受的惩罚。§3y 里用 pen_bind 得出的定性结论（语言椭球的惩罚远高于随机椭球、DDO 头的惩罚更低）在两套口径下方向相同；严格地说，之前写成"绑定惩罚"的地方都应读作"平均最大类别对惩罚"。
 - 核对：重算在全部闭式量上与已提交 JSON 的最大绝对差为 0.0e+00（逐位一致）；已提交 JSON 的 600 个 PGD 条目在自身条目内满足链 CE ≤ PGD ≤ LD（同样本口径的内部核对）。核对脚本 `stage1c_pen_recheck.py` 的自测与真实数据核对随本轮提交。
 - 第 4 节表格的 CE（1200）与 LD（1200）列本身没有错（它们是 heldout_val 全体的闭式量），可以继续单独使用；不能与 PGD 列跨样本集并排读。
+## §3z. 第十轮：LD-DRO 八臂训练预注册（2026-11-26，外审第十轮批准；写于任何 stage1c run 之前）
+
+外审第十轮验收了 P1/P2/P4（P1 通过；P2 基本验收，预注册的 PGD 收敛检查失败必须保留），批准进入 LD-DRO 正式算法训练阶段，并给出了各臂参数、扫描倍数与判读门槛。本节把它落成可执行、可核对的预注册。
+
+### 0. P2 收尾（指令 §2 的四项，先核实再修正，未扩大诊断）
+
+1. **"绑定惩罚"命名不成立**：源码是 `pen.max(1).values.mean()` —— 平均最大类别对惩罚，不是实际最坏竞争类（鲁棒间隔最小者）的惩罚。已在 `stage1c_radius_diagnose.py` 更正命名并补充 `pen_worstcomp_*`；对同样 30 头 × 5 椭球 × ε 网格的轻量重算（`stage1c_pen_recheck.py`）显示全部闭式量与已提交 JSON **逐位一致**（更正只补统计，不改数字）；worstcomp ÷ bind = 0.386 ~ 0.678，pen_bind 高估约一倍，定性结论方向不变。见 §3y 末尾的更正小节。
+2. **PGD 汇总的样本集混用**：§3y 第 4 节表格的 CE 列（1200 样本）与 LD/PGD/gap 列（前 300 样本）不能并排读。JSON 的 pgd 条目本身是同样本口径（600 个条目内链 CE ≤ PGD ≤ LD 全部成立），复用它渲染同样本对照表，不重跑任何 PGD。
+3. **小半径补充检查不是全范围收敛证明**：边界措辞已加入脚本与 §3y。正式 Language-PGD 训练需要在训练过程中抽查搜索质量（见下文的 grad_diag 抽查）。
+4. **统一批次标定**（`stage1c_calibration_traincore.py`，提交 `879f9b4`）：梯度配平（ρ̄_DDO / ε_grad / λ_grad）在 train_core 固定批次上与 §3y **逐位一致**；r_max 统计从 heldout_val 移到同一固定批次（让 heldout_val 专门承担选参），ε_pen 微调（下表）。八臂取值从这里冻结；若与 GPT 给的参考值略有出入，以本标定为准（指令 §3：按预先确定的配平方程更新并冻结，不按最终准确率手工调整）。
+
+### 1. 八臂与首轮强度（统一批次标定冻结值）
+
+| 臂 | 椭球 | 配平方程 | 锚点（×1） | ×0.5 | ×1 | ×2 | run_tag 前缀 |
+|---|---|---|---|---|---|---|---|
+| LD-Language-Full | lang_full | eps_pen | 5.345864 | 2.672932 | 5.345864 | 10.691727 | s1c_langfull_x{0p5,1,2} |
+| LD-Random-Full | rand_full | eps_pen | 5.339521 | 2.66976 | 5.339521 | 10.679041 | s1c_randfull_x{0p5,1,2} |
+| LD-Language-32 | lang32 | eps_pen | 5.284907 | 2.642454 | 5.284907 | 10.569815 | s1c_lang32_x{0p5,1,2} |
+| LD-Identity-H（主口径） | identity | eps_pen | 8.972407 | 4.486203 | 8.972407 | 17.944814 | s1c_identity_x{0p5,1,2} |
+| Language-ISDA | lang_full | lam_pen | 123.476919 | 61.73846 | 123.476919 | 246.953838 | s1c_isda_x{0p5,1,2} |
+| LD-Identity-H（梯度配平对照） | identity | eps_grad | 37.365229 | — | — | — | s1c_identity_grad |
+| Language-ISDA（梯度配平对照） | lang_full | lam_grad | 97.379955 | — | — | — | s1c_isda_grad |
+| Random-Full 同半径对照 | rand_full | ε 与 Language-Full ×1 逐位相同 | 5.345864 | — | — | — | s1c_randfull_same |
+| Language-PGD（锚点，PGD-5×1） | lang_full | ε 与 Language-Full ×1 逐位相同 | 5.345864 | — | — | — | s1c_pgd_x1 |
+
+- 共 19 个配置 × 3 seeds = **57 个 run**。ε 的量纲说明（§3y）：这些半径是"与原始 DDO（α=1）初始压力相当"的强度，只相当于 ε_dom 的约 1.7%，不能读作"只需抵抗真实域偏移的 1.7%"。
+- Identity-H 主比较用**同初始最大类别对惩罚**（外审第十轮的决定：两套口径相差 4.16 倍，只选其一可能人为放大或缩小某一方，故都保留——主口径 eps_pen，对照 eps_grad）。ISDA 首轮用初始惩罚配平的 λ，梯度配平的 λ 作敏感性对照。ISDA 首轮**固定 λ，不做 warmup**（原论文的 warmup 留待首轮结果后再定，不在本轮预设）。
+- 扫描倍数乘的是各臂自己的锚点（ISDA 乘 λ，不是把 λ 机械等同于 ε 的平方）。
+- 顺序：先锚点（×1）后扫描（×0.5, ×2）；驱动按完成状态跳过；不根据目标域表现决定是否继续。
+
+### 2. 训练协议（与 P1 逐项一致）
+
+- train_core（4790）训练 / heldout_val（1200）验证；`--target_eval none`；3 个配对 seeds（1/2/3）；100 epochs；batch 256；AdamW lr 1e-4 / wd 1e-4；model_selection final；`--grad_diag`；`--save_head`；词库 **Original-204 不变**（SDB-204 已冻结为 `prompts/banks/sdb-204-v1.json`，供其后的零训练诊断，不进入本轮训练）。
+- LD 臂：训练损失 = 鲁棒 CE（LD 闭式上界 / ISDA Jensen 上界 / PGD 两段式），**α = 0，不叠加原始 DDO 正则**（入口守卫强制 alpha=0 / beta=0 / 等权 / full / λkl=λgraph=0）；**评估始终用干净 logits**。
+- 椭球：与 §3x 同一构造（G = E[uuᵀ] 非中心化二阶矩，迹归一化，零均值超平面内）；随机椭球种子候选 s/+10/+20/+30；每个结果 json 记录生成元 sha256 与 E/G 的 sha256（语言生成元与 §3y 记录一致到前 16 位；E_sha256 完全一致）。
+- 逐 epoch 记录（LD 臂）：干净 CE、鲁棒损失、最大类别对惩罚（均值/标准差）、最坏竞争类惩罚、鲁棒最坏间隔；训练结束的源域增强 Acc（heldout_val）与训练成本（elapsed_seconds）。
+- PGD 搜索质量抽查（预注册）：`grad_diag` 的 8 个时刻上，训练用 PGD-5×1 的下界对更强的 PGD-50×4+闭式起点，与 LD 闭式上界构成链 CE ≤ PGD-训练 ≤ PGD-强 ≤ LD；链不成立或强-训差大，如实记录为"训练搜索未追上"。
+
+### 3. 运行前检查（已执行，见提交 `615f5b2`）
+
+- eps=0 / λ=0 严格退化 CE（ld_dro L1/L2、ld_training L1/L2 钉住）；梯度流经 W/γ（L4/L5，真实 backward）；dtype/device（L7）；公共 logit 平移不变性（stage1c W13，LD 损失差 < 1e-10）；分类头保存/重载一致性（save_head 机制 + 事后评估按 sha256 核对分类头与结果文件）。
+- 三臂 2-epoch 冒烟通过（ld / isda / pgd；PGD 成本约 LD 的 1.45 倍）；冒烟结果 json 已删除。
+- 全套回归在**启动提交**上重跑（默认路径逐位、端到端 37+33、11 个模块自测），记录见`experiment_results/round10_final_checks.txt`。
+
+### 4. 分析与判读（由 `stage1c_training_report.py` 执行；先 `--stage source` 提交锁定，后 `--stage final`）
+
+- **选择规则 = P1 冻结的规则**：heldout_val 7 种光度扰动均值 Acc，3 seeds 均值最大，并列取较小强度；对 5 个扫描臂各选一个强度。辅助指标（干净 Acc、扰动均值 CE）照 P1 报告，不参与主判定。
+- 源域选择写入 `s1c_source_selection.json` 并**提交锁定**；目标域事后评估（`eval_heads_targets.py --stage1c`）只能在其后（脚本核对锁定状态与分类头 sha256）。CE-Only / DDO α=1 / α=2 的目标域结果**复用 P1 的事后评估**，复用前提（配置一致性）由分析脚本逐键核对。
+- **两条核心判读**（预注册门槛：目标域平均提升 ≥ 0.5 pp 且 ≥ 2/3 配对 seed 为正 —— 这是**继续推进的研发门槛**，不是统计显著性证明，具体阈值在训练结果出来前已写定于此）：
+  - **Q1** Language-Full（源域选参）能否超过 DDO α=2（源域选参）—— 决定算法的实际价值；
+  - **Q2** 能否超过同谱 Random-Full（同预算选参）—— 决定语言域几何能否作为创新依据。
+- 固定强度对照（锚点 ×1）与选参后的性能对照**分开报告**：langfull_x1 对 randfull_same（同半径）、identity_x1（同初始惩罚）、isda_x1（同初始惩罚）、pgd_x1（同半径）、DDO α=2。
+- 次级判读（公平配平下）：Language-Full 对 Identity-H（各向同性）、对 ISDA（最坏情况建模 vs Jensen 上界）、对 Language-32（低秩椭球）。
+- PGD 只跑了锚点：**不把"未调参的 PGD 与已调参的 LD 之差"解释为算法全面优势**（指令 §4 的原话）。
+- 边界：CUB 是开发基准；P1 的规则只对 DDO 剂量验证过，LD 强度选择是同一规则的第一次新验证；80% 训练集协议不能与完整训练集的历史精度同表比较；扰动位于 LayerNorm 后的概念空间，不满足真实图像可达性约束。
+
+### 5. 执行
+
+提交本节与分析脚本（自测通过）→ 全套回归 → 启动矩阵 `run_matrix.py stage1c`（工作区干净，57 个 run 的 git 记录一致）→ 完成后 `--stage source` → 提交锁定 → `eval_heads_targets.py --stage1c` → `--stage final` → 结果写入 §3aa。
