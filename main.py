@@ -20,7 +20,8 @@ from model.cbm_models import clip_cbm_orth, clip_mlp, clip_cbm_subspace
 from data import get_dataset_classes
 from run_status import RunLock, git_info, jsonable
 from ld_dro import effective_response, ld_dro_loss, pgd_worst_loss          # LD 臂的梯度诊断用
-from ld_training import MODES as LD_MODES, build_ld_generator, pen_stats as ld_pen_stats, training_loss as ld_training_loss
+from ld_training import (MODES as LD_MODES, build_ld_generator, pen_stats as ld_pen_stats,  # noqa: E402
+                         training_loss as ld_training_loss, warmup_lam)
 from language_ellipsoid import domain_directions, second_moments
 
 # --grad_diag 时测量 CE/DDO 梯度统计的 epoch (1 起算, 在该 epoch 训练之前测), 另加训练结束后一次
@@ -380,6 +381,9 @@ class TrainingSession:
         sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'ddo_own_unw': 0.0, 'kl': 0.0,
                 'clean_ce': 0.0, 'pen_mean': 0.0, 'pen_std': 0.0, 'wcpen': 0.0, 'mrob': 0.0}
         ld_on = self.ld_mode != "none"
+        # ISDA 的线性 warmup (外审第十一轮 P3): 前 W 个 epoch 的有效 λ = λ × (epoch+1)/W, 之后恒为 λ。
+        # W=0 (默认) 时恒等于 λ —— 行为与此前逐位一致。
+        lam_now = warmup_lam(self.args.ld_lam, epoch, getattr(self.args, "isda_warmup_epochs", 0)) if ld_on else 0.0
 
         progress_bar = tqdm(
             self.train_loader,
@@ -412,10 +416,10 @@ class TrainingSession:
                     # alpha=0 已由 _init_ld_dro 守卫强制, 下面的 alpha*orth 项自然为 0。监控统计用 detach 的副本。
                     M = self._ld_M()
                     cls_loss = ld_training_loss(self.ld_mode, cls_preds, M, labels, self.args.ld_eps,
-                                                self.args.ld_lam, self.args.pgd_steps, self.args.pgd_restarts,
+                                                lam_now, self.args.pgd_steps, self.args.pgd_restarts,
                                                 self.args.pgd_seed)
                     ps = ld_pen_stats(cls_preds.detach(), M.detach(), labels,
-                                      self.args.ld_eps if self.ld_mode != "isda" else self.args.ld_lam,
+                                      self.args.ld_eps if self.ld_mode != "isda" else lam_now,
                                       kind="ld" if self.ld_mode != "isda" else "isda")
                     bs = images.size(0)
                     sums['clean_ce'] += ps['clean_ce'] * bs
@@ -529,7 +533,8 @@ class TrainingSession:
             # 实际最坏竞争类的惩罚 / 鲁棒最坏间隔 (按样本数加权)
             out.update({'clean_ce': sums['clean_ce'] / total, 'robust_loss': sums['cls'] / total,
                         'pen_maxpair_mean': sums['pen_mean'] / total, 'pen_maxpair_std': sums['pen_std'] / total,
-                        'worstcomp_pen_mean': sums['wcpen'] / total, 'robust_margin_mean': sums['mrob'] / total})
+                        'worstcomp_pen_mean': sums['wcpen'] / total, 'robust_margin_mean': sums['mrob'] / total,
+                        'ld_lam_effective': lam_now})
         return out
 
     def _evaluate(self, data_loader, mode='val'):
@@ -714,11 +719,13 @@ class TrainingSession:
         # CE ≤ PGD-训练 ≤ PGD-强 ≤ LD —— 差值大说明训练搜索没追上最坏情况, 不能读作"PGD 训练温和"。
         if self.ld_mode != "none":
             M = self._ld_M()
-            full = ld_training_loss(self.ld_mode, cls_preds, M, y, self.args.ld_eps, self.args.ld_lam,
+            lam_now = warmup_lam(self.args.ld_lam, getattr(self, "_ld_epoch0", 0),
+                                 getattr(self.args, "isda_warmup_epochs", 0))
+            full = ld_training_loss(self.ld_mode, cls_preds, M, y, self.args.ld_eps, lam_now,
                                     self.args.pgd_steps, self.args.pgd_restarts, self.args.pgd_seed)
             raw = torch.autograd.grad(full - ce, params, retain_graph=True)
             g_reg = torch.cat([t.reshape(-1) for t in raw])
-            strength = float(self.args.ld_eps if self.ld_mode != "isda" else self.args.ld_lam)
+            strength = float(self.args.ld_eps if self.ld_mode != "isda" else lam_now)
             rec.update({'ld_mode': self.ld_mode, 'ld_strength': strength,
                         'grad_regpart_ratio_over_ce': float(g_reg.norm() / g_ce.norm().clamp_min(1e-12)),
                         'grad_cos_ce_regpart': float((g_ce @ g_reg) / (g_ce.norm() * g_reg.norm()).clamp_min(1e-12))})
@@ -815,6 +822,7 @@ class TrainingSession:
                 self._lock.heartbeat()                     # 运行锁心跳: 每个 epoch 一次
                 epoch_start = time.time()
 
+                self._ld_epoch0 = epoch                            # ISDA warmup 的有效 λ 按"即将训练的 epoch"计
                 if getattr(self.args, 'grad_diag', False) and (epoch + 1) in GRAD_DIAG_EPOCHS:
                     self._grad_diag(f"before_epoch{epoch + 1}")
 
@@ -880,6 +888,7 @@ class TrainingSession:
                     'pen_maxpair_std': train_metrics.get('pen_maxpair_std'),
                     'worstcomp_pen_mean': train_metrics.get('worstcomp_pen_mean'),
                     'robust_margin_mean': train_metrics.get('robust_margin_mean'),
+                    'ld_lam_effective': train_metrics.get('ld_lam_effective'),
                 })
                 self._completed_epochs = epoch + 1
 

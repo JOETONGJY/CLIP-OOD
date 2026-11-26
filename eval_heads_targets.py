@@ -41,6 +41,7 @@ from run_status import git_info  # noqa: E402
 OUT_DIR = os.path.join("experiment_results", "Stage0D-Independent")
 SELECT_JSON = os.path.join(OUT_DIR, "p1_source_selection.json")
 SEL1C_JSON = os.path.join("experiment_results", "Stage1C-Training", "s1c_source_selection.json")
+SEL11_JSON = os.path.join("experiment_results", "Stage1C-Training", "s11_source_selection.json")
 # 不影响模型结构的配置项: 这些不同也共用同一个重建的模型 (只换分类头)
 KEY_SKIP = {"run_tag", "seed", "alpha", "epochs", "lr", "weight_decay", "target_eval", "save_head", "grad_diag",
             "save_model", "overwrite_run", "train_subset_cache", "source_val_cache", "device", "wandb"}
@@ -190,16 +191,66 @@ def eval_stage1c(seeds):
     return 0
 
 
+def eval_s11(seeds):
+    """第十一轮 (预注册 §3ad) 的事后目标域评估: 门是 s11 的源域选择文件; 覆盖 s1c_ext + sdb22
+    (+ s11_warmup 矩阵, 在 P3 的 warmup 矩阵注册之后重跑本命令即可补评)。"""
+    from run_matrix import MATRICES
+    locked, why = selection_is_locked(SEL11_JSON)
+    if not locked:
+        print("拒绝运行: 第十一轮的源域选择结果尚未锁定 —— " + why)
+        print("必须先运行 round11_report.py --stage source 并提交其输出, 再做事后目标域评估。")
+        return 2
+    ev = HeadEvaluator()
+    heads = {}
+    mats = [("s1c_ext", MATRICES["s1c_ext"][1]), ("sdb22", MATRICES["sdb22"][1])]
+    if "s11_warmup" in MATRICES:
+        mats.append(("s11_warmup", MATRICES["s11_warmup"][1]))
+    for mname, entries in mats:
+        for ds, tag, _ in entries:
+            for s in seeds:
+                run = f"{ds}_{tag}_seed{s}"
+                heads[run] = ev.evaluate(f"logs/heads/{run}.pt", f"logs/results/{run}.json")
+    with open(SEL11_JSON, encoding="utf-8") as f:
+        sel = json.load(f)
+
+    def same(r):
+        v, w = heads.get(r), sel["runs"].get(r, {})
+        return bool(w) and v is not None and w.get("head_sha256") == v["head_sha256"]             and w.get("result_sha256") == v["result_sha256"]
+
+    missing = [r for r in sorted(sel["runs"]) if not same(r)]
+    extra = [r for r in sorted(heads) if r not in sel["runs"]]
+    if missing:
+        print("拒绝: 以下 run 不在锁定清单里或分类头/结果不一致: " + ", ".join(missing[:8]))
+        return 3
+    os.makedirs(os.path.dirname(SEL11_JSON), exist_ok=True)
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "selection_lock_commit": why,
+           "selection_sha256": sha256_file(SEL11_JSON), "target_cache": ev.target_meta, "heads": heads,
+           "note": "extra(不在锁定清单) 的头 = " + (", ".join(extra) if extra else "无")}
+    out_path = os.path.join(os.path.dirname(SEL11_JSON), "s11_target_eval.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"选择锁定于提交 {why[:7]}; 评估了 {len(heads)} 个分类头; 目标域 {ev.target_meta['n']} 个样本")
+    for mname, entries in mats:
+        accs = {f"{ds}_{tag}": [heads[f"{ds}_{tag}_seed{s}"]["target_acc"] for s in seeds] for ds, tag, _ in entries}
+        for k, v in accs.items():
+            print(f"  {k:24s} " + " / ".join(f"{x:.2f}" for x in v))
+    print(f"[saved] {out_path}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate_stage0", action="store_true")
     ap.add_argument("--stage1c", action="store_true")
+    ap.add_argument("--s11", action="store_true")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     a = ap.parse_args()
     if a.validate_stage0:
         return validate_stage0(a.seeds)
     if a.stage1c:
         return eval_stage1c(a.seeds)
+    if a.s11:
+        return eval_s11(a.seeds)
 
     locked, why = selection_is_locked()
     if not locked:

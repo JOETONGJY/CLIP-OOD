@@ -1825,3 +1825,47 @@ SDB-204 v1.0 已由 GPT 提供并冻结（`prompts/banks/sdb-204-v1.json`，提�
 - 不选择词库、不设通过/失败阈值；是否把 SDB-204 进入训练（2×2 因子实验）由外审根据本节另行决定。
 - 视觉统计只在 train_core；heldout_val 留给 §3z 的强度选择。视觉覆盖用的增强族与 P1 选参同族，只描述不筛选。
 - 编码口径：E 必须经 clip_cbm_orth 同一构造取得（2026-11-26 发现 CLIP 文本编码的比特结果依赖 GPU 分配与调用历史，同进程存在三个稳定口径——见脚本 docstring 与提交记录）。
+## §3ad. 第十一轮预注册：扩展强度扫描 + SDB-204 的 2×2 因子 + ISDA warmup（2026-11-26，外审第十一轮指令；写于任何扩展 / SDB / warmup run 之前）
+
+总体方向不变（SL-RDO）。Q1 未过、Q2 过的判定保留，门槛不修改。P0 的四项修正已先行提交（pen_stats 干净间隔排除自身类 `c2cc90e`；子空间主角 `e91b30f`；§3aa 措辞收敛 `c8c0ab7`；SDB 标定 `76b936c`）。
+
+### P1. 扩展强度扫描（12 run）
+
+- 保持 Original-204。LD-Language-Full 与 Language-ISDA 各增加 **4× 与 8×**（其余两臂不扩；不加新模块）：
+  - LD-Language-Full：ε = 5.345864 × 4 = **21.383454**、× 8 = **42.766909**；
+  - Language-ISDA：λ = 123.476919 × 4 = **493.907676**、× 8 = **987.815353**。
+- 锚点与全部其它配置固定（§3z 的 train_core/heldout_val、`--target_eval none`、3 seeds、100 epochs、Original-204）。
+- **选择网格扩展为 {0.5, 1, 2, 4, 8}×**，规则不变（P1 冻结规则）；扩展后的选择提交锁定（`s11_source_selection.json`），之后才做目标域事后评估（`eval_heads_targets.py --s11`）。本轮最多扩到 8×，不无限追逐最优值。
+- **条件对照（预注册规则）**：若扩展后语言臂的选中配置对 DDO α=2 过门槛（平均 ≥ 0.5 pp 且 ≥ 2/3 正向），再补该选中强度的同谱 Random-Full 与 Identity-H 对照（同预算公平搜索），随后才允许更新 Q2 表述；未过门槛则不补、Q2 保留 §3aa 结论。
+
+### P2. SDB-204 正式进入训练：2×2 因子（48 run 中的 36 个）
+
+词库 v1.0 保持冻结。设计：Original/SDB × DDO/ISDA。
+
+| 格 | runs | 来源 |
+|---|---|---|
+| Original + DDO（七剂量） | 21（已完成） | 复用 P1 的 p1 矩阵；配置一致性由分析脚本核对 |
+| SDB + DDO（七剂量） | 21（新） | `sdb_dose_a0…a4`；词库 `--descriptor_bank prompts/banks/sdb-204-v1.json` |
+| Original + ISDA（{0.5,1,2,4,8}×） | 9 已完成 + 6（新） | 复用 stage1c 的 x0p5/x1/x2 + 本轮 s1c_ext 的 x4/x8 |
+| SDB + ISDA（(0.5, 1, 2, 4, 8)×） | 15（新） | `sdb_isda_x…`；**锚点重新标定** |
+
+- **SDB 侧锚点（统一批次标定，方程不变、方向集换 SDB-204；`stage1c_calibration_sdb.py`）**：ρ̄_DDO(SDB 方向集) = **0.148491**（Original 0.1049——SDB 方向集初始压力高约 40%，与 §3ac 谱诊断一致）；ε_grad(SDB) = 5.910967；**λ_pen(SDB) = 117.919376**（×0.5 = 58.959688、×4 = 471.677503、×8 = 943.355006）。SDB+ISDA 各倍数的 λ 从这里冻结取值。
+- 核对（报告脚本断言）：SDB runs 的 `descriptor_bank` 身份 = 5d98ecba…；SDB+ISDA 的椭球生成元 sha = b0fa7bfd…（与 SDB 标定一致）；ld_calib 引用 SDB 标定文件。
+- **α = 0 的词库无关性核对**：SDB+DDO 的 α=0 与 P1 的 α=0 训练损失相同（纯 CE），逐 seed 的源域增强 Acc 应逐位一致（分析脚本断言）。
+- **2×2 分析（描述性，逐 seed 配对）**：描述符效应 = SDB − Original（同一损失：DDO 在每个剂量上、ISDA 在每个倍数上）；损失效应 = ISDA@倍数 − DDO α=2（强基线口径）与**匹配初始惩罚口径**（ISDA@1× − DDO α=1——两库的 ISDA 锚点各自按与 DDO α=1 同等初始压力标定）；交互 = （描述符效应 under ISDA）−（描述符效应 under DDO）。**不提前认定 SDB 优于 Original。**
+- 若 LD-DRO 在扩展扫描中超过 ISDA（选中配置对 ISDA 选中配置过门槛），额外补 SDB + LD（同预算），本轮先不注册其 ε。
+
+### P3. ISDA warmup（独立消融，3 run，在选择锁定之后）
+
+- 在**扩展后源域选中的 λ** 上增加前 20 epoch 线性 warmup（有效 λ = λ × (epoch+1)/20），3 seeds，与固定 λ 的选中 run 严格配对（同 seed 同 λ 值）。代码 `--isda_warmup_epochs`（默认 0 = 关闭，行为逐位不变；冒烟已验证 ep1/ep2 的有效 λ = λ/20、2λ/20，grad_diag 同步）。判读：warmup 配对差（门槛同 §3z）。
+
+### 判读与边界
+
+- 门槛沿用 §3z（平均 ≥ 0.5 pp 且 ≥ 2/3 配对 seed 正向；研发门槛）。两条核心判读沿用：Q1（Language-Full 扩展后选中 vs DDO α=2）、Q2 保留 §3aa 结论（随机对照未扩展，不重判；若触发条件对照再更新）。
+- P4 方向记录：簇级等权几何优先——**注意（外审第十一轮的主角更正后）**：三种加权的 top32 子空间几乎完全重合（最小主角 0.99+），簇级等权的效应在谱形状与权重分布，不在子空间朝向；普通可靠性标量加权不再重点探索；DDO 与 LD/ISDA 不叠加；Stage 1B 后置；CUB 实验完成后冻结候选方法再做 AwA2/LADV/PACS 跨数据集验证。
+- Stage 0C 的 L1 梯度比补充（原 Stage 0C 定义的第二半）不阻塞本轮训练，作为后续轻量补充。
+- 纪律：所有新 run `--target_eval none`；选择锁定 → 事后评估；SDB 词库冻结不改动；不增加新的复杂模块。
+
+### 执行
+
+提交本节与分析脚本 → 全套回归 → 顺序启动 `run_matrix.py s1c_ext`（12 run）与 `run_matrix.py sdb22`（36 run）→ 完成后 `round11_report.py --stage source` → 提交锁定 → `eval_heads_targets.py --s11` → `--stage final` → P3 的 warmup 3 run → 补评 → §3ae。

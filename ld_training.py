@@ -26,11 +26,22 @@ import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
 from ld_dro import isda_loss, ld_dro_loss, pgd_train_loss  # noqa: E402
+
 from language_ellipsoid import build_ellipsoids  # noqa: E402
 
 MODES = ("none", "ld", "isda", "pgd")
 ELLS = ("lang_full", "lang32", "rand_full", "rand32", "identity")
 SEED_CANDS = lambda s: (int(s), int(s) + 10, int(s) + 20, int(s) + 30)   # noqa: E731  与 §3x 相同的候选顺序
+
+
+def warmup_lam(lam, epoch0, warmup_epochs):
+    """ISDA 的线性 warmup (外审第十一轮 P3): 前 W 个 epoch 的有效 λ = λ × (epoch0+1)/W（epoch0 从 0 计），
+    之后恒为 λ。W<=0 或 λ=0 时原样返回 λ（关闭）。"""
+    lam = float(lam)
+    W = int(warmup_epochs)
+    if W <= 0 or lam == 0.0:
+        return lam
+    return lam * min(1.0, (int(epoch0) + 1) / W)
 
 
 def training_loss(mode, logits, M, y, eps=0.0, lam=0.0, pgd_steps=5, pgd_restarts=1, pgd_seed=0):
@@ -209,6 +220,11 @@ def self_test():
           La.size(1) == Ra.size(1) and build_ld_generator(G, "lang_full", 1)[1]["spectrum"]["r"]
           == ma["spectrum"]["r"])
     check("L13 未知椭球报错", _raises(lambda: build_ld_generator(G, "xx", 1)))
+    Wl = [warmup_lam(100.0, e, 20) for e in range(22)]
+    check("L14 warmup: 前 20 个 epoch 线性 (5, 10, ..., 100), 之后恒为 λ",
+          Wl[0] == 5.0 and Wl[19] == 100.0 and Wl[20] == 100.0 and Wl[21] == 100.0
+          and abs(Wl[9] - 50.0) < 1e-12, f"{[round(v, 1) for v in Wl[:3]]}...{Wl[19]},{Wl[20]}")
+    check("L15 warmup 关闭 (W=0) 或 λ=0 时原样返回", warmup_lam(7.0, 0, 0) == 7.0 and warmup_lam(0.0, 3, 20) == 0.0)
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

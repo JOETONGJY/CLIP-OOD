@@ -76,9 +76,51 @@ assert abs(LD_ARMS["isda"]["anchor"] - 123.4769) < 5e-4 and abs(LD_CTRL["identit
     and abs(LD_CTRL["isda_grad"] - 97.3800) < 5e-4 and abs(LD_CTRL["randfull_same"] - LD_ARMS["lang_full"]["anchor"]) == 0.0 \
     and abs(LD_CTRL["pgd"] - LD_ARMS["lang_full"]["anchor"]) == 0.0, "第八臂对照标定值与 §3z 不一致"
 MTAG = {"0.5": "x0p5", "1": "x1", "2": "x2"}
+MTAG8 = dict(MTAG)
+MTAG8.update({"4": "x4", "8": "x8"})
 # 八臂共用 P1 的独立划分管线 (与 p1 矩阵完全相同的四个开关), 另加标定来源记录
 LD_P1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE,
          "--source_val_cache", AUG_CACHE, "--ld_calib", CALIB_JSON]
+
+# ---- 第十一轮 (外审指令; 预注册 RESULTS §3ad, 写于任何扩展/SDB run 之前) ----
+# P1 扩展: LD-Language-Full 与 Language-ISDA 各加 4×/8× (锚点 ×4/×8, 2 的幂 → 浮点精确); 其余配置固定。
+# P2 的 2×2: Original+DDO 复用 p1 矩阵的七剂量 (21 run, 已完成); SDB+DDO 七剂量; ISDA 沿用统一倍数网格
+# {0.5,1,2,4,8}×, SDB 侧用重新标定的锚点 (stage1c_calibration_sdb.json); Original+ISDA 复用 stage1c 的
+# x0p5/x1/x2 + 本矩阵的 x4/x8。SDB runs 带 --descriptor_bank (词库身份进可靠性缓存键与结果 json)。
+SDB_BANK = "prompts/banks/sdb-204-v1.json"
+SDB_CALIB = os.path.join(ROOT, "experiment_results", "Stage1C-Radius", "stage1c_calibration_sdb.json")
+with open(SDB_CALIB, encoding="utf-8") as _f:
+    _SCAL = json.load(_f)
+assert _SCAL["bank"]["bank_sha256"] == "5d98ecba21d015ad04b2a6a2e1b94dd8dcb59dcf02ca2cf8e9ef6e050f59cbb6", \
+    "SDB 标定引用的词库身份不对"
+assert abs(_SCAL["isda"]["anchor"] - 117.9194) < 5e-4, f"SDB λ_pen 锚点漂移: {_SCAL['isda']['anchor']}"
+assert abs(_SCAL["rho_bar_sdb"] - 0.148491) < 5e-6, f"SDB ρ̄_DDO 漂移: {_SCAL['rho_bar_sdb']}"
+SDB_P1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE,
+          "--source_val_cache", AUG_CACHE, "--descriptor_bank", SDB_BANK]
+
+
+def _ld_ext_entries():
+    out = []
+    for m in ("4", "8"):
+        out.append(("CUB", f"s1c_langfull_{MTAG8[m]}",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "ld", "--ld_ell", "lang_full",
+                             "--ld_eps", repr(float(LD_ARMS["lang_full"]["anchor"]) * int(m))] + LD_P1))
+        out.append(("CUB", f"s1c_isda_{MTAG8[m]}",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                             "--ld_lam", repr(float(LD_ARMS["isda"]["anchor"]) * int(m))] + LD_P1))
+    return out
+
+
+def _sdb22_entries():
+    out = []
+    for a, tag in DOSE:                                   # tag 已是 dose_a0 形式
+        out.append(("CUB", f"sdb_{tag}", EQUAL + ["--alpha", str(a)] + SDB_P1))
+    for m in ("0.5", "1", "2", "4", "8"):
+        out.append(("CUB", f"sdb_isda_{MTAG8[m]}",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                             "--ld_lam", repr(float(_SCAL["isda"]["anchor"]) * float(m)),
+                             "--ld_calib", SDB_CALIB] + SDB_P1))
+    return out
 
 
 def _ld_entries():
@@ -196,6 +238,11 @@ MATRICES = {
     # isda_grad / randfull_same / pgd 锚点)。19 个配置 × 3 seeds = 57 个 run; CE-Only / DDO α=1 / α=2 复用 P1 基线
     # (配置一致性由分析脚本核对)。先跑锚点 (x1) 再跑扫描 (§3z 的顺序), 驱动按完成状态跳过
     "stage1c": ("Stage1C-Training", _ld_entries()),
+    # 第十一轮 P1 扩展 (预注册 §3ad): Language-Full 与 ISDA 各加 4×/8× (Original 词库, 锚点不变), 4 配置 × 3 seeds
+    "s1c_ext": ("Stage1C-Training", _ld_ext_entries()),
+    # 第十一轮 P2 (预注册 §3ad): SDB-204 × {DDO 七剂量, ISDA 五强度}, 12 配置 × 3 seeds = 36 run。
+    # Original+DDO 复用 p1 的七剂量; Original+ISDA 复用 stage1c 的 x0p5/x1/x2 + s1c_ext 的 x4/x8
+    "sdb22": ("SDB-2x2", _sdb22_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -270,6 +317,25 @@ def _self_test_expected():
     e_r = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_randfull_same"][0][2], "CUB", 1, "s1c_randfull_same")
     e_l = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_langfull_x1"][0][2], "CUB", 1, "s1c_langfull_x1")
     assert e_r["ld_eps"] == e_l["ld_eps"] and e_r["ld_ell"] == "rand_full", (e_r, e_l)
+    # 第十一轮 (§3ad): 扩展扫描 4 配置; SDB 2×2 = 7 剂量 + 5 ISDA 强度 = 12 配置; SDB runs 带 --descriptor_bank
+    assert len(MATRICES["s1c_ext"][1]) == 4, len(MATRICES["s1c_ext"][1])
+    e = expected(COMMON + MATRICES["s1c_ext"][1][0][2], "CUB", 1, "s1c_langfull_x4")
+    assert (e["ld_mode"] == "ld" and e["ld_ell"] == "lang_full"
+            and float(e["ld_eps"]) == float(repr(float(LD_ARMS["lang_full"]["anchor"]) * 4))
+            and e["target_eval"] == "none" and e["save_head"] is True), e
+    e = expected(COMMON + MATRICES["s1c_ext"][1][3][2], "CUB", 1, "s1c_isda_x8")
+    assert e["ld_mode"] == "isda" and float(e["ld_lam"]) == float(repr(float(LD_ARMS["isda"]["anchor"]) * 8)), e
+    assert len(MATRICES["sdb22"][1]) == 12, len(MATRICES["sdb22"][1])
+    e = expected(COMMON + MATRICES["sdb22"][1][0][2], "CUB", 1, "sdb_dose_a0")
+    assert MATRICES["sdb22"][1][0][1] == "sdb_dose_a0"
+    assert (e["descriptor_bank"] == SDB_BANK and float(e["alpha"]) == 0.0 and e["weight_mode"] == "none"
+            and e["target_eval"] == "none" and e["train_subset_cache"] == AUG_CACHE), e
+    e = expected(COMMON + MATRICES["sdb22"][1][7][2], "CUB", 1, "sdb_isda_x0p5")
+    assert (e["ld_mode"] == "isda" and e["descriptor_bank"] == SDB_BANK
+            and float(e["ld_lam"]) == float(repr(float(_SCAL["isda"]["anchor"]) * 0.5))
+            and os.path.normpath(e["ld_calib"]) == os.path.normpath(SDB_CALIB)), e
+    e = expected(COMMON + MATRICES["sdb22"][1][11][2], "CUB", 1, "sdb_isda_x8")
+    assert float(e["ld_lam"]) == float(repr(float(_SCAL["isda"]["anchor"]) * 8)), e
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}

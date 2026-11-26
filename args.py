@@ -163,6 +163,9 @@ def get_args():
     parser.add_argument('--pgd_steps', type=int, default=5, help='PGD 臂训练搜索的步数 (ld_dro.pgd_train_loss)')
     parser.add_argument('--pgd_restarts', type=int, default=1, help='PGD 臂训练搜索的额外随机重启次数')
     parser.add_argument('--pgd_seed', type=int, default=0, help='PGD 臂训练搜索的种子 (固定, 逐 batch 可复现)')
+    parser.add_argument('--isda_warmup_epochs', type=int, default=0,
+                        help='ISDA 的线性 warmup 时长 (epoch 数): 前 W 个 epoch 的有效 λ = λ × (epoch+1)/W, '
+                             '之后恒为 λ。0=关闭 (默认, 行为不变; 外审第十一轮 P3 批准的独立消融用)')
     parser.add_argument('--ld_calib', type=str, default='',
                         help='标定 JSON 路径 (stage1c_calibration_traincore.py 的输出); 只做来源记录 (其 sha256 '
                              '写进结果 json 的 ld_config), 不参与任何计算')
