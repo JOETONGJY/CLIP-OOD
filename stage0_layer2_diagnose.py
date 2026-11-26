@@ -236,27 +236,52 @@ def regress(tab, norm_key, B, seed):
 
 
 def cache_consistency(new, old):
-    """两份干净特征的逐样本一致性 (外审第八轮: 不用"逐位一致"这类笼统说法, 直接报三个量)。
-    相对误差 = ‖new − old‖₂ / ‖old‖₂ (逐样本)。"""
+    """增强缓存的干净特征 (预计算时已 L2 归一化) 对训练缓存的逐样本一致性, 全部样本。
+    训练缓存存的是编码器的原始输出 —— **未归一化**, 归一化在模型 forward 里按 float32 做
+    (model/cbm_models.py: encode_image(...).float() / norm)。所以先把训练缓存按同样的方式归一化再比;
+    直接比原始张量只会得到尺度差 (行范数 16~21 对 1)。相对误差 = ‖new − old‖₂ / ‖old‖₂ (逐样本, 归一化后)。
+    外审第八轮: 不用"逐位一致"这类笼统说法, 直接报 torch.equal / 最大绝对误差 / 最大相对误差。"""
+    nf, of = new.float(), old.float()
+    old_norm = of.norm(dim=-1, keepdim=True)
     out = {"n_new": int(new.size(0)), "n_old": int(old.size(0)),
            "shape_equal": tuple(new.shape) == tuple(old.shape),
            "dtype_new": str(new.dtype), "dtype_old": str(old.dtype),
-           "torch_equal": bool(torch.equal(new, old))}
+           "old_is_l2_normalized": bool((old_norm - 1).abs().max() < 1e-2),
+           "old_row_norm_min": float(old_norm.min()), "old_row_norm_max": float(old_norm.max()),
+           "new_row_norm_min": float(nf.norm(dim=-1).min()), "new_row_norm_max": float(nf.norm(dim=-1).max())}
     if not out["shape_equal"]:
         return out
-    nf, of = new.float(), old.float()
-    diff = (nf - of).abs()
-    row_err, row_norm = diff.norm(dim=-1), of.norm(dim=-1)
+    ref = of if out["old_is_l2_normalized"] else of / old_norm   # 与模型 forward 相同: float32 下 L2 归一化 (已归一化则不重复做)
+    torch_equal_raw, torch_equal_norm = bool(torch.equal(new, old)), bool(torch.equal(nf.half(), ref.half()))
+    diff = (nf - ref).abs()
+    row_err, row_norm = diff.norm(dim=-1), ref.norm(dim=-1)
     rel = row_err / row_norm.clamp_min(1e-12)
-    cos = (nf * of).sum(-1) / (nf.norm(dim=-1) * row_norm).clamp_min(1e-12)
-    out.update({"n_equal_rows": int((row_err == 0).sum()),
+    cos = (nf * ref).sum(-1) / (nf.norm(dim=-1) * row_norm).clamp_min(1e-12)
+    out.update({"torch_equal": torch_equal_norm, "torch_equal_raw_tensors": torch_equal_raw,
+                "n_equal_rows": int((row_err == 0).sum()),
                 "frac_equal_elements": float((diff == 0).double().mean()),
                 "max_abs_error": float(diff.max()), "mean_abs_error": float(diff.mean()),
                 "max_rel_error_l2": float(rel.max()), "mean_rel_error_l2": float(rel.mean()),
                 "median_rel_error_l2": float(rel.median()),
+                "n_rows_rel_gt_1e-2": int((rel > 1e-2).sum()), "n_rows_rel_gt_1e-3": int((rel > 1e-3).sum()),
                 "min_cosine": float(cos.min()), "mean_cosine": float(cos.mean()),
-                "max_norm_dev_new": float((nf.norm(dim=-1) - 1).abs().max()),
-                "max_norm_dev_old": float((row_norm - 1).abs().max())})
+                "max_norm_dev_new": float((nf.norm(dim=-1) - 1).abs().max())})
+    return out
+
+
+def feature_source_impact(heads, z_new, z_old, E, labels):
+    """同一批分类头分别用两份干净特征评估 (其余计算完全相同), 差异有多大 —— 缓存不一致对结论的可见影响的上界。"""
+    u = {"new": layer_norm(z_new.double() @ E.T), "old": layer_norm(z_old.double() @ E.T)}
+    out = {"max_abs_acc_diff": 0.0, "max_abs_ce_diff": 0.0, "max_abs_logit_diff": 0.0, "n_heads": 0, "n_heads_with_acc_diff": 0}
+    for h in heads.values():
+        lg = {k: head_logits(v, h["classifier"]).detach() for k, v in u.items()}
+        acc = {k: float((v.argmax(1) == labels).double().mean()) for k, v in lg.items()}
+        ce = {k: float(torch.nn.functional.cross_entropy(v, labels)) for k, v in lg.items()}
+        out["max_abs_acc_diff"] = max(out["max_abs_acc_diff"], abs(acc["new"] - acc["old"]))
+        out["max_abs_ce_diff"] = max(out["max_abs_ce_diff"], abs(ce["new"] - ce["old"]))
+        out["max_abs_logit_diff"] = max(out["max_abs_logit_diff"], float((lg["new"] - lg["old"]).abs().max()))
+        out["n_heads"] += 1
+        out["n_heads_with_acc_diff"] += int(acc["new"] != acc["old"])
     return out
 
 
@@ -412,15 +437,21 @@ def write_report(res):
     add("## 增强缓存的干净特征与训练缓存的一致性（全部样本）")
     add("")
     add(f"`{AUG_CACHE}` 的 clean_feats 对 `{TRAIN_CACHE}` 的 feats（{cc.get('n_new')} 对 {cc.get('n_old')} 个样本，"
-        f"{cc.get('dtype_new')} 对 {cc.get('dtype_old')}）：")
+        f"{cc.get('dtype_new')} 对 {cc.get('dtype_old')}）。训练缓存存的是编码器的原始输出——未归一化，行范数 "
+        f"{cc.get('old_row_norm_min', nan):.1f}~{cc.get('old_row_norm_max', nan):.1f}，归一化在模型 forward 里按 float32 做；"
+        "所以下面是把它按同样方式归一化之后再比的：")
     add("")
     add(f"- `torch.equal` = **{cc.get('torch_equal')}**；完全相同的行 {cc.get('n_equal_rows')} / {cc.get('n_new')}，"
         f"完全相同的元素占 {100 * cc.get('frac_equal_elements', 0):.2f}%")
     add(f"- 最大绝对误差 {cc.get('max_abs_error', nan):.3e}（均值 {cc.get('mean_abs_error', nan):.3e}）")
     add(f"- 最大相对误差 ‖new − old‖₂ / ‖old‖₂ = {cc.get('max_rel_error_l2', nan):.3e}"
-        f"（中位数 {cc.get('median_rel_error_l2', nan):.3e}）；逐样本余弦最小 {cc.get('min_cosine', nan):.7f}")
-    add(f"- 标签逐项一致：{cc.get('labels_equal')}；范数偏离 1 的最大值：新 {cc.get('max_norm_dev_new', nan):.2e} / "
-        f"旧 {cc.get('max_norm_dev_old', nan):.2e}")
+        f"（中位数 {cc.get('median_rel_error_l2', nan):.3e}；超过 1e-2 的样本 {cc.get('n_rows_rel_gt_1e-2')} 个，超过 1e-3 的 "
+        f"{cc.get('n_rows_rel_gt_1e-3')} 个）；逐样本余弦最小 {cc.get('min_cosine', nan):.7f}")
+    hi = cc.get("head_impact", {})
+    add(f"- 标签逐项一致：{cc.get('labels_equal')}；新特征的范数偏离 1 的最大值 {cc.get('max_norm_dev_new', nan):.2e}")
+    add(f"- **对结论的可见影响**：{hi.get('n_heads')} 个分类头分别用两份干净特征在 heldout_val 上评估（其余计算完全相同），"
+        f"Acc 最大相差 {100 * hi.get('max_abs_acc_diff', nan):.2f} 个百分点（{hi.get('n_heads_with_acc_diff')} 个头有差异），"
+        f"CE 最大相差 {hi.get('max_abs_ce_diff', nan):.4f}，logit 最大绝对差 {hi.get('max_abs_logit_diff', nan):.3f}")
     add("")
     add("## 读法与边界")
     add("")
@@ -561,14 +592,29 @@ def self_test():
     check("S11f 一个 seed 方向相反 → 不满足逐 seed 一致 → 不支持", layer2_verdict(fake([big_neg, big_neg[:2] + [(0.08, 0.2)]], [(0.001, 0.0)] * 3), "fixed")["label"].startswith("初步证据不支持"))
 
     # ---- (c) 缓存一致性 ----
-    a_ = torch.randn(50, 8, dtype=torch.float16)
-    same = cache_consistency(a_, a_.clone())
-    check("S13a 相同张量: torch.equal = True 且误差为 0", same["torch_equal"] and same["max_abs_error"] == 0.0 and same["max_rel_error_l2"] == 0.0)
+    raw = (torch.randn(50, 8) * 20).half()                             # 训练缓存的存法: 未归一化的 fp16
+    a_ = (raw.float() / raw.float().norm(dim=-1, keepdim=True)).half()   # 增强缓存的存法: float32 归一化后存 fp16
+    same = cache_consistency(a_, raw)
+    check("S13a 同一批特征、两种存法: fp16 下 torch.equal = True, 差别只有 fp16 舍入 (尺度差不计入)",
+          same["torch_equal"] and same["max_abs_error"] < 1e-2 and same["old_is_l2_normalized"] is False
+          and same["torch_equal_raw_tensors"] is False)
+    sc = cache_consistency(a_, a_.clone())
+    check("S13d 完全相同的已归一化张量: 误差为 0", sc["old_is_l2_normalized"] and sc["torch_equal"]
+          and sc["max_abs_error"] == 0.0 and sc["max_rel_error_l2"] == 0.0)
     b_ = a_.clone(); b_[3, 2] += 0.5
-    diff_ = cache_consistency(a_, b_)
-    check("S13b 改动一个元素: torch.equal = False, 最大绝对误差 = 0.5, 相同行 49/50",
+    diff_ = cache_consistency(b_, a_)
+    check("S13b 新特征改动一个元素: torch.equal = False, 最大绝对误差 = 0.5, 相同行 49/50",
           (not diff_["torch_equal"]) and abs(diff_["max_abs_error"] - 0.5) < 1e-6 and diff_["n_equal_rows"] == 49)
-    check("S13c 形状不同时不比较数值", cache_consistency(a_, torch.zeros(10, 8))["torch_equal"] is False and "max_abs_error" not in cache_consistency(a_, torch.zeros(10, 8)))
+    check("S13c 形状不同时不比较数值", cache_consistency(a_, torch.zeros(10, 8))["shape_equal"] is False
+          and "max_abs_error" not in cache_consistency(a_, torch.zeros(10, 8)))
+    heads_ = {"h": {"classifier": {"1.weight": torch.ones(K, dtype=torch.float64), "1.bias": torch.zeros(K, dtype=torch.float64),
+                                   "2.weight": torch.randn(C, K, dtype=torch.float64), "2.bias": torch.zeros(C, dtype=torch.float64)}}}
+    z_ = torch.randn(40, K, dtype=torch.float64)
+    lab_ = torch.randint(0, C, (40,))
+    imp0 = feature_source_impact(heads_, z_, z_, torch.eye(K, dtype=torch.float64), lab_)
+    imp1 = feature_source_impact(heads_, z_, z_ + 0.05 * torch.randn(40, K, dtype=torch.float64), torch.eye(K, dtype=torch.float64), lab_)
+    check("S14 两份特征相同时影响量为 0; 特征被扰动时影响量非零",
+          imp0["max_abs_logit_diff"] == 0.0 and imp0["n_heads"] == 1 and imp1["max_abs_logit_diff"] > 0 and imp1["max_abs_ce_diff"] > 0)
 
     # ---- (c) 报告 ----
     res = {"arms": {}, "n_val": N, "created": "2026-11-26 00:00:00", "bootstrap_B": 300, "aug_names": ["p1", "p2", "p3"],
@@ -594,6 +640,7 @@ def self_test():
     res["verdict_0b_layer2"] = layer2_verdict(res, "fixed")
     res["verdict_0d"] = {"acc_optimal": "a2", "ce_optimal": "a1"}
     res["cache_consistency"] = cache_consistency(a_, a_)
+    res["cache_consistency"]["head_impact"] = imp0
     md = write_report(res)
     check("S12 报告包含 0D / 0B / 判定 / 缓存一致性四节", all(h in md for h in ("## 0D", "## 0B 第二层", "## 判定", "一致性")))
     check("S12b 报告里的数字来自结果 (判定标签出现, 且没有 nan 数值)",
@@ -665,6 +712,10 @@ def main():
     # ===== 3. 分类头 =====
     heads = load_heads()
     check(f"27 个分类头都已加载", len(heads) == 27, f"实际 {len(heads)}")
+    old_val = old["feats"][val_idx].float()
+    cc["head_impact"] = feature_source_impact(heads, clean_val, old_val / old_val.norm(dim=-1, keepdim=True), E, labels_val)
+    print(f"  两份干净特征对 27 个头评估的影响: Acc 最大差 {100 * cc['head_impact']['max_abs_acc_diff']:.2f} 个百分点, "
+          f"CE 最大差 {cc['head_impact']['max_abs_ce_diff']:.4f}, logit 最大绝对差 {cc['head_impact']['max_abs_logit_diff']:.3f}")
     ce_head = heads[(CE_ARM, 1)]
     fixed_comps = top_comps_class_avg(compute_logits(clean_val, ce_head, E).detach(), labels_val, n_classes)
 
