@@ -1,0 +1,104 @@
+外审第九轮（2026-11-26）各项检查的记录 —— 由脚本从各检查的原始输出中抽取, 未手写结论行。
+原始输出保存在本机 workspace (文件名见各节标题)。回归套件运行时的代码提交: 3e8e35a (其后只有结果提交, 没有代码改动)。
+
+回归套件的原始输出: workspace/final_regress_all.txt (首行: === 代码提交: 3e8e35a ===)
+
+== 1. 默认训练路径回归 (regress_default_path.py, REGRESS_BATCH=128; 留档是 batch 128 的冒烟, 必须带这个环境变量)
+  (没有匹配到任何行)
+
+== 2. 端到端检查 eng_fix_check.py (37 项) 与 eng_fix_check2.py (33 项)
+  ENG_FIX_CHECK: PASS
+  ENG_FIX_CHECK2: PASS
+  (eng_fix_check2 里带 '-> FAIL' 的行是'驱动把失败判定为失败'的预期输出, 所在的检查项本身是 OK)
+
+== 3. P1 管线专项检查 p1_e2e_check.py
+  OK   Q1 子集的第 i 行 == 完整缓存的第 idx[i] 行 (抽 52 行核对特征/标签/属性), 长度 4790
+  OK   Q3a 划分无重复、不相交、合起来 = 完整训练集
+  OK   Q3b 训练缓存与增强缓存的标签逐项一致 (5990 个, 下标可通用)
+  OK   Q2 从 cub_train.txt 用 seed 42 重新推导的划分与缓存里的完全相同 (标签序列也一致)
+  OK   Q7a 1-epoch 冒烟 run 正常完成 (退出码 0, 结果完整)
+  OK   Q7b 结果里记录的训练子集 = train_core (样本数 / 下标哈希 / 划分缓存哈希 / 标签与训练缓存一致)
+  OK   Q5 目标域特征缓存被移走时: --target_eval none 仍正常完成 (退出码 0)
+  OK   Q5b 同一配置换成 final_only: 因为读不到目标域缓存而失败 (非零退出), 证明两种模式的差别是真实的  [exit=1]
+  OK   Q5c 目标域特征缓存已放回原处, 哈希不变
+  OK   Q6 同一个 Stage 0 分类头: 新验证路径与 Stage 0D 诊断的干净 / 各扰动 Acc 相差 < 0.5 个百分点, 干净 CE 相差 < 0.01  [干净 0.0000, 扰动最大 0.0000, CE 6.79e-08]
+  OK   Q6b 增强均值 Acc 与诊断一致 (< 0.5 个百分点)  [59.214 vs 59.214]
+  P1-E2E: PASS
+
+== 4. 描述符库接口端到端检查 descriptor_bank_e2e_check.py
+  OK   R1 默认词库的 1-epoch run 正常完成 (退出码 0)
+  OK   R1b 结果 json 记录了词库身份: Original-204 (204 条目标模板, 身份与钉死的记录一致), 路径与缓存键  [{"bank_sha256": "bc4ba710ad72ff0fee814a9303d5fed1731ed02dcdecf1d7829f63f8f94c82de", "n_source": 1, "n_target": 204, "cache_key": "e3abc74fcd065d5f"
+  OK   R1c run_config 里记录了 --descriptor_bank 的取值
+  OK   R2 用 JSON 词库的 1-epoch run 正常完成
+  OK   R2b 文本相同的 JSON 词库: epoch 0 的权重张量与默认词库逐位相同
+  OK   R2c 源 / 目标精度、词库身份、缓存键都与默认词库相同
+  OK   R3 不合格的词库 (重复模板): 训练拒绝启动 (非零退出), 报错里写明原因, 不写结果 json  [exit=1]
+  OK   R4 预留但尚未提供的词库: 拒绝启动并写明'尚未提供', 不静默回退到 Original-204  [exit=1]
+  DESCRIPTOR_BANK_E2E: PASS
+
+== 5. 事后目标域评估与管线内评估的等价性 (eval_heads_targets.py --validate_stage0)
+  等价性验证: 27 / 27 个分类头逐位相同 (最大绝对差 0.000e+00)
+  VALIDATE: PASS
+  (逐个分类头的 27 行 OK 明细见原始输出)
+
+== 6. 描述符库现状审查 descriptor_bank_audit.py
+  OK  D2 认领自旧缓存的数值与旧文件逐位相同  [旧键 3ea993d3a8ced9f7]
+  OK  D3 缓存文件记录了词库身份 / 类别表 / 概念表 / CLIP 身份  [{"key": "e3abc74fcd065d5f", "legacy_key": "3ea993d3a8ced9f7", "bank_sha256": "bc4ba710ad72ff0fee814a9303d5fed1731ed02dcdecf1d7829f63f8f94c82de", "n_source": 1, "n_target": 204, 
+  OK  D4 domain_diffs 的形状 = (204, 200, 768)  [(204, 200, 768)]
+  AUDIT: PASS
+
+== 7. 各模块自测 (回归套件运行时的提交上)
+  concept_cancellation.py --selftest           PASS
+  stage0_diagnose.py --selftest                PASS
+  ld_dro.py                                    PASS
+  tests_projected_dirs.py                      PASS
+  tests_subspace_report.py                     PASS
+  stage0_layer2_diagnose.py --selftest         PASS
+  stage0_layer2_compare.py --selftest          PASS
+  language_ellipsoid.py                        PASS
+  descriptor_bank.py                           PASS
+  p1_independent_report.py --selftest          PASS
+  stage1c_radius_diagnose.py --selftest        PASS
+
+== 8. Stage 1C 半径诊断: 最终正式运行的核对项 (代码 3e8e35a; 预注册的 PGD 收敛检查未通过, 如实保留)
+  OK  三个初始化分类头与训练时的初始状态一致 (固定批次上的 CE = grad_diag 的 before_epoch1 记录)  [s1: 5.374850 对记录 5.374850; s2: 5.513198 对记录 5.513198; s3: 5.265450 对记录 5.265450]
+  OK  Language-Full / Language-32 / Identity 不随种子变化; Random-Full / Random-32 各个种子互不相同
+  OK  全部分类头都已就位 (每个 seed: 1 个初始化 + 9 个收敛)
+  OK  每个分类头的有效权重 (A, c) 都能复现它自己的 logits (最大绝对差 < 1e-2)  [3.19e-05]
+  OK  链 CE(0) ≤ PGD 下界 ≤ LD 上界 在全部 (分类头, 椭球, ε) 上成立
+  OK  各椭球的初始梯度比在网格上单调、二分时两端都夹住了目标  [lang_full: 单调 True, ε True, λ True; rand_full: 单调 True, ε True, λ True; lang32: 单调 True, ε True, λ True; rand32: 单调 True, ε True, λ True; identity: 单调 True, ε True, λ True]
+  BAD  PGD 收敛: 更强的 PGD 相对评估用 PGD 的增量在全部检查点上都满足判据  [最大平均增量 0.29748, 最大单样本增量 2.40542]
+  OK  LD 损失对公共 logit 平移严格不变 (差 < 1e-9); 原始 DDO 的损失发生变化
+  [saved] experiment_results\Stage1C-Radius/stage1c_radius_cub.json、.md  (耗时 441.4s)
+  EXIT=1
+
+== 9. Stage 1C 半径诊断: 事后补充的 PGD 收敛检查 (不在预注册范围内; 60 个检查点中 57 个收敛, 未收敛的 3 个都在 ε = ε_dom/16)
+  OK  三个初始化分类头与训练时的初始状态一致 (固定批次上的 CE = grad_diag 的 before_epoch1 记录)  [s1: 5.374850 对记录 5.374850; s2: 5.513198 对记录 5.513198; s3: 5.265450 对记录 5.265450]
+  OK  Language-Full / Language-32 / Identity 不随种子变化; Random-Full / Random-32 各个种子互不相同
+  OK  全部分类头都已就位 (每个 seed: 1 个初始化 + 9 个收敛)
+  OK  每个分类头的有效权重 (A, c) 都能复现它自己的 logits (最大绝对差 < 1e-2)  [3.19e-05]
+  BAD  事后补充检查: 全部检查点都满足收敛判据  [57/60; 最大平均增量 0.002072, 最大单样本增量 0.0639]
+  [saved] experiment_results\Stage1C-Radius/stage1c_radius_cub_conv_extra.json  (57/60 个检查点收敛)
+  EXIT=1
+
+== 10. P1 分析脚本自测 p1_independent_report.py --selftest (17 项)
+  SELFTEST: PASS
+
+== 11. P1 分析脚本的合成端到端测试 p1_e2e_synthetic.py
+  OK   E1 source 阶段成功写出选择结果
+  OK   E2 选择: α̂ = 2, 21 个 run, 无目标域信息
+  OK   E3 源域一侧把 α=4 识别为过正则化 (S_over = True)
+  OK   E4 md 报告含剂量表与选择结果
+  OK   E5 选择结果未提交时 final 拒绝运行 (退出码 2)
+  OK   E6 锁定之后但还没有目标域评估文件: 报错退出 (不是静默通过)
+  OK   E7 final 阶段成功
+  OK   E8 判定与合成数据相符: ρ=1, α̂=2=α*, R_sel=0, 追踪/可用/识别成功  [rho=1.0 α*=2.0 R=0.0 v={'tracks_target': True, 'selection_usable': True, 'better_than_clean_selection': True, 'beats_default_a1': True} over='识别成功' lock=e333deb3/e33
+  OK   E9 目标域 α=4 比最优低 1.5 个百分点, 源域同样低 1.5 个百分点
+  OK   E10 最终 md 含 Spearman / Regret / 判定三节
+  OK   E11 结果 json 在锁定后被改动: final 拒绝 (断言失败, 非零退出)
+  E2E-SYNTHETIC: PASS
+
+== 12. 描述符库加载入口自测 descriptor_bank.py
+  SELFTEST: PASS
+  (OK 项数: 24)
+
