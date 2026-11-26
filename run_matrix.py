@@ -12,6 +12,7 @@
 用法 (只想看进度时必须加 --dry_run; 2026-11-25 漏加过一次, 同一组 run 被两个进程同时跑):
   python run_matrix.py dose      [--seeds 1 2 3] [--dry_run] [--overwrite_run]
   python run_matrix.py subspace  ...
+  python run_matrix.py p1        ...          (P1 以 --target_eval none 训练, 见 RESULTS §3v)
 """
 import argparse
 import json
@@ -55,6 +56,9 @@ SUB_DIRS = {"mean": ["--ddo_dirs", "mean"],
             # 符号分布三个因素, 这一臂只改符号分布
             "fullsym": ["--ddo_dirs", "full_sym"]}
 ATAG = {0.125: "0p125", 0.25: "0p25", 0.5: "0p5", 1.0: "1", 2.0: "2", 4.0: "4", 8.0: "8"}
+
+# P1: 划分 (train_core / heldout_val, seed 42) 与验证用的增强特征都在这个缓存里 (cache/ 被 gitignore, 不入库)
+AUG_CACHE = os.path.join("cache", "CUB_train_aug.pt")
 
 
 def _random_dirs(k):
@@ -133,6 +137,14 @@ MATRICES = {
         for arm, dirs, k in (("full8", "full_bf", 8), ("split8", "split_bf", 8),
                              ("full32", "full_bf", 32), ("split32", "split_bf", 32))
         for a in ((0.5, 1.0, 2.0, 4.0) if k == 8 else (1.0, 2.0, 4.0, 8.0))]),
+    # ---- P1: Stage 0D 独立验证 (2026-11-26, 外审第九轮; 预注册 RESULTS §3v) ----
+    # 与 dose 矩阵同样的 7 个剂量 x 3 seeds, 配置相同, 另加: 只用 train_core (4790) 训练; 训练结束后在
+    # heldout_val (1200) 上评估干净 + 7 种扰动; --target_eval none (训练期间完全不评估目标域 —— 源域选择
+    # 结果提交锁定之后, 才用 --save_head 保存的分类头做事后评估, 见 eval_heads_targets.py)
+    "p1": ("Stage0D-Independent", [
+        ("CUB", f"p1_{tag}", EQUAL + ["--alpha", str(a), "--target_eval", "none", "--save_head",
+                                     "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE])
+        for a, tag in DOSE]),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -179,6 +191,14 @@ def _self_test_expected():
     assert len(MATRICES["mechanism"][1]) == 24, len(MATRICES["mechanism"][1])
     assert len(MATRICES["biasfree"][1]) == 16, len(MATRICES["biasfree"][1])       # 4 臂 x 4 剂量
     assert len(MATRICES["stage0"][1]) == 9, len(MATRICES["stage0"][1])
+    # P1: 完成判定与实际命令行是同一份 (COMMON + extra)。P1 在 COMMON 之后又给了 --target_eval none, argparse 与
+    # expected() 都取最后一个 -> none。(2026-11-26 自检抓到: 此前判定用的是 extra + COMMON, 会拿 final_only 去比对
+    # 实际按 none 训练的结果, 21 个 run 全被误判为失败。)
+    assert len(MATRICES["p1"][1]) == 7, len(MATRICES["p1"][1])
+    e = expected(COMMON + MATRICES["p1"][1][0][2], "CUB", 1, "p1_dose_a0")
+    assert (e["target_eval"] == "none" and e["save_head"] is True and e["alpha"] == "0.0" and e["weight_mode"] == "none"
+            and e["train_subset_cache"] == AUG_CACHE and e["source_val_cache"] == AUG_CACHE and e["epochs"] == "100"), e
+    assert expected(COMMON + MATRICES["p1"][1][4][2])["alpha"] == "1.0"
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
@@ -225,7 +245,7 @@ def main():
     if opt.dry_run:
         n_done = 0
         for ds, tag, extra, seed in jobs:
-            done = result_is_complete(path_of(ds, tag, seed), expected(extra + COMMON, ds, seed, tag))
+            done = result_is_complete(path_of(ds, tag, seed), expected(COMMON + extra, ds, seed, tag))
             n_done += done
             print(f"  {'[完成] ' if done else '[待跑] '}{ds}_{tag}_seed{seed}: {' '.join(extra)}")
         print(f"已完成 {n_done} / {len(jobs)}", flush=True)
@@ -251,13 +271,14 @@ def _drive(jobs, opt, log_dir, path_of, lock):
         lock.heartbeat()
         run_name = f"{ds}_{tag}_seed{seed}"
         path = path_of(ds, tag, seed)
-        exp = expected(extra + COMMON, ds, seed, tag)
+        argv = COMMON + extra                        # 实际执行的命令行; 完成判定必须用同一份 (见下方 expected)
+        exp = expected(argv, ds, seed, tag)
         if result_is_complete(path, exp) and not opt.overwrite_run:
             skipped += 1
             print(f"[skip {i + 1}/{len(jobs)}] {run_name}", flush=True)
             continue
         cmd = [PY, "-u", "main_cached.py", "--dataset", ds, "--seed", str(seed), "--run_tag", tag]
-        cmd += COMMON + extra + (["--overwrite_run"] if opt.overwrite_run else [])
+        cmd += argv + (["--overwrite_run"] if opt.overwrite_run else [])
         log = os.path.join(log_dir, run_name + ".log")
         print(f"[run  {i + 1}/{len(jobs)}] {run_name}  {time.strftime('%H:%M:%S')}", flush=True)
         with open(log, "w", encoding="utf-8") as f:

@@ -100,10 +100,19 @@ def get_args():
                         help="覆盖保护: 同名结果 json / 权重日志 / 检查点已存在时默认拒绝启动; "
                              "加上本开关才覆盖 (会先删除该 run 的旧结果与权重日志)")
     parser.add_argument('--target_eval', type=str, default='per_epoch',
-                        choices=['per_epoch', 'final_only'],
+                        choices=['per_epoch', 'final_only', 'none'],
                         help='目标域评估时机: per_epoch=每个 epoch 都评估 (历史默认); '
                              'final_only=目标域不参与训练与选模, 仅在最后一个 epoch 评估一次 (严格 final 协议; '
-                             'main_cached 入口在此模式下把目标域特征缓存延迟到最终评估时才读入)')
+                             'main_cached 入口在此模式下把目标域特征缓存延迟到最终评估时才读入); '
+                             'none=训练期间完全不评估目标域、不读取目标域特征缓存 (2026-11-26, P1: 源域选择规则与'
+                             '选择结果锁定之后, 再用 --save_head 保存的分类头做事后评估)')
+    # ---- P1: Stage 0D 独立验证 (2026-11-26, 外审第九轮; 预注册见 RESULTS.md §3v; 仅 main_cached 入口生效) ----
+    parser.add_argument('--train_subset_cache', type=str, default='',
+                        help='只用训练集的一个子集训练: 从该缓存读取 split["train_core"] 的样本下标 '
+                             '(cache/CUB_train_aug.pt 的 4790 个样本, seed 42 分层划分); 留空=完整训练集 (行为不变)')
+    parser.add_argument('--source_val_cache', type=str, default='',
+                        help='训练结束后在该缓存的 split["heldout_val"] (1200 个样本) 上评估: 干净特征 + 全部扰动特征, '
+                             '逐项 Acc 与 CE 写入结果 json 的 source_val (与目标域评估走同一条 forward 路径)')
     parser.add_argument('--grad_diag', action="store_true", default=False,
                         help='在固定 epoch 与固定批次上测量 CE 与本模型正则项、等权 DDO 损失对分类头的梯度范数比'
                              ' (含乘以 alpha 之后的实际范数比) 与夹角 (只读梯度, 不影响训练)')

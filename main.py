@@ -630,6 +630,10 @@ class TrainingSession:
         logger.info("[grad-diag %s] %s" % (tag, json.dumps(
             {k: round(v, 6) for k, v in rec.items() if isinstance(v, float)})))
 
+    def _evaluate_source_val(self):
+        """P1: 训练结束后在源域留出集 (干净 + 扰动) 上的评估。只有 main_cached 入口实现 (需要增强特征缓存)。"""
+        raise NotImplementedError("--source_val_cache 只在 main_cached 入口可用")
+
     def run(self):
         """训练入口。同名 run 的运行锁 (2026-11-25, 外审要求): 另一个进程正在跑同一个 run_name 时
         拒绝启动, 防止两个进程互相覆盖结果与权重日志; 正常结束、异常、中断都会释放锁。"""
@@ -693,6 +697,10 @@ class TrainingSession:
         # 措辞上的区分 (外审): 本开关保证的是"不评估"; main_cached 入口在此模式下把目标域特征缓存
         # 延迟到最终评估时才读入内存 (见 main_cached._LazyTargetLoader)。
         eval_target_every_epoch = getattr(self.args, 'target_eval', 'per_epoch') == 'per_epoch'
+        # P1 (2026-11-26): --target_eval none —— 训练期间完全不评估目标域 (目标域结果只在源域选择锁定后,
+        # 用已保存的分类头做事后评估, 见 eval_heads_targets.py)
+        eval_target_none = getattr(self.args, 'target_eval', 'per_epoch') == 'none'
+        self.source_val = None
 
         try:
             for epoch in range(self.args.epochs):
@@ -707,7 +715,7 @@ class TrainingSession:
                 source_metrics = self._evaluate(self.source_test_loader, 'source')
                 is_last = self._selection_epoch(epoch, self.args.epochs)
                 target_metrics = (self._evaluate(self.target_test_loader, 'target')
-                                  if (eval_target_every_epoch or is_last) else None)
+                                  if ((eval_target_every_epoch or is_last) and not eval_target_none) else None)
 
                 # domain 权重诊断 (每 epoch): r/δ/prior_w/final_w/H(q)/max/min/std/Δw
                 weight_diagnostics = self._log_domain_weights(epoch)
@@ -729,7 +737,7 @@ class TrainingSession:
                 if is_last:
                     self.selected_metrics = {
                         'source_acc': source_metrics['source_acc'],
-                        'target_acc': target_metrics['target_acc'],
+                        'target_acc': target_metrics['target_acc'] if target_metrics is not None else None,
                         'epoch': epoch,
                         'protocol': self.args.model_selection,
                     }
@@ -737,7 +745,7 @@ class TrainingSession:
                         torch.save(self.model.state_dict(),
                                    f"best_{self.args.dataset}_sel{self.args.model_selection}.pth")
                     self.final_metrics = {'source': dict(source_metrics),
-                                          'target': dict(target_metrics)}
+                                          'target': (dict(target_metrics) if target_metrics is not None else None)}
 
                 # 2026-11-25: 逐 epoch 的平均损失与源域验证 CE (目标域精度仅在评估过的 epoch 记录)
                 # 两个 DDO 字段口径不同 (外审第四轮指出旧字段 ddo_eq 名不副实, 已改名):
@@ -788,6 +796,11 @@ class TrainingSession:
 
             if getattr(self.args, 'grad_diag', False):
                 self._grad_diag("final")
+
+            # P1 (2026-11-26): 源域增强验证 —— heldout_val 上的干净 + 扰动 Acc / CE。放在训练与梯度诊断之后;
+            # 与目标域评估是互不相干的两步: --target_eval none 时上面从未读过目标域特征缓存
+            if getattr(self.args, "source_val_cache", ""):
+                self.source_val = self._evaluate_source_val()
 
         except KeyboardInterrupt:
             # 2026-11-25: 中断的 run 不得留下"部分训练"的结果 json; 原样上抛, 由外层处理
@@ -852,11 +865,12 @@ class TrainingSession:
                 with torch.no_grad():
                     ddo_eq_final = self._ddo_loss_equal_weight()
                 fm = self.final_metrics or {}
+                ft = fm.get('target') or {}                 # --target_eval none 时为 None
                 final_diag = {
                     'source_acc': fm.get('source', {}).get('source_acc'),
                     'source_ce': fm.get('source', {}).get('source_cls_loss'),
-                    'target_acc': fm.get('target', {}).get('target_acc'),
-                    'target_ce': fm.get('target', {}).get('target_cls_loss'),
+                    'target_acc': ft.get('target_acc'),
+                    'target_ce': ft.get('target_cls_loss'),
                     'ddo_eq': float(ddo_eq_final) if ddo_eq_final is not None else None,
                 }
             sel = self.selected_metrics or {}
@@ -892,6 +906,10 @@ class TrainingSession:
                 # 2026-11-25 (外审): 实际构造的训练方向集 (类型 / 行数 / k / 谱能量占比 / 随机标架种子)
                 # 与方向张量的 sha256 —— 不能只凭命令行参数反推模型里约束的是哪一组方向
                 'ddo_dirs_info': getattr(self.model, 'ddo_dirs_info', None),
+                # P1 (2026-11-26): 源域增强验证 (heldout_val 上干净 + 每种扰动的 Acc / CE) 与训练子集的来源记录
+                # (两者都只含 float / int / str / None, 可直接写 json; run_status.jsonable 只处理标量, 不能用来包字典)
+                'source_val': getattr(self, "source_val", None),
+                'train_subset': getattr(self, "train_subset_info", None),
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},
@@ -913,8 +931,13 @@ class TrainingSession:
             logger.info("Training Completed")
             logger.info(f"Protocol: {sel_mode}")
             if sel_mode == 'final' and sel:
-                logger.info(f"[selected@final] Source {sel['source_acc']:.2f}% | "
-                            f"Target {sel['target_acc']:.2f}% (严格DG主指标)")
+                if sel.get('target_acc') is not None:
+                    logger.info(f"[selected@final] Source {sel['source_acc']:.2f}% | "
+                                f"Target {sel['target_acc']:.2f}% (严格DG主指标)")
+                else:
+                    # --target_eval none: 目标域不在这里评估; 源域选择锁定后用 logs/heads/ 的分类头做事后评估
+                    logger.info(f"[selected@final] Source {sel['source_acc']:.2f}% | "
+                                f"Target 未评估 (--target_eval none; 事后评估用 eval_heads_targets.py)")
             logger.info(f"Best(Source-or-target监视) Source {self.best_metrics['source_acc']:.2f}% | "
                         f"Target {self.best_metrics['target_acc']:.2f}% (仅对照)")
             logger.info("=" * 60)
