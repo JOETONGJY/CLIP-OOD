@@ -266,6 +266,25 @@ def self_test():
           bool((b2 >= b1 - 1e-5).all() and (b1 >= ce0 - 1e-5).all()), f"平均增量 {float((b2 - b1).mean()):.4f}")
     check("W15 ε=0 时 PGD 退化为 CE", torch.equal(pgd_worst_per_sample(logits[:30], M, y[:30], 0.0, 5, 2, 0), ce0))
 
+    # ---- 共享会话: 每个头存下的 (A, c) 必须是它自己的 (2026-11-26 的首次正式运行在这里出过错) ----
+    import types
+    sess = types.SimpleNamespace(model=torch.nn.Module())
+    sess.model.classifier = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.LayerNorm(K), torch.nn.Linear(K, C))
+    stored = []
+    for _ in range(3):                                            # 同一个会话先后加载 3 个不同的头
+        with torch.no_grad():
+            for p_ in sess.model.classifier.parameters():
+                p_.copy_(torch.randn_like(p_))
+        stored.append(head_state(sess))
+    own = all(torch.equal(stored[i]["A"], stored[i]["A"].clone()) and all(
+        not torch.equal(stored[i]["A"], stored[j]["A"]) for j in range(3) if j != i) for i in range(3))
+    x_ = ln0(torch.randn(20, K))
+    repro = all(float((x_ @ H["A"].T + H["c"] - H["sess"].model.classifier(x_)).abs().max()) > 0.0 for H in stored[:2])  # 会话里已是最后一个头
+    rec2 = x_ @ stored[2]["A"].T + stored[2]["c"]
+    last_ok = float((rec2 - sess.model.classifier(x_)).abs().max()) < 1e-5 * (1 + float(rec2.abs().max()))   # 相对容差
+    check("W16 同一会话先后加载多个头: 每个头存下的 (A, c) 互不相同, 且最后一个能复现会话当前的输出 (之前的头不再能)",
+          own and repro and last_ok)
+
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -299,12 +318,12 @@ def build_session(cfg, seed):
     return _NoTargetSession(argparse.Namespace(**c))
 
 
-def head_state(sess, bias_free=False):
+def head_state(sess):
     """分类头的有效权重 A = W⊙γ 与偏置 c = W·β + b, 在加载之后立刻单独存一份 (clone)。
     同一结构的多个分类头共用一个会话对象, 会话里的分类头会被下一个头覆盖 —— 之后再用会话去取就拿到了别人的。
-    无偏置路径 (full_bf / split_bf) 的 logits 里没有偏置, c 记为 0。"""
+    注意: --ddo_dirs full_bf / split_bf 的"无偏置"只作用于 DDO 正则项的损失路径, 分类头的前向始终带偏置。"""
     A, c = effective_response(sess.model.classifier)
-    return {"sess": sess, "A": A.detach().clone(), "c": (torch.zeros_like(c) if bias_free else c.detach().clone())}
+    return {"sess": sess, "A": A.detach().clone(), "c": c.detach().clone()}
 
 
 def _sha(path):
@@ -400,7 +419,7 @@ def prepare(device, check):
     heads = {}
     for s in SEEDS:
         sess = init_sess[s]
-        heads[("init", s)] = {**head_state(sess, False), "logits": logits_of(sess), "sha": None, "ddo_dirs": "full"}
+        heads[("init", s)] = {**head_state(sess), "logits": logits_of(sess), "sha": None, "ddo_dirs": "full"}
     conv_sess, head_sha = {}, {}
     for arm in ARMS:
         for s in SEEDS:
@@ -411,8 +430,7 @@ def prepare(device, check):
                 conv_sess[key] = build_session(h["run_config"], 1)
             sess = conv_sess[key]
             sess.model.classifier.load_state_dict(h["classifier"], strict=True)
-            bf = h["run_config"].get("ddo_dirs") in ("full_bf", "split_bf")      # 无偏置路径: logits 里没有偏置
-            heads[(arm, s)] = {**head_state(sess, bf), "logits": logits_of(sess), "ddo_dirs": h["run_config"].get("ddo_dirs")}
+            heads[(arm, s)] = {**head_state(sess), "logits": logits_of(sess), "ddo_dirs": h["run_config"].get("ddo_dirs")}
             head_sha[f"{arm}|{s}"] = _sha(path)
     check("全部分类头都已就位 (每个 seed: 1 个初始化 + 9 个收敛)", len(heads) == len(SEEDS) * (1 + len(ARMS)))
     # 一致性核对: 每个头存下的有效权重 (A, c) 必须能复现它自己的 logits —— 同一结构的多个头共用会话时,
@@ -654,7 +672,7 @@ def write_report(res):
     cal, dom, vis, table = res["calibration"], res["dom"], res["vis"], res["table"]
     L = [f"# Stage 1C 半径诊断（LD-DRO；CUB；{res['created'][:10]}）", "",
          "预注册见 `RESULTS.md` §3x。只用文本与源域数据；收敛分类头只用于事后量级诊断，初始强度配平只用 3 个初始化分类头。"
-         "评估样本：heldout_val 的 1200 个干净特征；PGD 只在前 400 个样本上做。本文件由脚本从同一份 JSON 生成。", "",
+         f"评估样本：heldout_val 的 1200 个干净特征；PGD 只在前 {N_PGD} 个样本上做。本文件由脚本从同一份 JSON 生成。", "",
          "## 1. 量纲锚点", "",
          f"- K = {res['K']}；G 的迹 = {_f(res['tr_G'], 4)}；均值能量占比 = {_f(res['eta_mean'], 4)}",
          f"- **ε_dom（Language-Full）= {_f(res['eps_dom_lang_full'], 2)}**：实际域方向 u = LN0(E·d) 在语言椭球内的白化半径（均方根，3 个随机种子的平均对 Language / Identity 即其自身）",
@@ -728,7 +746,8 @@ def write_report(res):
           "- ε 网格只是覆盖量级的采样；真正用于配平的是连续求出的 ε_grad / ε_pen / λ_grad / λ_pen。",
           "- 初始化分类头的间隔本身没有意义（随机），它们只用来度量惩罚与梯度的量级；间隔与翻转率看收敛分类头。",
           "- 收敛分类头是在完整训练集上训练的，heldout_val 的样本对它们是训练集内样本；这里只做量级诊断，不做任何判定。",
-          "- 27 个收敛头在完整训练集上训练，固定批次 (train_core 前 256 个) 对它们同样是训练集内样本。",
+          "- 固定批次 (train_core 的前 256 个样本) 只用于 3 个初始化头的梯度比，不涉及收敛头。",
+          "- 预注册的 PGD 收敛检查没有全部通过: 未收敛的检查点在报告里列出, 那里的 PGD 下界只能读作\"可能偏低\", gap 不能单独归因于上界松。",
           "- LD 交叉熵是闭式上界，PGD 是数值下界；gap 是上下界之间的距离，不是已知真值后的误差。大的 ε 下上界会很松。",
           "- 扰动发生在 LayerNorm 之后、affine 之前的概念空间：不满足真实图像的可达性约束，不能据此声称对真实域偏移有认证鲁棒性。",
           "- ε_dom / ε_vis 是文本域方向、源域光度扰动在椭球内的白化半径，只说明椭球的量纲，不代表目标域偏移的大小。", ""]
