@@ -1,0 +1,190 @@
+{
+ "created": "2026-11-26 17:02:27",
+ "code": {
+  "commit": "895726576c7a1235cc32e49541418bc121c25178",
+  "dirty": true
+ },
+ "device": "cuda",
+ "note": "统一 train_core 固定批次的初始强度标定（外审第十轮 P2 收尾第 4 项）。与 §3y 的差别只在 r_max 统计的样本集（heldout_val → train_core 前 256）；梯度配平逐项一致（核对见 checks）。",
+ "old_json_sha256": "959448101fc9a70f881e05181aae87034bccfc37fc85936a753931583a927905",
+ "fixed_batch": "train_core 的前 256 个样本（与训练时 grad_diag 的诊断批次相同）",
+ "equations": {
+  "rho_bar": "3 个初始化头上等权 DDO (α=1) 正则梯度比均值",
+  "eps_grad": "LD 正则部分梯度比 = rho_bar 的 eps（二分）",
+  "P_star_tc": "eps_grad(lang_full) * r_max_mean_tc(lang_full)",
+  "eps_pen": "P_star_tc / r_max_mean_tc(e)",
+  "lam_pen": "2 * P_star_tc / r_max_sq_mean_tc(e)"
+ },
+ "rho_ddo": {
+  "1": 0.1039930060505867,
+  "2": 0.10486067831516266,
+  "3": 0.10591354221105576
+ },
+ "cos_ddo": {
+  "1": 0.012748329900205135,
+  "2": 0.02340659685432911,
+  "3": 0.008731766603887081
+ },
+ "rho_bar": 0.10492240885893504,
+ "p_star": 0.4479858000804171,
+ "r_max_mean_tc": {
+  "lang_full": 0.08380045493443807,
+  "rand_full": 0.08390000214179356,
+  "lang32": 0.08476700882116954,
+  "rand32": 0.09272709488868713,
+  "identity": 0.049929278592268624
+ },
+ "r_max_sq_mean_tc": {
+  "lang_full": 0.007256186877687772,
+  "rand_full": 0.007152813021093607,
+  "lang32": 0.0074307249548534555,
+  "rand32": 0.008823584609975418,
+  "identity": 0.0024935034258912006
+ },
+ "r_max_mean_heldout_ref": {
+  "lang_full": 0.08466223378976186,
+  "rand_full": 0.08427700151999791,
+  "lang32": 0.08564421534538269,
+  "rand32": 0.0894949013988177,
+  "identity": 0.050090583662192024
+ },
+ "calibration": {
+  "lang_full": {
+   "eps_grad": 5.345863580703735,
+   "eps_grad_bracketed": true,
+   "lam_grad": 97.37995529174803,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.07662537693977356,
+   "eps_pen": 5.345863580703735,
+   "lam_pen": 123.47691911241694
+  },
+  "rand_full": {
+   "eps_grad": 5.474682569503784,
+   "eps_grad_bracketed": true,
+   "lam_grad": 101.31219863891603,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.021142916521057487,
+   "eps_pen": 5.339520722816043,
+   "lam_pen": 125.26143176378564
+  },
+  "lang32": {
+   "eps_grad": 5.181202173233032,
+   "eps_grad_bracketed": true,
+   "lam_grad": 94.19849777221678,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.07661812628308932,
+   "eps_pen": 5.2849074930262026,
+   "lam_pen": 120.57660667087684
+  },
+  "rand32": {
+   "eps_grad": 4.6926891803741455,
+   "eps_grad_bracketed": true,
+   "lam_grad": 81.35428237915039,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": -0.005996524666746457,
+   "eps_pen": 4.8312286782864815,
+   "lam_pen": 101.54281278698254
+  },
+  "identity": {
+   "eps_grad": 37.3652286529541,
+   "eps_grad_bracketed": true,
+   "lam_grad": 807.1963195800782,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.06763729453086853,
+   "eps_pen": 8.972406826438428,
+   "lam_pen": 359.32238586783006
+  }
+ },
+ "arms": {
+  "lang_full": {
+   "anchor": 5.345863580703735,
+   "scan": {
+    "0.5": 2.6729317903518677,
+    "1": 5.345863580703735,
+    "2": 10.69172716140747
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "rand_full": {
+   "anchor": 5.339520722816043,
+   "scan": {
+    "0.5": 2.6697603614080214,
+    "1": 5.339520722816043,
+    "2": 10.679041445632086
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "lang32": {
+   "anchor": 5.2849074930262026,
+   "scan": {
+    "0.5": 2.6424537465131013,
+    "1": 5.2849074930262026,
+    "2": 10.569814986052405
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "identity": {
+   "anchor": 8.972406826438428,
+   "scan": {
+    "0.5": 4.486203413219214,
+    "1": 8.972406826438428,
+    "2": 17.944813652876856
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "isda": {
+   "anchor": 123.47691911241694,
+   "scan": {
+    "0.5": 61.73845955620847,
+    "1": 123.47691911241694,
+    "2": 246.95383822483387
+   },
+   "equation": "lam_pen (train_core 固定批次)"
+  }
+ },
+ "controls": {
+  "identity_grad": 37.3652286529541,
+  "isda_grad": 97.37995529174803,
+  "randfull_same": 5.345863580703735,
+  "pgd": 5.345863580703735
+ },
+ "mults": [
+  0.5,
+  1.0,
+  2.0
+ ],
+ "ell_sha256": {
+  "1|full": {
+   "language": "a0dc61684d701cee",
+   "random": "46b09b98ede51143",
+   "identity": "1aea801f91137499"
+  },
+  "1|r32": {
+   "language": "877ce3929071c0c6",
+   "random": "c952ff88f3449c8d",
+   "identity": "1aea801f91137499"
+  },
+  "2|full": {
+   "language": "a0dc61684d701cee",
+   "random": "2abaa2c87b3bf9c5",
+   "identity": "1aea801f91137499"
+  },
+  "2|r32": {
+   "language": "877ce3929071c0c6",
+   "random": "01da97484390642f",
+   "identity": "1aea801f91137499"
+  },
+  "3|full": {
+   "language": "a0dc61684d701cee",
+   "random": "b63e33a5cd9023f2",
+   "identity": "1aea801f91137499"
+  },
+  "3|r32": {
+   "language": "877ce3929071c0c6",
+   "random": "eb25019a725548ab",
+   "identity": "1aea801f91137499"
+  }
+ },
+ "all_checks_passed": true,
+ "elapsed_seconds": 95.8
+}
