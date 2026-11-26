@@ -142,6 +142,30 @@ def get_args():
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')
+    # ---- LD-DRO / ISDA / PGD 训练臂 (2026-11-26, 外审第十轮批准; 预注册 RESULTS §3z; 仅 clip_cbm + 等权下定义) ----
+    parser.add_argument('--ld_mode', type=str, default='none', choices=['none', 'ld', 'isda', 'pgd'],
+                        help='训练损失的鲁棒项: none=原始 DDO 正则 (默认, 行为不变); ld=LD-DRO 闭式上界 '
+                             '(logits + eps*r_yk); isda=ISDA Jensen 上界 (logits + (lam/2)*r_yk^2); '
+                             'pgd=两段式训练损失 (ld_dro.pgd_train_loss: detach 搜索 + 固定扰动重算)。LD 臂下训练'
+                             '损失就是该鲁棒 CE (eps=0/lam=0 严格退化回 CE), 不叠加原始 DDO 正则 (入口要求 alpha=0/'
+                             'weight_mode=none/ddo_dirs=full/beta=0); 评估始终用干净 logits')
+    parser.add_argument('--ld_eps', type=float, default=0.0,
+                        help='LD / PGD 臂的扰动半径 eps (椭球 {L q : ||q||_2 <= eps}, 生成元 L 由 --ld_ell 决定; '
+                             '取值来自 stage1c_calibration_traincore.py 的统一批次标定, 冻结于 RESULTS §3z)')
+    parser.add_argument('--ld_lam', type=float, default=0.0,
+                        help='ISDA 臂的高斯扰动强度 lam (Jensen 上界的平方惩罚系数; 与 eps 不同量纲, 不取同值)')
+    parser.add_argument('--ld_ell', type=str, default='lang_full',
+                        choices=['lang_full', 'lang32', 'rand_full', 'rand32', 'identity'],
+                        help='椭球 (language_ellipsoid.build_ellipsoids, 迹归一化, 限制在零均值超平面): '
+                             'lang_full=G 的前 K-1 个特征对; lang32=截断 r=32; rand_full/rand32=同谱随机正交基 '
+                             '(种子候选 s/+10/+20/+30, 与 Stage 1C 半径诊断同一规则, 实际使用的种子与生成元 sha256 '
+                             '写进结果 json); identity=H/(K-1)')
+    parser.add_argument('--pgd_steps', type=int, default=5, help='PGD 臂训练搜索的步数 (ld_dro.pgd_train_loss)')
+    parser.add_argument('--pgd_restarts', type=int, default=1, help='PGD 臂训练搜索的额外随机重启次数')
+    parser.add_argument('--pgd_seed', type=int, default=0, help='PGD 臂训练搜索的种子 (固定, 逐 batch 可复现)')
+    parser.add_argument('--ld_calib', type=str, default='',
+                        help='标定 JSON 路径 (stage1c_calibration_traincore.py 的输出); 只做来源记录 (其 sha256 '
+                             '写进结果 json 的 ld_config), 不参与任何计算')
     args = parser.parse_args()
 
     return args

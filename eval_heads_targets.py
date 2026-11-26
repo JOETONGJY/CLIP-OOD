@@ -16,6 +16,7 @@ cache/<ds>_target_test.pt 上评估。不另写一套前向计算。
 用法:
   python eval_heads_targets.py --validate_stage0                    # 等价性验证 (27 个 Stage 0 分类头)
   python eval_heads_targets.py [--seeds 1 2 3]                      # P1: 矩阵 p1 的 7 个剂量 (先检查选择已锁定)
+  python eval_heads_targets.py --stage1c [--seeds 1 2 3]            # Stage 1C 八臂 (预注册 §3z; 门是 s1c 的选择文件)
 """
 import argparse
 import hashlib
@@ -39,6 +40,7 @@ from run_status import git_info  # noqa: E402
 
 OUT_DIR = os.path.join("experiment_results", "Stage0D-Independent")
 SELECT_JSON = os.path.join(OUT_DIR, "p1_source_selection.json")
+SEL1C_JSON = os.path.join("experiment_results", "Stage1C-Training", "s1c_source_selection.json")
 # 不影响模型结构的配置项: 这些不同也共用同一个重建的模型 (只换分类头)
 KEY_SKIP = {"run_tag", "seed", "alpha", "epochs", "lr", "weight_decay", "target_eval", "save_head", "grad_diag",
             "save_model", "overwrite_run", "train_subset_cache", "source_val_cache", "device", "wandb"}
@@ -148,13 +150,56 @@ def validate_stage0(seeds):
     return 0 if ok and n > 0 else 1
 
 
+def eval_stage1c(seeds):
+    """Stage 1C 八臂 (预注册 RESULTS §3z) 的事后目标域评估: 与 P1 同一套流程, 门是 s1c 的源域选择文件。
+    CE-Only / DDO α=1 / α=2 三个基线不在这里重评 —— 复用 P1 的事后评估 (p1_target_eval.json)。"""
+    from run_matrix import MATRICES
+    locked, why = selection_is_locked(SEL1C_JSON)
+    if not locked:
+        print("拒绝运行: Stage 1C 的源域选择结果尚未锁定 —— " + why)
+        print("必须先运行 stage1c_training_report.py --stage source 并提交其输出, 再做事后目标域评估。")
+        return 2
+    ev = HeadEvaluator()
+    heads = {}
+    for ds, tag, _ in MATRICES["stage1c"][1]:
+        for s in seeds:
+            run = f"{ds}_{tag}_seed{s}"
+            heads[run] = ev.evaluate(f"logs/heads/{run}.pt", f"logs/results/{run}.json")
+    with open(SEL1C_JSON, encoding="utf-8") as f:
+        sel = json.load(f)
+
+    def same(r):
+        v, w = heads[r], sel["runs"].get(r, {})
+        return bool(w) and w.get("head_sha256") == v["head_sha256"] and w.get("result_sha256") == v["result_sha256"]
+
+    mismatched = [r for r in sorted(set(heads) | set(sel["runs"])) if r not in heads or not same(r)]
+    if mismatched:
+        print("拒绝: 以下 run 的分类头或结果 json 与源域选择锁定时的不一致 (或数量不同): " + ", ".join(mismatched))
+        return 3
+    os.makedirs(os.path.dirname(SEL1C_JSON), exist_ok=True)
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "selection_lock_commit": why,
+           "selection_sha256": sha256_file(SEL1C_JSON), "target_cache": ev.target_meta, "heads": heads}
+    out_path = os.path.join(os.path.dirname(SEL1C_JSON), "s1c_target_eval.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"选择锁定于提交 {why[:7]}; 评估了 {len(heads)} 个分类头; 目标域 {ev.target_meta['n']} 个样本")
+    for ds, tag, _ in MATRICES["stage1c"][1]:
+        accs = [heads[f"{ds}_{tag}_seed{s}"]["target_acc"] for s in seeds]
+        print(f"  {tag:22s} 目标域 Acc: " + " / ".join(f"{x:.2f}" for x in accs))
+    print(f"[saved] {out_path}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate_stage0", action="store_true")
+    ap.add_argument("--stage1c", action="store_true")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     a = ap.parse_args()
     if a.validate_stage0:
         return validate_stage0(a.seeds)
+    if a.stage1c:
+        return eval_stage1c(a.seeds)
 
     locked, why = selection_is_locked()
     if not locked:

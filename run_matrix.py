@@ -60,6 +60,53 @@ ATAG = {0.125: "0p125", 0.25: "0p25", 0.5: "0p5", 1.0: "1", 2.0: "2", 4.0: "4", 
 # P1: 划分 (train_core / heldout_val, seed 42) 与验证用的增强特征都在这个缓存里 (cache/ 被 gitignore, 不入库)
 AUG_CACHE = os.path.join("cache", "CUB_train_aug.pt")
 
+# ---- Stage 1C 八臂 (2026-11-26, 外审第十轮批准; 预注册 RESULTS §3z, 写于任何 stage1c run 之前) ----
+# ε / λ 从统一批次标定 (stage1c_calibration_traincore.py 的输出, 已提交) 里取完整精度值 —— 不手抄数字。
+# 方程 (§3z): LD 四个几何臂 = eps_pen (同初始最大类别对惩罚, Identity-H 主口径); ISDA = lam_pen;
+# 对照: Identity-H 的梯度配平 eps_grad、ISDA 的梯度配平 lam_grad、Random-Full 与 Language-Full 完全同半径;
+# PGD 锚点与 LD-Language-Full ×1 完全同半径 (梯度配平口径与它一致到 4 位小数, 取同半径比较)。
+CALIB_JSON = os.path.join(ROOT, "experiment_results", "Stage1C-Radius", "stage1c_calibration_traincore.json")
+with open(CALIB_JSON, encoding="utf-8") as _f:
+    _CAL = json.load(_f)
+LD_ARMS, LD_CTRL = _CAL["arms"], _CAL["controls"]
+# 冻结值的钉子 (导入时核对, 防止标定文件被改动后矩阵悄悄变化; 4 位小数来自 §3z 的表)
+for _e, _want in (("lang_full", 5.3459), ("rand_full", 5.3395), ("lang32", 5.2849), ("identity", 8.9724)):
+    assert abs(LD_ARMS[_e]["anchor"] - _want) < 5e-4, f"标定值漂移: {_e} = {LD_ARMS[_e]['anchor']}, §3z 冻结 {_want}"
+assert abs(LD_ARMS["isda"]["anchor"] - 123.4769) < 5e-4 and abs(LD_CTRL["identity_grad"] - 37.3652) < 5e-4 \
+    and abs(LD_CTRL["isda_grad"] - 97.3800) < 5e-4 and abs(LD_CTRL["randfull_same"] - LD_ARMS["lang_full"]["anchor"]) == 0.0 \
+    and abs(LD_CTRL["pgd"] - LD_ARMS["lang_full"]["anchor"]) == 0.0, "第八臂对照标定值与 §3z 不一致"
+MTAG = {"0.5": "x0p5", "1": "x1", "2": "x2"}
+# 八臂共用 P1 的独立划分管线 (与 p1 矩阵完全相同的四个开关), 另加标定来源记录
+LD_P1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE,
+         "--source_val_cache", AUG_CACHE, "--ld_calib", CALIB_JSON]
+
+
+def _ld_entries():
+    out = []
+    for ell, tag in (("lang_full", "langfull"), ("rand_full", "randfull"), ("lang32", "lang32"), ("identity", "identity")):
+        for m, mt in MTAG.items():
+            out.append(("CUB", f"s1c_{tag}_{mt}",
+                        EQUAL + ["--alpha", "0", "--ld_mode", "ld", "--ld_ell", ell,
+                                 "--ld_eps", repr(float(LD_ARMS[ell]["scan"][m]))] + LD_P1))
+    for m, mt in MTAG.items():
+        out.append(("CUB", f"s1c_isda_{mt}",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                             "--ld_lam", repr(float(LD_ARMS["isda"]["scan"][m]))] + LD_P1))
+    out.append(("CUB", "s1c_identity_grad",
+                EQUAL + ["--alpha", "0", "--ld_mode", "ld", "--ld_ell", "identity",
+                         "--ld_eps", repr(float(LD_CTRL["identity_grad"]))] + LD_P1))
+    out.append(("CUB", "s1c_isda_grad",
+                EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                         "--ld_lam", repr(float(LD_CTRL["isda_grad"]))] + LD_P1))
+    out.append(("CUB", "s1c_randfull_same",
+                EQUAL + ["--alpha", "0", "--ld_mode", "ld", "--ld_ell", "rand_full",
+                         "--ld_eps", repr(float(LD_CTRL["randfull_same"]))] + LD_P1))
+    # PGD 训练成本高: 首轮只跑标定锚点 (与 LD-Language-Full ×1 完全同半径), PGD-5×1 的两段式训练损失
+    out.append(("CUB", "s1c_pgd_x1",
+                EQUAL + ["--alpha", "0", "--ld_mode", "pgd", "--ld_ell", "lang_full",
+                         "--ld_eps", repr(float(LD_CTRL["pgd"])), "--pgd_steps", "5", "--pgd_restarts", "1"] + LD_P1))
+    return out
+
 
 def _random_dirs(k):
     # 随机标架的种子与训练 seed 配对 (seed 1/2/3 各用一个标架), 同一标架在不同剂量之间保持不变:
@@ -145,6 +192,10 @@ MATRICES = {
         ("CUB", f"p1_{tag}", EQUAL + ["--alpha", str(a), "--target_eval", "none", "--save_head",
                                      "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE])
         for a, tag in DOSE]),
+    # Stage 1C 八臂 (预注册 §3z): LD 四个几何臂 × {0.5,1,2}×锚点 + ISDA 扫描 + 4 个固定强度对照 (identity_grad /
+    # isda_grad / randfull_same / pgd 锚点)。19 个配置 × 3 seeds = 57 个 run; CE-Only / DDO α=1 / α=2 复用 P1 基线
+    # (配置一致性由分析脚本核对)。先跑锚点 (x1) 再跑扫描 (§3z 的顺序), 驱动按完成状态跳过
+    "stage1c": ("Stage1C-Training", _ld_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -199,6 +250,26 @@ def _self_test_expected():
     assert (e["target_eval"] == "none" and e["save_head"] is True and e["alpha"] == "0.0" and e["weight_mode"] == "none"
             and e["train_subset_cache"] == AUG_CACHE and e["source_val_cache"] == AUG_CACHE and e["epochs"] == "100"), e
     assert expected(COMMON + MATRICES["p1"][1][4][2])["alpha"] == "1.0"
+    # Stage 1C 八臂 (§3z): 19 个配置; LD 臂 alpha=0、eps 取标定值; PGD 臂 steps/restarts 显式给出
+    assert len(MATRICES["stage1c"][1]) == 19, len(MATRICES["stage1c"][1])
+    n_ld = sum(1 for _, t, _ in MATRICES["stage1c"][1] if "isda" not in t and t != "s1c_pgd_x1")
+    assert n_ld == 14, n_ld                                   # 4 几何臂 × 3 强度 + 3 个 LD 对照 (identity_grad/randfull_same 在内)
+    e = expected(COMMON + MATRICES["stage1c"][1][0][2], "CUB", 1, "s1c_langfull_x0p5")
+    assert (e["ld_mode"] == "ld" and e["ld_ell"] == "lang_full" and float(e["ld_eps"]) == float(repr(float(LD_ARMS["lang_full"]["scan"]["0.5"])))
+            and float(e["alpha"]) == 0.0 and e["target_eval"] == "none" and e["save_head"] is True
+            and e["train_subset_cache"] == AUG_CACHE and e["source_val_cache"] == AUG_CACHE
+            and os.path.normpath(e["ld_calib"]) == os.path.normpath(CALIB_JSON)), e
+    e = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_identity_x1"][0][2], "CUB", 1, "s1c_identity_x1")
+    assert float(e["ld_eps"]) == float(repr(float(LD_ARMS["identity"]["anchor"]))), e
+    e = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_pgd_x1"][0][2], "CUB", 1, "s1c_pgd_x1")
+    assert (e["ld_mode"] == "pgd" and e["pgd_steps"] == "5" and e["pgd_restarts"] == "1"
+            and float(e["ld_eps"]) == float(repr(float(LD_ARMS["lang_full"]["anchor"])))), e
+    e = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_isda_x1"][0][2], "CUB", 1, "s1c_isda_x1")
+    assert e["ld_mode"] == "isda" and float(e["ld_lam"]) == float(repr(float(LD_ARMS["isda"]["anchor"]))), e
+    # 同半径对照: randfull_same 的 eps 与 langfull x1 完全相同 (逐位)
+    e_r = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_randfull_same"][0][2], "CUB", 1, "s1c_randfull_same")
+    e_l = expected(COMMON + [x for x in MATRICES["stage1c"][1] if x[1] == "s1c_langfull_x1"][0][2], "CUB", 1, "s1c_langfull_x1")
+    assert e_r["ld_eps"] == e_l["ld_eps"] and e_r["ld_ell"] == "rand_full", (e_r, e_l)
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}

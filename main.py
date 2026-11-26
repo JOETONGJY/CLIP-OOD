@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import hashlib
 import logging
 import random
 import shutil
@@ -18,6 +19,9 @@ from args import get_args
 from model.cbm_models import clip_cbm_orth, clip_mlp, clip_cbm_subspace
 from data import get_dataset_classes
 from run_status import RunLock, git_info, jsonable
+from ld_dro import effective_response, ld_dro_loss, pgd_worst_loss          # LD 臂的梯度诊断用
+from ld_training import MODES as LD_MODES, build_ld_generator, pen_stats as ld_pen_stats, training_loss as ld_training_loss
+from language_ellipsoid import domain_directions, second_moments
 
 # --grad_diag 时测量 CE/DDO 梯度统计的 epoch (1 起算, 在该 epoch 训练之前测), 另加训练结束后一次
 GRAD_DIAG_EPOCHS = (1, 5, 10, 20, 30, 50, 75)
@@ -66,6 +70,57 @@ class TrainingSession:
         self._init_model()
         self._init_optimizer()
         self._init_loss_fns()
+        self._init_ld_dro()
+
+    def _init_ld_dro(self):
+        """LD 臂（外审第十轮批准；预注册 RESULTS §3z）：训练损失 = LD-DRO / ISDA / PGD 的鲁棒交叉熵，
+        **不叠加**原始 DDO 正则（强度完全由 eps / lam 决定）。默认 ld_mode='none' 时直接返回，全部行为不变。
+        配置守卫：LD 臂要求 alpha=0 / beta=0 / weight_mode=none / ddo_dirs=full / lambda_kl=0 / lambda_graph=0。
+        评估始终用干净 logits（鲁棒项只进训练目标）；椭球生成元由训练 seed 按候选规则构造并记录 sha256。"""
+        self.ld_mode = getattr(self.args, "ld_mode", "none") or "none"
+        if self.ld_mode == "none":
+            return
+        if self.ld_mode not in LD_MODES:
+            raise ValueError(f"未知 ld_mode='{self.ld_mode}' (可选: {LD_MODES})")
+        a = self.args
+        if getattr(a, "CBM_type", "clip_cbm") != "clip_cbm":
+            raise ValueError("ld_mode 只在第三章入口 (clip_cbm) 下定义")
+        if getattr(a, "weight_mode", "none") != "none" or getattr(a, "ddo_dirs", "full") != "full" \
+                or float(a.beta) != 0.0 or float(a.alpha) != 0.0 \
+                or float(a.lambda_kl) != 0.0 or float(a.lambda_graph) != 0.0:
+            raise ValueError("ld_mode != none 要求 alpha=0 / beta=0 / weight_mode=none / ddo_dirs=full / "
+                             f"lambda_kl=0 / lambda_graph=0 (got alpha={a.alpha}, weight_mode={a.weight_mode}, "
+                             f"ddo_dirs={getattr(a, 'ddo_dirs', 'full')}); LD 臂不叠加原始 DDO 正则")
+        if self.ld_mode in ("ld", "pgd") and not float(a.ld_eps) > 0:
+            raise ValueError(f"ld_mode={self.ld_mode} 需要 --ld_eps > 0")
+        if self.ld_mode == "isda" and not float(a.ld_lam) > 0:
+            raise ValueError("ld_mode=isda 需要 --ld_lam > 0")
+        # 椭球: 与 Stage 1C 半径诊断同一构造 (G = E[uuᵀ] 非中心化二阶矩, u = LN0(E·d)); 随机椭球的种子候选
+        # 规则一致 (s/+10/+20/+30)。生成元 L 是 buffer (不参与梯度); M = A·L 里变化的只有 A (分类头权重)。
+        E = self.model.concept_embeddings.detach().double().cpu()
+        U = domain_directions(self.train_dataset.domain_diffs.double().cpu(), E)
+        G = second_moments(U)[0]
+        L, gmeta = build_ld_generator(G, a.ld_ell, int(a.seed))
+        self.ld_L = L.to(self.device)
+        calib = None
+        if getattr(a, "ld_calib", ""):
+            with open(a.ld_calib, "rb") as f:
+                calib = {"path": a.ld_calib.replace(os.sep, "/"), "sha256": hashlib.sha256(f.read()).hexdigest()}
+        self.ld_meta = {"mode": self.ld_mode, "eps": float(a.ld_eps), "lam": float(a.ld_lam),
+                        "pgd_steps": int(getattr(a, "pgd_steps", 5)), "pgd_restarts": int(getattr(a, "pgd_restarts", 1)),
+                        "pgd_seed": int(getattr(a, "pgd_seed", 0)), "K": int(E.size(0)),
+                        "E_sha256": hashlib.sha256(E.numpy().tobytes()).hexdigest(),
+                        "G_sha256": hashlib.sha256(G.numpy().tobytes()).hexdigest(),
+                        "generator": gmeta, "calibration": calib,
+                        "protocol": "训练损失 = 鲁棒 CE (不叠加原始 DDO 正则, alpha=0); 评估用干净 logits"}
+        logger.info(f"[LD] mode={self.ld_mode} ell={a.ld_ell} (r={gmeta['r']}, seed_used={gmeta['ell_seed_used']}, "
+                    f"sha {gmeta['sha256'][:16]}) eps={a.ld_eps:g} lam={a.ld_lam:g}")
+
+    def _ld_M(self):
+        """LD 臂的 M = A·L。A = W⊙γ 是分类头的有效权重（随训练变化，每个 batch 重算）；
+        L 是固定的椭球生成元（见 _init_ld_dro）。h(u + Lq) = h(u) + M q。"""
+        A, _ = effective_response(self.model.classifier)
+        return A @ self.ld_L
 
     def _prepare_datasets(self):
         """CUB, AWA2, LADA, LADV"""
@@ -322,7 +377,9 @@ class TrainingSession:
         # 2026-11-25: 按样本数加权的 epoch 累计量 —— 原先返回的是最后一个 batch 的损失,
         # 不能用于机制分析 (外审指出)。ddo_own_unw = 本臂训练方向集上的未加权 DDO 损失 (不跨方法可比);
         # 跨方法可比的统一口径是每个 epoch 结束后在【原始完整方向集】上另算的 ddo_full_eval (见 epoch_metrics)。
-        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'ddo_own_unw': 0.0, 'kl': 0.0}
+        sums = {'total': 0.0, 'cls': 0.0, 'concept': 0.0, 'orth': 0.0, 'ddo_own_unw': 0.0, 'kl': 0.0,
+                'clean_ce': 0.0, 'pen_mean': 0.0, 'pen_std': 0.0, 'wcpen': 0.0, 'mrob': 0.0}
+        ld_on = self.ld_mode != "none"
 
         progress_bar = tqdm(
             self.train_loader,
@@ -349,8 +406,25 @@ class TrainingSession:
                 )
                 main_logits = logits_inv
             else:
-                cls_loss = self.loss_fns['cls'](cls_preds, labels)
                 main_logits = cls_preds
+                if ld_on:
+                    # LD 臂 (预注册 §3z): 训练损失 = 鲁棒 CE (LD-DRO / ISDA / PGD), 不叠加原始 DDO 正则 ——
+                    # alpha=0 已由 _init_ld_dro 守卫强制, 下面的 alpha*orth 项自然为 0。监控统计用 detach 的副本。
+                    M = self._ld_M()
+                    cls_loss = ld_training_loss(self.ld_mode, cls_preds, M, labels, self.args.ld_eps,
+                                                self.args.ld_lam, self.args.pgd_steps, self.args.pgd_restarts,
+                                                self.args.pgd_seed)
+                    ps = ld_pen_stats(cls_preds.detach(), M.detach(), labels,
+                                      self.args.ld_eps if self.ld_mode != "isda" else self.args.ld_lam,
+                                      kind="ld" if self.ld_mode != "isda" else "isda")
+                    bs = images.size(0)
+                    sums['clean_ce'] += ps['clean_ce'] * bs
+                    sums['pen_mean'] += ps['pen_maxpair_mean'] * bs
+                    sums['pen_std'] += ps['pen_maxpair_std'] * bs
+                    sums['wcpen'] += ps['pen_worstcomp_mean'] * bs
+                    sums['mrob'] += ps['robust_margin_mean'] * bs
+                else:
+                    cls_loss = self.loss_fns['cls'](cls_preds, labels)
             # concept_loss = self.loss_fns['concept'](concept_preds, attr_labels)
             if self.args.beta > 0:
                 concept_loss = self.loss_fns['concept'](concept_preds, attr_labels.float())
@@ -441,7 +515,7 @@ class TrainingSession:
                 'KL': f"{kl_loss.item():.4f}"
             })
 
-        return {
+        out = {
             'train_acc': 100 * correct / total,
             'train_loss': sums['total'] / total,          # 以下均为 epoch 内按样本加权平均
             'cls_loss': sums['cls'] / total,
@@ -450,6 +524,13 @@ class TrainingSession:
             'ddo_own_unweighted_loss': sums['ddo_own_unw'] / total,
             'kl_loss': sums['kl'] / total,
         }
+        if ld_on:
+            # LD 臂 (预注册 §3z) 的逐 epoch 监控量: 干净 CE / 鲁棒损失 (= cls_loss 本身) / 惩罚分布 /
+            # 实际最坏竞争类的惩罚 / 鲁棒最坏间隔 (按样本数加权)
+            out.update({'clean_ce': sums['clean_ce'] / total, 'robust_loss': sums['cls'] / total,
+                        'pen_maxpair_mean': sums['pen_mean'] / total, 'pen_maxpair_std': sums['pen_std'] / total,
+                        'worstcomp_pen_mean': sums['wcpen'] / total, 'robust_margin_mean': sums['mrob'] / total})
+        return out
 
     def _evaluate(self, data_loader, mode='val'):
         self.model.eval()
@@ -598,8 +679,9 @@ class TrainingSession:
         g_ce = torch.autograd.grad(ce, params, retain_graph=True)
         g_ce = torch.cat([g.reshape(-1) for g in g_ce])
         rec = {'tag': tag, 'ce': float(ce), 'grad_ce_norm': float(g_ce.norm())}
-        # (a) 本模型训练时实际优化的正则项 (含其加权方式 / 方向集变体; 不含 alpha) —— 强度匹配用
-        if reg_loss is not None:
+        # (a) 本模型训练时实际优化的正则项 (含其加权方式 / 方向集变体; 不含 alpha) —— 强度匹配用。
+        # LD 臂训练优化的不是 DDO 正则 (见 (c)), 这里跳过以免误读。
+        if reg_loss is not None and self.ld_mode == "none":
             alpha = float(self.args.alpha)
             rt = reg_loss.abs().mean()
             # bias-free 的正则 (full_bf / split_bf) 对 LayerNorm.beta 与 Linear.bias 没有梯度 (不在计算图里),
@@ -626,6 +708,31 @@ class TrainingSession:
             rec.update({'ddo_eq': float(ddo), 'grad_ddo_norm': float(g_dd.norm()),
                         'grad_norm_ratio_ddo_over_ce': float(g_dd.norm() / g_ce.norm().clamp_min(1e-12)),
                         'grad_cos_ce_ddo': float((g_ce @ g_dd) / denom)})
+        # (c) LD 臂 (预注册 §3z): 鲁棒损失的正则部分 (鲁棒 CE − 干净 CE) 对分类头的梯度比与夹角;
+        # 与 §3x/§3y 配平用的"正则部分梯度比"同一口径。PGD 臂另抽查训练搜索的质量:
+        # 训练用的 PGD(steps×restarts) 下界 对 更强的 PGD-50×4+闭式起点, 与 LD 闭式上界构成链
+        # CE ≤ PGD-训练 ≤ PGD-强 ≤ LD —— 差值大说明训练搜索没追上最坏情况, 不能读作"PGD 训练温和"。
+        if self.ld_mode != "none":
+            M = self._ld_M()
+            full = ld_training_loss(self.ld_mode, cls_preds, M, y, self.args.ld_eps, self.args.ld_lam,
+                                    self.args.pgd_steps, self.args.pgd_restarts, self.args.pgd_seed)
+            raw = torch.autograd.grad(full - ce, params, retain_graph=True)
+            g_reg = torch.cat([t.reshape(-1) for t in raw])
+            strength = float(self.args.ld_eps if self.ld_mode != "isda" else self.args.ld_lam)
+            rec.update({'ld_mode': self.ld_mode, 'ld_strength': strength,
+                        'grad_regpart_ratio_over_ce': float(g_reg.norm() / g_ce.norm().clamp_min(1e-12)),
+                        'grad_cos_ce_regpart': float((g_ce @ g_reg) / (g_ce.norm() * g_reg.norm()).clamp_min(1e-12))})
+            if self.ld_mode == "pgd":
+                with torch.no_grad():
+                    lgd, Md = cls_preds.detach(), M.detach()
+                    p_tr, _ = pgd_worst_loss(lgd, Md, y, self.args.ld_eps, steps=self.args.pgd_steps,
+                                             restarts=self.args.pgd_restarts, seed=self.args.pgd_seed)
+                    p_st, _ = pgd_worst_loss(lgd, Md, y, self.args.ld_eps, steps=50, restarts=4,
+                                             seed=self.args.pgd_seed + 1, closed_form_starts=True)
+                    ldc = float(ld_dro_loss(lgd, Md, y, self.args.ld_eps))
+                rec['pgd_search_quality'] = {'pgd_train_bound': float(p_tr), 'pgd_strong_bound': float(p_st),
+                                             'ld_closed': ldc, 'strong_minus_train': float(p_st - p_tr),
+                                             'chain_ok': bool(rec['ce'] <= float(p_tr) + 1e-5 <= float(p_st) + 1e-5 <= ldc + 1e-5)}
         self.grad_diag_records.append(rec)
         logger.info("[grad-diag %s] %s" % (tag, json.dumps(
             {k: round(v, 6) for k, v in rec.items() if isinstance(v, float)})))
@@ -661,6 +768,7 @@ class TrainingSession:
         return f"{self.args.dataset}_{method_tag}_seed{self.args.seed}"
 
     def _run(self):
+        self._t0 = time.time()                              # 训练成本 (预注册 §3z 要求记录; 含最终评估与存头)
         # 覆盖保护放在最前面: 产物冲突且未指定 --overwrite_run 时在此抛出 ——
         # 不打印训练头部、不进入训练 (运行锁已在 run() 中取得, 先于覆盖检查)
         self._check_run_conflicts()
@@ -764,6 +872,14 @@ class TrainingSession:
                     'source_acc': source_metrics['source_acc'],
                     'source_ce': source_metrics['source_cls_loss'],
                     'target_acc': target_metrics['target_acc'] if target_metrics is not None else None,
+                    # LD 臂 (预注册 §3z) 的逐 epoch 监控量 (来自 _train_epoch 的返回 dict; 非 LD 臂为 None):
+                    # 干净 CE / 鲁棒损失 / 惩罚分布 / 实际最坏竞争类的惩罚 / 鲁棒最坏间隔
+                    'clean_ce': train_metrics.get('clean_ce'),
+                    'robust_loss': train_metrics.get('robust_loss'),
+                    'pen_maxpair_mean': train_metrics.get('pen_maxpair_mean'),
+                    'pen_maxpair_std': train_metrics.get('pen_maxpair_std'),
+                    'worstcomp_pen_mean': train_metrics.get('worstcomp_pen_mean'),
+                    'robust_margin_mean': train_metrics.get('robust_margin_mean'),
                 })
                 self._completed_epochs = epoch + 1
 
@@ -912,6 +1028,10 @@ class TrainingSession:
                 'train_subset': getattr(self, "train_subset_info", None),
                 # 描述符库身份 (2026-11-26, 外审第九轮 P4): 这个 run 用的是哪一份词库 (完整文本的 sha256)
                 'descriptor_bank': getattr(self.train_dataset, "descriptor_bank_info", None),
+                # LD 臂 (2026-11-26, 外审第十轮; 预注册 §3z): 鲁棒损失配置、椭球生成元身份与标定来源;
+                # 非 LD 臂为 None。训练成本 (秒, 含最终评估与存头) 一并记录
+                'ld_config': getattr(self, "ld_meta", None),
+                'elapsed_seconds': round(time.time() - self._t0, 1),
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},
