@@ -149,6 +149,17 @@ def self_test():
         check("B2b 旧的 prompt200.py (210 条) 含重复条目, 校验器拒绝加载它", False)
     except ValueError as e:
         check("B2b 旧的 prompt200.py (210 条) 含重复条目, 校验器拒绝加载它", "重复出现" in str(e), str(e)[-40:])
+    # SDB-204 v1.0 (2026-11-26, 外审第十轮提供并冻结; 8 类配额 30/25/25/25/25/25/25/24):
+    # file_sha256 = 冻结文件的原始字节; bank_sha256 = 两个列表完整文本 (含顺序) 的身份, 进入可靠性缓存键。
+    # 它是未经 CLIP 语义验证的候选词库, 不是"更可靠的词库"; 训练主线首轮仍用 Original-204。
+    sdb = load_descriptor_bank(os.path.join("prompts", "banks", "sdb-204-v1.json"))
+    check("B2c SDB-204 v1.0 的文本身份与冻结记录一致 (词库未被改动)",
+          sdb["src_sha256"] == "e8e367e769f86c27d7507382b76c671667da9fa8ae030159a57681a812b0fa33"
+          and sdb["tgt_sha256"] == "ada3a1854ffd3fd43d5dd02b2da2b9dc710f9b3ecc0c4fff09e7b738333ec26c"
+          and sdb["bank_sha256"] == "5d98ecba21d015ad04b2a6a2e1b94dd8dcb59dcf02ca2cf8e9ef6e050f59cbb6"
+          and sdb["meta"]["file_sha256"] == "847796e3fc62ca4db2cea2fda75227105874d88652164c0ef353e37f92065644"
+          and sdb["n_source"] == 1 and sdb["n_target"] == 204 and sdb["meta"]["n_categories"] == 8,
+          sdb["bank_sha256"][:16])
     from prompts import prompt200new
     check("B3 加载结果与原来的硬编码导入逐条相同 (文本与顺序)", list(prompt200new.source_text_prompts) == b["source_text_prompts"]
           and list(prompt200new.target_text_prompts) == b["target_text_prompts"])
