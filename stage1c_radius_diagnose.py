@@ -107,7 +107,10 @@ def clean_margins(logits, y):
 def penalized_metrics(logits, y, M, strength, kind="ld"):
     """闭式量与损失。LD: 竞争类 k 的 logit 加 ε·r_yk —— "椭球内存在能改变预测的扰动" ⟺
     max_k (ℓ_k − ℓ_y + ε r_yk) > 0, 对每个竞争类单独取最坏是精确的; LD 交叉熵是共享扰动下最坏交叉熵的上界。
-    ISDA: 竞争类的 logit 加 (λ/2)·r_yk² (高斯扰动的 Jensen 上界), 这里的"可翻转"只是对该上界而言。"""
+    ISDA: 竞争类的 logit 加 (λ/2)·r_yk² (高斯扰动的 Jensen 上界), 这里的"可翻转"只是对该上界而言。
+    惩罚的两套统计 (外审第十轮的命名更正, RESULTS §3y): pen_bind_* 是每个样本在**全部竞争类上的最大惩罚**
+    的均值/分位 (平均最大类别对惩罚; 历史键名保留, 它当初被叫作"绑定惩罚", 名不副实 —— 它不一定是决定
+    鲁棒间隔的那个竞争类); pen_worstcomp_* 是**实际最坏竞争类** (鲁棒间隔 m_yk − pen 最小的那个) 上的惩罚。"""
     rows = torch.arange(y.numel(), device=y.device)
     r = pair_radius(M, y)
     m_y, correct = clean_margins(logits, y)
@@ -117,12 +120,15 @@ def penalized_metrics(logits, y, M, strength, kind="ld"):
     rob = m_yk - pen                                            # m_yk − 惩罚 (逐竞争类)
     rob[rows, y] = float("inf")
     m_rob = rob.min(1).values
+    wc = rob.argmin(1)                                          # 实际最坏竞争类 = 鲁棒间隔最小的竞争类
+    pen_wc = pen[rows, wc]
     off = r > 0
     loss = ld_dro_loss(logits, M, y, strength) if kind == "ld" else isda_loss(logits, M, y, strength)
     return {"strength": float(strength), "kind": kind, "acc": float(correct.double().mean()),
             "ce": float(F.cross_entropy(logits, y)), "loss": float(loss),
             "pen_bind_mean": float(pen.max(1).values.mean()), "pen_bind_q50": _q(pen.max(1).values, 0.5),
             "pen_bind_q90": _q(pen.max(1).values, 0.9), "pen_all_q50": _q(pen[off], 0.5), "pen_all_q90": _q(pen[off], 0.9),
+            "pen_worstcomp_mean": float(pen_wc.mean()), "pen_worstcomp_q50": _q(pen_wc, 0.5), "pen_worstcomp_q90": _q(pen_wc, 0.9),
             "clean_worst_margin_mean": float(m_y.mean()), "clean_worst_margin_q10": _q(m_y, 0.1),
             "robust_worst_margin_mean": float(m_rob.mean()),
             "flip_rate_all": float((m_rob < 0).double().mean()),
@@ -220,6 +226,15 @@ def self_test():
         check(f"W6 ε={eps}: 翻转率与 max_k(ℓ_k−ℓ_y+ε r_yk)>0 等价; ε=0 时损失 = CE 且正确样本的翻转率为 0",
               abs(m["flip_rate_all"] - float(exists.double().mean())) < 1e-12
               and (eps > 0 or (abs(m["loss"] - m["ce"]) < 1e-6 and m["flip_rate_correct"] == 0.0)))
+    m6 = penalized_metrics(logits, y, M, 2.0)                    # 命名更正 (外审第十轮): pen_bind 是最大类别对惩罚
+    pen2 = 2.0 * pair_radius(M, y)
+    rob2 = (logits[torch.arange(B), y][:, None] - logits) - pen2
+    rob2[torch.arange(B), y] = float("inf")
+    wc2 = rob2.argmin(1)
+    manual_wc = float(pen2[torch.arange(B), wc2].mean())
+    check("W6b 最坏竞争类惩罚与逐样本显式计算一致, 且 ≤ 最大类别对惩罚 (两套统计不可混用)",
+          abs(m6["pen_worstcomp_mean"] - manual_wc) < 1e-9 and m6["pen_worstcomp_mean"] <= m6["pen_bind_mean"] + 1e-12,
+          f"worstcomp {m6['pen_worstcomp_mean']:.4f} vs bind {m6['pen_bind_mean']:.4f}")
     _, q1 = pgd_worst_loss(logits, M, y, 2.0, steps=200, restarts=20, seed=1, closed_form_starts=True)
     lq = logits + torch.einsum("cr,br->bc", M, q1)                # PGD 找到的最坏扰动下的 logits
     lq_k = lq.clone()
@@ -705,24 +720,28 @@ def write_report(res):
             vals.append(d)
         return vals
 
-    L += ["", "## 3. 同半径口径：ε 网格上的闭式量与 PGD", ""]
+    L += ["", "## 3. 同半径口径：ε 网格上的闭式量与 PGD", "",
+          "CE / LD 按样本集分开报告（外审第十轮的口径更正）：CE（1200）与 LD（1200）用 heldout_val 全体；"
+          "CE（300）/ LD（300）/ PGD 下界（300）/ gap（300）四列都来自**前 300 个样本的同一子集**，四列之间可以互相比较。"
+          "最大类别对惩罚 = 每个样本在全部竞争类上的最大惩罚的均值（历史标签\"绑定惩罚\"名不副实，见 §3y 的更正）。", ""]
     for grp, label, keys_of in (("init", "初始化分类头（3 seeds 均值）", lambda e: [f"init|{s}|{e}" for s in SEEDS]),
                                 *((arm, f"收敛分类头 {arm}（3 seeds 均值）", (lambda e, arm=arm: [f"{arm}|{s}|{e}" for s in SEEDS])) for arm in MAIN_ARMS)):
-        L += [f"### {label}", "", "| ε (× ε_dom) | 椭球 | 干净最坏间隔 | 绑定惩罚（均值） | 鲁棒最坏间隔 | 正确样本的翻转率 | CE | LD | PGD 下界 | gap = LD − PGD |",
-              "|---|---|---|---|---|---|---|---|---|---|"]
+        L += [f"### {label}", "",
+              "| ε (× ε_dom) | 椭球 | 最大类别对惩罚（均值） | 鲁棒最坏间隔 | 正确样本的翻转率 | CE（1200） | LD（1200） | CE（300） | LD（300） | PGD 下界（300） | gap（300） |",
+              "|---|" + "---|" * 10]
         for i, mult in enumerate(res["grid_mult"]):
             for e in ELL_ORDER:
                 m = avg(keys_of(e), ["by_eps", i])
-                row = [res["grid"][i], mult, e, _mean([x["clean_worst_margin_mean"] for x in m]),
-                       _mean([x["pen_bind_mean"] for x in m]), _mean([x["robust_worst_margin_mean"] for x in m]),
-                       _mean([x["flip_rate_correct"] for x in m]), _mean([x["ce"] for x in m]), _mean([x["loss"] for x in m])]
                 pg = [table[k]["pgd"][i] for k in keys_of(e) if "pgd" in table[k]]
                 if pg:
-                    row += [_mean([p["pgd"] for p in pg]), _mean([p["gap"] for p in pg])]
+                    same = [_mean([p["ce"] for p in pg]), _mean([p["ld"] for p in pg]),
+                            _mean([p["pgd"] for p in pg]), _mean([p["gap"] for p in pg])]
                 else:
-                    row += [float("nan")] * 2
-                L.append(f"| {_f(row[0], 2)} ({_f(mult, 4)}) | {ELL_LABEL[e]} | {_f(row[3])} | {_f(row[4])} | {_f(row[5])} | "
-                         f"{_f(100 * row[6], 1)}% | {_f(row[7], 3)} | {_f(row[8], 3)} | {_f(row[9], 3)} | {_f(row[10], 3)} |")
+                    same = [float("nan")] * 4
+                L.append(f"| {_f(res['grid'][i], 2)} ({_f(mult, 4)}) | {ELL_LABEL[e]} | {_f(_mean([x['pen_bind_mean'] for x in m]))} | "
+                         f"{_f(_mean([x['robust_worst_margin_mean'] for x in m]))} | {_f(100 * _mean([x['flip_rate_correct'] for x in m]), 1)}% | "
+                         f"{_f(_mean([x['ce'] for x in m]), 3)} | {_f(_mean([x['loss'] for x in m]), 3)} | "
+                         f"{_f(same[0], 3)} | {_f(same[1], 3)} | {_f(same[2], 3)} | {_f(same[3], 3)} |")
         L.append("")
     L += ["## 4. 同初始惩罚口径（ε_pen）与梯度配平口径（ε_grad）下的闭式量", "",
           "| 分类头 | 椭球 | ε_grad | 翻转率（正确样本）@ε_grad | ε_pen | 翻转率（正确样本）@ε_pen | λ_grad | 翻转率@λ_grad | λ_pen | 翻转率@λ_pen |",
@@ -748,6 +767,8 @@ def write_report(res):
           "- 收敛分类头是在完整训练集上训练的，heldout_val 的样本对它们是训练集内样本；这里只做量级诊断，不做任何判定。",
           "- 固定批次 (train_core 的前 256 个样本) 只用于 3 个初始化头的梯度比，不涉及收敛头。",
           "- 预注册的 PGD 收敛检查没有全部通过: 未收敛的检查点在报告里列出, 那里的 PGD 下界只能读作\"可能偏低\", gap 不能单独归因于上界松。",
+          "- 事后补充的收敛检查只覆盖测过的离散半径、3 个分类头与前 100 个样本, 不是全范围收敛证明; 正式 Language-PGD 训练需要在训练过程中检查搜索质量 (预注册 §3z)。",
+          "- \"绑定惩罚\"(历史键名 pen_bind_*) 的实际含义是平均最大类别对惩罚, 不是实际最坏竞争类(鲁棒间隔最小者)的惩罚; 后者由 pen_worstcomp_* 报告 (外审第十轮的命名更正)。",
           "- LD 交叉熵是闭式上界，PGD 是数值下界；gap 是上下界之间的距离，不是已知真值后的误差。大的 ε 下上界会很松。",
           "- 扰动发生在 LayerNorm 之后、affine 之前的概念空间：不满足真实图像的可达性约束，不能据此声称对真实域偏移有认证鲁棒性。",
           "- ε_dom / ε_vis 是文本域方向、源域光度扰动在椭球内的白化半径，只说明椭球的量纲，不代表目标域偏移的大小。", ""]
