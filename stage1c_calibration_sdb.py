@@ -122,7 +122,8 @@ def main():
           f"sha {gmeta['sha256'][:16]}, seed_used {gmeta['ell_seed_used']}")
 
     # ===== 3. rho_bar(SDB) + 固定批次上的 r_max 统计 =====
-    P_sdb = torch.tensor(U.reshape(b["n_target"], -1, E.size(1)), dtype=torch.float32)
+    n_cls = diffs.size(1)
+    P_sdb = torch.as_tensor(U.reshape(b["n_target"], n_cls, E.size(0)), dtype=torch.float32)
     batches = {}
     rho_ddo, cos_ddo = {}, {}
     for s in SEEDS:

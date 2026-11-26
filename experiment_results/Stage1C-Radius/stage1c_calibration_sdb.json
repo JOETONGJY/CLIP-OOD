@@ -1,0 +1,76 @@
+{
+ "created": "2026-11-26 19:57:31",
+ "code": {
+  "commit": "d0ad1f6341ea1cb8a28cc4a8bf6ab563041c5fa3",
+  "dirty": true
+ },
+ "device": "cuda",
+ "note": "SDB-204 词库的初始强度标定（外审第十一轮 P2；方程与 stage1c_calibration_traincore 相同，方向集与椭球换成 SDB-204）。SDB+ISDA 的 λ 从这里冻结取值。",
+ "bank": {
+  "id": "sdb-204",
+  "bank_sha256": "5d98ecba21d015ad04b2a6a2e1b94dd8dcb59dcf02ca2cf8e9ef6e050f59cbb6",
+  "file_sha256": "847796e3fc62ca4db2cea2fda75227105874d88652164c0ef353e37f92065644"
+ },
+ "E_sha256": "776184621135ba284d6d5b047c7155e646ecf072db4aa476c186eddab7038e1a",
+ "G_sha256": "c75b172d32acff433c20c73c661a8292eb33d21d38bbe0b9c02892bc452c845f",
+ "generator": {
+  "ell": "lang_full",
+  "r": 311,
+  "ell_seed_used": 1,
+  "sha256": "b0fa7bfdd93645a70122df8a13517cc68a462925b51870308a98a6fddd0ed5dd",
+  "spectrum": {
+   "r": 311,
+   "energy_captured_by_r": 1.0,
+   "effective_rank_entropy_trunc": 5.474162736794952,
+   "lambda_max_over_lambda_min_trunc": 9720745.563844003,
+   "cos_first_axis_language_vs_random": 0.058172
+  }
+ },
+ "rho_ddo_sdb": {
+  "1": 0.14631496369838715,
+  "2": 0.15133248269557953,
+  "3": 0.147824227809906
+ },
+ "cos_ddo_sdb": {
+  "1": 0.0060562873259186745,
+  "2": 0.0056709717027843,
+  "3": 0.010085555724799633
+ },
+ "rho_bar_sdb": 0.14849055806795755,
+ "eps_grad": 5.910966634750365,
+ "lam_grad": 100.10465621948241,
+ "p_star": 0.5734791362714008,
+ "r_max_mean_tc": {
+  "lang_full": 0.09701951841513316
+ },
+ "r_max_sq_mean_tc": {
+  "lang_full": 0.009726631144682566
+ },
+ "arms": {
+  "lang_full": {
+   "anchor": 5.910966634750365,
+   "equation": "eps_pen (train_core 固定批次, SDB 方向集)",
+   "scan": {
+    "0.5": 2.9554833173751827,
+    "1": 5.910966634750365,
+    "2": 11.82193326950073
+   }
+  }
+ },
+ "isda": {
+  "anchor": 117.91937573060228,
+  "equation": "lam_pen (train_core 固定批次, SDB 方向集)",
+  "scan": {
+   "0.5": 58.95968786530114,
+   "1": 117.91937573060228,
+   "2": 235.83875146120457
+  }
+ },
+ "mults": [
+  0.5,
+  1.0,
+  2.0
+ ],
+ "all_checks_passed": true,
+ "elapsed_seconds": 47.8
+}
