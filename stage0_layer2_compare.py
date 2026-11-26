@@ -42,7 +42,7 @@ def load(spec, repo):
 def compare(old, new, verbose=True):
     """返回 (是否全部通过, 结果 dict)。verbose=False 时只返回结果, 用于自测。"""
     res = {"c0": sorted(old["arms"]) == sorted(new["arms"]), "c1": 0.0, "n_od": 0, "c2": 0.0, "n_c2": 0, "c2b": True,
-           "c4": True, "rows": []}
+           "c4": True, "rows": [], "skipped": []}
     say = print if verbose else (lambda *a, **k: None)
     ok = [res["c0"]]
     if not res["c0"]:
@@ -61,6 +61,12 @@ def compare(old, new, verbose=True):
                     res["c1"] = max(res["c1"], abs(po[k][an] - pn[k][an]))
                     res["n_od"] += 1
             for sch in SCHEMES:
+                need_old = ("delta_r2_" + sch, "pcr_coef_" + sch, "n_pairs_" + sch)
+                need_new = ("delta_r2_rawnorm_" + sch, "pcr_coef_rawnorm_" + sch, "delta_r2_" + sch,
+                            "pcr_coef_" + sch, "n_pairs_" + sch)
+                if not all(k in po for k in need_old) or not all(k in pn for k in need_new):
+                    res["skipped"].append(sch)                   # 某一版没有这个口径 (如 05d328f 初版没有 own_sample)
+                    continue
                 row = (t, po["seed"], sch, po["delta_r2_" + sch], pn["delta_r2_rawnorm_" + sch], pn["delta_r2_" + sch],
                        po["pcr_coef_" + sch], pn["pcr_coef_rawnorm_" + sch], pn["pcr_coef_" + sch])
                 res["rows"].append(row)
@@ -68,10 +74,10 @@ def compare(old, new, verbose=True):
                 res["n_c2"] += 1
                 res["c2b"] &= po["n_pairs_" + sch] == pn["n_pairs_" + sch]
     ok.append(res["c1"] == 0.0)
-    ok.append(res["c2"] < TOL)
+    ok.append(res["n_c2"] > 0 and res["c2"] < TOL)
     ok.append(res["c2b"])
     res["c4"] = all((r[3] > 0) == (r[5] > 0) and (r[6] < 0) == (r[8] < 0) for r in res["rows"])
-    res["biggest"] = max(max(abs(r[5] - r[3]), abs(r[8] - r[6])) for r in res["rows"])
+    res["biggest"] = max((max(abs(r[5] - r[3]), abs(r[8] - r[6])) for r in res["rows"]), default=0.0)
     if not verbose:
         return all(ok) and res["c4"], res
 
@@ -79,9 +85,14 @@ def compare(old, new, verbose=True):
         say(("  OK   " if cond else "  BAD  ") + name + ("  [%s]" % detail if detail else ""))
     mark("C0 两版包含相同的臂", res["c0"], "%d 个" % len(tags))
     mark("C1 0D 的全部数字逐 seed 完全相同 (%d 个数)" % res["n_od"], res["c1"] == 0.0, "最大差 %g" % res["c1"])
-    mark("C2 新版未投影口径 == 旧版主口径 (%d 组 ΔR² 与系数, 逐 seed 逐口径)" % res["n_c2"], res["c2"] < TOL,
-         "最大差 %.2e" % res["c2"])
+    mark("C2 新版未投影口径 == 旧版主口径 (%d 组 ΔR² 与系数, 逐 seed 逐口径)" % res["n_c2"],
+         res["n_c2"] > 0 and res["c2"] < TOL, "最大差 %.2e" % res["c2"])
+    if not (res["n_c2"] > 0 and res["c2"] < TOL):
+        say("       (C2 只在两版的计算本应相同时才有意义, 例如 5e9f1ff -> 收尾版。05d328f 初版的回归缺扰动强度, "
+            "它与定稿版不同是预期的修正结果, 不是错误。)")
     mark("C2b 配对数逐 seed 相同", res["c2b"])
+    if res["skipped"]:
+        say("  注: 以下口径在某一版中不存在, 已跳过: %s" % sorted(set(res["skipped"])))
     say("\n  %-9s %-5s %-11s %14s %14s %9s | %9s %9s %9s" % (
         "臂", "seed", "口径", "ΔR² 旧=未投影", "ΔR² 新=投影", "差", "系数 旧", "系数 新", "差"))
     for t, s, sch, o_d, r_d, p_d, o_c, r_c, p_c in res["rows"]:
@@ -90,8 +101,8 @@ def compare(old, new, verbose=True):
     say("\n  控制变量换成投影范数后, 全部 %d 组中 ΔR² 与系数的最大变化: %.4f" % (len(res["rows"]), res["biggest"]))
 
     def mean_of(src, t, key):
-        v = [p[key] for p in src["arms"][t]["per_seed"]]
-        return sum(v) / len(v)
+        v = [p[key] for p in src["arms"][t]["per_seed"] if key in p]
+        return sum(v) / len(v) if v else float("nan")
     say("\n  %-22s %12s %12s %14s | %9s %9s" % ("臂", "ΔR² 旧(固定)", "ΔR² 新(固定)", "ΔR² 新(逐样本)", "系数 旧", "系数 新"))
     for t in tags:
         say("  %-22s %12.4f %12.4f %14.4f | %+9.3f %+9.3f" % (
@@ -134,9 +145,16 @@ def self_test():
     bad2 = json.loads(json.dumps(new))
     bad2["arms"]["ce_a0"]["per_seed"][0]["delta_r2_rawnorm_fixed"] += 1e-3
     ok3, r3 = compare(old, bad2, verbose=False)
-    good = ok1 and r1["c1"] == 0.0 and r1["c2"] == 0.0 and (not ok2) and (not ok3)
-    print(("  OK  " if good else "  BAD  ") + "自测: 一致的版本对通过; 0D 数字被改 → 不通过; 未投影口径被改 → 不通过",
-          "[%s / %s / %s]" % (ok1, ok2, ok3))
+    part = json.loads(json.dumps(old))                           # 旧版缺少 own_sample 口径 → 跳过并如实报告, 不崩溃
+    for t in part["arms"]:
+        for p in part["arms"][t]["per_seed"]:
+            for k in ("delta_r2_own_sample", "pcr_coef_own_sample", "n_pairs_own_sample"):
+                p.pop(k)
+    ok4, r4 = compare(part, new, verbose=False)
+    good = ok1 and r1["c1"] == 0.0 and r1["c2"] == 0.0 and (not ok2) and (not ok3) \
+        and ok4 and r4["skipped"] and r4["n_c2"] == 8      # 2 臂 × 2 seeds × 剩下的 2 个口径
+    print(("  OK  " if good else "  BAD  ") + "自测: 一致的版本对通过; 0D 数字被改 → 不通过; 未投影口径被改 → 不通过; "
+          "旧版缺一个口径 → 跳过该口径仍通过", "[%s / %s / %s / %s]" % (ok1, ok2, ok3, ok4))
     print("SELFTEST:", "PASS" if good else "FAIL")
     return 0 if good else 1
 
