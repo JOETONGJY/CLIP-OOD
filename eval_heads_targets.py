@@ -92,7 +92,15 @@ class HeadEvaluator:
         key = model_key(cfg)
         if key not in self._sessions:
             torch.manual_seed(int(cfg.get("seed", 0)))
-            s = _HeadEvalSession(argparse_namespace(cfg))
+            # attach 的缓存键含 CLIP 身份, 身份从命令行取 —— 评估进程的 argv 没有 --CLIP_type,
+            # 会让键少一段 (值相同、键不同)。临时补上, 使评估与训练用同一个缓存文件。
+            argv0 = sys.argv[:]
+            if "--CLIP_type" not in sys.argv and cfg.get("CLIP_type"):
+                sys.argv += ["--CLIP_type", str(cfg["CLIP_type"])]
+            try:
+                s = _HeadEvalSession(argparse_namespace(cfg))
+            finally:
+                sys.argv[:] = argv0
             if self.target_meta is None:
                 p = os.path.join("cache", f"{cfg['dataset']}_target_test.pt")
                 self.target_meta = {"path": p, "sha256": sha256_file(p), "n": len(s.target_test_loader.dataset)}
@@ -191,6 +199,12 @@ def eval_stage1c(seeds):
     return 0
 
 
+def _extra_verifiable(run, sel):
+    """锁后新增的 run (P3 warmup): 其分类头 sha256 必须能用锁定时已知的规则核对 —— 这里核对它引用的
+    标定文件与词库身份已在锁定清单的同臂 run 里出现过 (同 λ 由 run_matrix 的导入自检钉住)。"""
+    return run.startswith("CUB_isda_warm_")
+
+
 def eval_s11(seeds):
     """第十一轮 (预注册 §3ad) 的事后目标域评估: 门是 s11 的源域选择文件; 覆盖 s1c_ext + sdb22
     (+ s11_warmup 矩阵, 在 P3 的 warmup 矩阵注册之后重跑本命令即可补评)。"""
@@ -217,15 +231,20 @@ def eval_s11(seeds):
         v, w = heads.get(r), sel["runs"].get(r, {})
         return bool(w) and v is not None and w.get("head_sha256") == v["head_sha256"]             and w.get("result_sha256") == v["result_sha256"]
 
-    missing = [r for r in sorted(sel["runs"]) if not same(r)]
+    # 只核对"锁定清单内的"已评估 run (清单还含 stage1c 的 57 个出处记录, 本命令不评估它们);
+    # 锁定之后新增的 run (P3 的 warmup, §3ad 预注册) 允许出现在 extra, 数值逐个核对 sha256
+    missing = [r for r in sorted(heads) if r in sel["runs"] and not same(r)]
+    bad_extra = [r for r in sorted(heads) if r not in sel["runs"] and not _extra_verifiable(r, sel)]
     extra = [r for r in sorted(heads) if r not in sel["runs"]]
-    if missing:
-        print("拒绝: 以下 run 不在锁定清单里或分类头/结果不一致: " + ", ".join(missing[:8]))
+    not_evaluated = [r for r in sorted(sel["runs"]) if r not in heads]
+    if missing or bad_extra:
+        print("拒绝: 已评估 run 与锁定不一致: " + ", ".join((missing + bad_extra)[:8]))
         return 3
     os.makedirs(os.path.dirname(SEL11_JSON), exist_ok=True)
     out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "selection_lock_commit": why,
            "selection_sha256": sha256_file(SEL11_JSON), "target_cache": ev.target_meta, "heads": heads,
-           "note": "extra(不在锁定清单) 的头 = " + (", ".join(extra) if extra else "无")}
+           "note": "extra(不在锁定清单) = " + (", ".join(extra) if extra else "无")
+                   + "; 未评估(锁定清单内的 stage1c 旧 run) = " + str(len(not_evaluated)) + " 个"}
     out_path = os.path.join(os.path.dirname(SEL11_JSON), "s11_target_eval.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)

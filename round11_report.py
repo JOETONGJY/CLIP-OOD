@@ -251,6 +251,12 @@ def stage_final():
                          capture_output=True)
     assert anc.returncode == 0, "事后评估记录的锁定提交不是当前 HEAD 的祖先"
     T_all = {r: v["target_acc"] for r, v in tgt["heads"].items()}
+    # 0.5×/1×/2× 的目标域精度在第十轮的事后评估里 (已提交, 不可变); 4×/8× 与 SDB 在本轮的 tgt 里
+    t10_path = os.path.join("experiment_results", "Stage1C-Training", "s1c_target_eval.json")
+    with open(t10_path, encoding="utf-8") as f:
+        t10 = json.load(f)
+    for r, v in t10["heads"].items():
+        T_all.setdefault(r, v["target_acc"])
     with open(P1_TGT, encoding="utf-8") as f:
         p1t = json.load(f)
     B = {"ce": [p1t["heads"][f"CUB_p1_dose_a0_seed{s}"]["target_acc"] for s in SEEDS],
