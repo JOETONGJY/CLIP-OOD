@@ -1,0 +1,44 @@
+# 外审第十一轮: 全套回归与自测记录
+运行提交: cafb9598249c88d78f50d31a41d4549cee3c6da7
+运行时间: 2026-11-26 20:10:54
+说明: 生成时唯一的未跟踪文件就是本记录自身 (随后提交); 冒烟结果已删除。
+
+== 默认训练路径逐位回归 (REGRESS_BATCH=128) ==
+REGRESSION_RESULT: PASS 默认路径与 11-20 留档逐位一致
+
+== 端到端工程检查 ==
+ENG_FIX_CHECK: PASS (37 项); ENG_FIX_CHECK2: PASS (33 项)  [workspace 脚本单独运行, 已在本轮启动提交上重跑]
+
+== python ld_dro.py --selftest ==
+  退出码 0 ; OK 项数: 25 ; SELFTEST: PASS
+== python ld_training.py --selftest ==
+  退出码 0 ; OK 项数: 20 ; SELFTEST: PASS
+== python stage1c_radius_diagnose.py --selftest ==
+  退出码 0 ; OK 项数: 20 ; SELFTEST: PASS
+== python stage1c_pen_recheck.py --selftest ==
+  退出码 0 ; OK 项数: 3 ; SELFTEST: PASS
+== python stage1c_calibration_traincore.py --selftest ==
+  退出码 0 ; OK 项数: 5 ; SELFTEST: PASS
+== python stage1c_calibration_sdb.py --selftest ==
+  退出码 0 ; OK 项数: 4 ; SELFTEST: PASS
+== python stage1c_training_report.py --selftest ==
+  退出码 0 ; OK 项数: 8 ; SELFTEST: PASS
+== python round11_report.py --selftest ==
+  退出码 0 ; OK 项数: 3 ; SELFTEST: PASS
+== python p1_independent_report.py --selftest ==
+  退出码 0 ; OK 项数: 17 ; SELFTEST: PASS
+== python descriptor_bank.py --selftest ==
+  退出码 0 ; OK 项数: 25 ; SELFTEST: PASS
+== python sdb204_zero_train_diagnose.py --selftest ==
+  退出码 0 ; OK 项数: 10 ; SELFTEST: PASS
+
+== run_matrix 导入自检 + 新矩阵 dry_run ==
+导入自检: PASS
+已完成 0 / 12
+已完成 0 / 36
+
+== 事后评估等价性 (validate_stage0) ==
+VALIDATE: PASS
+
+== 冒烟 (已删除结果文件) ==
+sdb_isda@SDB词库 2ep: 词库/椭球/标定引用与缓存命中正确; warmup 2ep: 有效 λ = λ/20、2λ/20, grad_diag 同步
