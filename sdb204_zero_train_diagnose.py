@@ -3,11 +3,15 @@
 两份词库对照：Original-204（训练在用）与 SDB-204 v1.0（冻结候选，未经 CLIP 语义验证）。全部描述性：
 只用文本与源域数据（视觉统计只在 train_core），不使用目标域，不产生任何选择规则，SDB 不进入本轮训练。
   D1 类别语义保持 margin   （文本侧；margin<0 的"身份翻转"比例；8 条两库相同文本逐位一致）
-  D2 跨类别一致性（可靠性）  （reliability.py 的 r_i；8 条相同文本逐位一致）
+  D2 跨类别一致性（可靠性）  （reliability.py 的 r_i；两库都在同一 CLIP 实例同一调用模式下现算，逐位可比）
   D3 近重复与冗余           （类平均方向 |cos|>0.9 的簇；最近邻分布；相对冗余度 c̃）
   D4 三种几何（并入 Stage 0C）（G_uniform / G_RW / G_group 的谱、有效秩、eps_dom、主轴夹角）
   D5 视觉扰动投影覆盖       （train_core 的 7 种光度扰动 Δu 在各库 Language-Full 椭球里的白化半径与值域外能量）
   D6 注入稳定性             （204 个描述符逐一精确复制 / 近重复注入后的首轴余弦、有效秩熵变化）
+
+编码口径（2026-11-26 实测）：CLIP 文本编码的比特结果依赖 GPU 分配与调用历史（init 编码 / 同实例重编码 /
+全新实例编码是三个稳定但不同的结果）。E 必须经 clip_cbm_orth 的同一构造取得（与训练/§3y 逐位一致）；
+两库的 diffs/可靠性都在同一实例上现算以保证互相逐位可比，并与 Original 的现役缓存对比量化口径差。
 
 用法: python sdb204_zero_train_diagnose.py [--selftest] [--skip_d6]
 产物: experiment_results/DescriptorBank/sdb204_zero_train.{json,md} (md 报告在 §3ac 由脚本生成)
@@ -30,7 +34,7 @@ import torch.nn.functional as F  # noqa: E402
 
 from descriptor_bank import load_descriptor_bank  # noqa: E402
 from language_ellipsoid import build_ellipsoids, domain_directions, ln0, second_moments  # noqa: E402
-from reliability import compute_descriptor_clusters, compute_descriptor_redundancy, attach_domain_reliability  # noqa: E402
+from reliability import compute_descriptor_clusters, compute_descriptor_redundancy  # noqa: E402
 from run_status import git_info  # noqa: E402
 from stage1c_radius_diagnose import whiten_radius_sq  # noqa: E402
 
@@ -224,8 +228,12 @@ def main():
 
     import clip
     from args import get_args
+    from reliability import compute_domain_diffs_and_scores
 
     # ===== 0. 类别表 / 概念矩阵 / CLIP =====
+    # E 必须来自与训练完全相同的编码路径: CLIP 文本编码的结果依赖 GPU 分配与调用历史 (同进程里 init 编码 /
+    # 同实例重编码 / 全新实例编码是三个稳定但不同的口径, 2026-11-26 实测), 所以这里用 clip_cbm_orth 的同一
+    # 构造 (抛一次性模型取 concept_embeddings) —— 它在训练、Stage 1C 与本脚本里都稳定复现 §3y 记录的 E_sha256。
     sys.argv = [sys.argv[0], "--dataset", "CUB", "--seed", "1", "--epochs", "1",
                 "--CLIP_type", os.path.abspath("clip_weights/ViT-L-14.pt")]
     args = get_args()
@@ -236,28 +244,34 @@ def main():
     concept_names = list(ds.concept2id.keys())
     with open(os.path.join("experiment_results", "Stage1C-Radius", "stage1c_radius_cub.json"), encoding="utf-8") as f:
         e_ref = json.load(f)["E_sha256"]
-    clip_path = os.path.abspath("clip_weights/ViT-L-14.pt")
-    clip_model, _ = clip.load(clip_path, device=device)
+    from model.cbm_models import clip_cbm_orth
+    model = clip_cbm_orth(args=args, class_names=class_names, concept_names=concept_names,
+                          domain_diffs=ds.domain_diffs, weight_mode="none")
+    clip_model = model.clip_model
+    E = model.concept_embeddings.detach().double().cpu()
+    got_e = hashlib.sha256(E.numpy().tobytes()).hexdigest()
+    check("概念矩阵 E 与 §3y 记录逐位一致 (经 clip_cbm_orth 同一编码路径)", got_e == e_ref,
+          f"{got_e[:16]} vs {e_ref[:16]}")
     with torch.no_grad():
-        E = clip_model.encode_text(clip.tokenize(concept_names).to(device)).float().cpu()
-        E = E / E.norm(dim=-1, keepdim=True)
         cls_emb = clip_model.encode_text(
             clip.tokenize([f"a photo of a {c}." for c in class_names]).to(device)).float().cpu()
-    got_e = hashlib.sha256(E.double().numpy().tobytes()).hexdigest()
-    check("概念矩阵 E 与 §3y 记录逐位一致", got_e == e_ref, f"{got_e[:16]} vs {e_ref[:16]}")
 
-    # ===== 1. 两库的域方向与可靠性 (Original 走缓存; SDB 计算并写缓存) =====
+    # ===== 1. 两库的域方向与可靠性 —— 两库都在同一实例、同一调用模式下现算 (逐位可比), 另与 Original 的
+    # 现役缓存对比量化编码口径差 (不写入/不污染任何缓存) =====
     banks = {}
     for name, spec in (("original", "original"), ("sdb204", SDB_PATH)):
         b = load_descriptor_bank(spec)
-        holder = type("H", (), {"concept2id": ds.concept2id})()
-        attach_domain_reliability(holder, clip_model, b["source_text_prompts"], b["target_text_prompts"],
-                                  class_names, device, weight_strategy="prior_residual", verbose=True,
-                                  clip_path=clip_path)
-        banks[name] = {"bank": b, "diffs": holder.domain_diffs.double().cpu(),
-                       "rel": holder.reliability_scores.double().cpu()}
+        diffs, rel = compute_domain_diffs_and_scores(
+            clip_model, b["source_text_prompts"], b["target_text_prompts"], class_names, device, verbose=False)
+        banks[name] = {"bank": b, "diffs": diffs.double().cpu(), "rel": rel.double().cpu()}
         print(f"  [{name}] N={b['n_target']}, diffs {tuple(banks[name]['diffs'].shape)}, "
               f"rel 中位 {float(banks[name]['rel'].median()):.4f}", flush=True)
+    cached = torch.load("cache/reliability/reliability_e3abc74fcd065d5f.pt", map_location="cpu", weights_only=False)
+    reg = float((cached["scores"].double() - banks["original"]["rel"]).abs().max())
+    check("现算的 Original 可靠性与现役缓存同量级 (编码口径差的量化, 见 regime_note)",
+          0.0 <= reg < 0.05, f"最大差 {reg:.2e}")
+    regime_note = ("CLIP 文本编码的比特结果依赖 GPU 分配/调用历史; 本脚本两库都在同一实例同一调用模式下现算, "
+                   f"逐位可比; 现算 Original 与现役缓存的可靠性最大差 {reg:.2e} (编码口径差, 非同一口径的逐位比较)。")
     same_text = sorted(set(banks["original"]["bank"]["target_text_prompts"])
                        & set(banks["sdb204"]["bank"]["target_text_prompts"]))
     check("两库逐条相同的文本数与 GPT 报告一致 (8 条)", len(same_text) == 8, f"{len(same_text)} 条")
@@ -402,7 +416,7 @@ def main():
                      "sdb204": {"bank_sha256": banks["sdb204"]["bank"]["bank_sha256"],
                                 "file_sha256": banks["sdb204"]["bank"]["meta"]["file_sha256"]}},
            "E_sha256": got_e, "n_classes": len(class_names), "same_texts": len(same_text),
-           "determinism": {"margin_max_diff": dmax_m, "rel_max_diff": dmax_r},
+           "determinism": {"margin_max_diff": dmax_m, "rel_max_diff": dmax_r}, "regime_note": regime_note,
            "d1": {k: {kk: v[kk] for kk in ("margin_stat", "margin_flip_rate", "margin_by_cat", "flip_by_cat") if kk in v}
                   for k, v in banks.items()},
            "d2": {k: {"rel_stat": v["rel_stat"], "rel_by_cat": v.get("rel_by_cat")} for k, v in banks.items()},
