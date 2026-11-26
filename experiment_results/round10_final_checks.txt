@@ -1,0 +1,41 @@
+# 外审第十轮: 全套回归与自测记录
+运行提交: f748c458276d32b4789d7df0fc1a3bdf1969e38e
+运行时间: 2026-11-26 17:26:02
+说明: 生成时唯一的未跟踪文件就是本记录自身 (随后提交); 除此之外工作区干净。
+
+== 默认训练路径逐位回归 (workspace regress_default_path.py, REGRESS_BATCH=128) ==
+REGRESSION_RESULT: PASS 默认路径与 11-20 留档逐位一致 (H(q)/max/min/std/dw/train/source/target 全一致; residual/final_weights 张量逐位相等, max|diff|=0)
+
+== 端到端工程检查 ==
+ENG_FIX_CHECK: PASS (37 项)
+ENG_FIX_CHECK2: PASS (33 项)
+
+== python ld_dro.py --selftest ==
+  退出码 0 ; OK 项数: 25 ; SELFTEST: PASS
+== python ld_training.py --selftest ==
+  退出码 0 ; OK 项数: 17 ; SELFTEST: PASS
+== python stage1c_radius_diagnose.py --selftest ==
+  退出码 0 ; OK 项数: 20 ; SELFTEST: PASS
+== python stage1c_pen_recheck.py --selftest ==
+  退出码 0 ; OK 项数: 3 ; SELFTEST: PASS
+== python stage1c_calibration_traincore.py --selftest ==
+  退出码 0 ; OK 项数: 5 ; SELFTEST: PASS
+== python stage1c_training_report.py --selftest ==
+  退出码 0 ; OK 项数: 8 ; SELFTEST: PASS
+== python p1_independent_report.py --selftest ==
+  退出码 0 ; OK 项数: 17 ; SELFTEST: PASS
+== python descriptor_bank.py --selftest ==
+  退出码 0 ; OK 项数: 25 ; SELFTEST: PASS
+
+== run_matrix 导入时自检 + stage1c dry_run ==
+导入自检: PASS (含 stage1c 19 配置的完成判定与冻结值钉子)
+已完成 0 / 57
+
+== 事后评估等价性 (eval_heads_targets.py --validate_stage0) ==
+VALIDATE: PASS
+
+== stage1c_pen_recheck 真实数据重算 (此前已运行, 记录于提交 8957265) ==
+全部闭式量与已提交 stage1c JSON 逐位一致 (最大差 0.0e+00); PGD 600 条目同样本链成立
+
+== stage1c_calibration_traincore 真实数据标定 (提交 879f9b4) ==
+梯度配平与 3y 逐项一致; eps_pen 冻结值: lang_full 5.345864 / rand_full 5.339521 / lang32 5.284907 / identity 8.972407 / isda 123.476919
