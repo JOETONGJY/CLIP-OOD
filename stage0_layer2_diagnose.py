@@ -257,9 +257,11 @@ def cache_consistency(new, old):
     row_err, row_norm = diff.norm(dim=-1), ref.norm(dim=-1)
     rel = row_err / row_norm.clamp_min(1e-12)
     cos = (nf * ref).sum(-1) / (nf.norm(dim=-1) * row_norm).clamp_min(1e-12)
+    diff16 = (nf.half() - ref.half()).abs()                        # 两边都舍入到存储精度 (fp16) 再比
     out.update({"torch_equal": torch_equal_norm, "torch_equal_raw_tensors": torch_equal_raw,
                 "n_equal_rows": int((row_err == 0).sum()),
                 "frac_equal_elements": float((diff == 0).double().mean()),
+                "frac_equal_elements_fp16": float((diff16 == 0).double().mean()),
                 "max_abs_error": float(diff.max()), "mean_abs_error": float(diff.mean()),
                 "max_rel_error_l2": float(rel.max()), "mean_rel_error_l2": float(rel.mean()),
                 "median_rel_error_l2": float(rel.median()),
@@ -369,7 +371,8 @@ def write_report(res):
         add(f"| {arm(tag)['name']} | {100 * cl:.2f}% | {100 * au:.2f}% | {rel} | {agg_of(tag)['avg_aug_ce'][0]:.3f} |")
     add("")
     acc_opt, ce_opt = res["verdict_0d"]["acc_optimal"], res["verdict_0d"]["ce_optimal"]
-    add(f"- 按增强 Acc 选出的剂量：α = {acc_opt}；按增强 CE 选出的剂量：α = {ce_opt}"
+    show = lambda x_: {"a1": "1", "a2": "2"}.get(x_, "无法判定")      # noqa: E731
+    add(f"- 按增强 Acc 选出的剂量：α = {show(acc_opt)}；按增强 CE 选出的剂量：α = {show(ce_opt)}"
         + ("。**两者不一致，必须同时报告。**" if acc_opt != ce_opt else "。"))
     add("")
     add("各扰动的逐项 Acc（%，3 seeds 均值）：")
@@ -441,8 +444,9 @@ def write_report(res):
         f"{cc.get('old_row_norm_min', nan):.1f}~{cc.get('old_row_norm_max', nan):.1f}，归一化在模型 forward 里按 float32 做；"
         "所以下面是把它按同样方式归一化之后再比的：")
     add("")
-    add(f"- `torch.equal` = **{cc.get('torch_equal')}**；完全相同的行 {cc.get('n_equal_rows')} / {cc.get('n_new')}，"
-        f"完全相同的元素占 {100 * cc.get('frac_equal_elements', 0):.2f}%")
+    add(f"- `torch.equal` = **{cc.get('torch_equal')}**；完全相同的行 {cc.get('n_equal_rows')} / {cc.get('n_new')}；"
+        f"逐元素比较：与 float32 参考完全相同的占 {100 * cc.get('frac_equal_elements', 0):.2f}%，"
+        f"参考也舍入到 fp16 后相同的占 {100 * cc.get('frac_equal_elements_fp16', 0):.2f}%")
     add(f"- 最大绝对误差 {cc.get('max_abs_error', nan):.3e}（均值 {cc.get('mean_abs_error', nan):.3e}）")
     add(f"- 最大相对误差 ‖new − old‖₂ / ‖old‖₂ = {cc.get('max_rel_error_l2', nan):.3e}"
         f"（中位数 {cc.get('median_rel_error_l2', nan):.3e}；超过 1e-2 的样本 {cc.get('n_rows_rel_gt_1e-2')} 个，超过 1e-3 的 "
