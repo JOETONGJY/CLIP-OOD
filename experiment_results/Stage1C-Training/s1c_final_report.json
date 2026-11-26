@@ -1,0 +1,397 @@
+{
+ "selected_target": {
+  "langfull": {
+   "strength": "2",
+   "target_acc": [
+    55.234657039711195,
+    54.348539547095505,
+    55.26747620610436
+   ],
+   "mean": 54.95022426430369
+  },
+  "randfull": {
+   "strength": "0.5",
+   "target_acc": [
+    48.40827042993108,
+    48.17853626517886,
+    48.572366261896946
+   ],
+   "mean": 48.38639098566896
+  },
+  "lang32": {
+   "strength": "2",
+   "target_acc": [
+    55.234657039711195,
+    54.44699704627502,
+    55.13619954053167
+   ],
+   "mean": 54.93928454217263
+  },
+  "identity": {
+   "strength": "1",
+   "target_acc": [
+    49.16311125697407,
+    48.572366261896946,
+    49.49130292090581
+   ],
+   "mean": 49.07559347992561
+  },
+  "isda": {
+   "strength": "2",
+   "target_acc": [
+    56.35050869707909,
+    55.49721037085658,
+    56.186412865113226
+   ],
+   "mean": 56.011377311016304
+  },
+  "pgd": {
+   "strength": "1 (锚点)",
+   "target_acc": [
+    52.14965539875287,
+    51.75582540203479,
+    52.54348539547095
+   ],
+   "mean": 52.14965539875286
+  }
+ },
+ "paired": {
+  "langfull_vs_DDO_a2": {
+   "diff_per_seed": [
+    -1.115851657367898,
+    -1.115851657367898,
+    -1.5096816540859876
+   ],
+   "n_positive": 0,
+   "mean": -1.2471283229405945
+  },
+  "langfull_vs_DDO_a1": {
+   "diff_per_seed": [
+    0.3938299967180896,
+    -0.2625533311453907,
+    0.5251066622907743
+   ],
+   "n_positive": 2,
+   "mean": 0.21879444262115774
+  },
+  "langfull_vs_CE": {
+   "diff_per_seed": [
+    6.826386609780116,
+    6.202822448309817,
+    6.432556613062026
+   ],
+   "n_positive": 3,
+   "mean": 6.4872552237173196
+  },
+  "randfull_vs_DDO_a2": {
+   "diff_per_seed": [
+    -7.942238267148014,
+    -7.28585493928454,
+    -8.204791598293404
+   ],
+   "n_positive": 0,
+   "mean": -7.810961601575319
+  },
+  "randfull_vs_DDO_a1": {
+   "diff_per_seed": [
+    -6.432556613062026,
+    -6.432556613062033,
+    -6.170003281916642
+   ],
+   "n_positive": 0,
+   "mean": -6.345038836013567
+  },
+  "randfull_vs_CE": {
+   "diff_per_seed": [
+    0.0,
+    0.032819166393174726,
+    -0.2625533311453907
+   ],
+   "n_positive": 1,
+   "mean": -0.07657805491740532
+  },
+  "lang32_vs_DDO_a2": {
+   "diff_per_seed": [
+    -1.115851657367898,
+    -1.017394158188381,
+    -1.6409583196586794
+   ],
+   "n_positive": 0,
+   "mean": -1.2580680450716528
+  },
+  "lang32_vs_DDO_a1": {
+   "diff_per_seed": [
+    0.3938299967180896,
+    -0.16409583196587363,
+    0.3938299967180825
+   ],
+   "n_positive": 2,
+   "mean": 0.20785472049009948
+  },
+  "lang32_vs_CE": {
+   "diff_per_seed": [
+    6.826386609780116,
+    6.301279947489334,
+    6.301279947489334
+   ],
+   "n_positive": 3,
+   "mean": 6.476315501586261
+  },
+  "identity_vs_DDO_a2": {
+   "diff_per_seed": [
+    -7.187397440105023,
+    -6.892024942566458,
+    -7.28585493928454
+   ],
+   "n_positive": 0,
+   "mean": -7.121759107318674
+  },
+  "identity_vs_DDO_a1": {
+   "diff_per_seed": [
+    -5.677715786019036,
+    -6.038726616343951,
+    -5.2510666229077785
+   ],
+   "n_positive": 0,
+   "mean": -5.655836341756921
+  },
+  "identity_vs_CE": {
+   "diff_per_seed": [
+    0.7548408270429903,
+    0.4266491631112572,
+    0.6563833278634732
+   ],
+   "n_positive": 3,
+   "mean": 0.6126244393392403
+  },
+  "isda_vs_DDO_a2": {
+   "diff_per_seed": [
+    0.0,
+    0.032819166393174726,
+    -0.5907449950771237
+   ],
+   "n_positive": 1,
+   "mean": -0.18597527622798302
+  },
+  "isda_vs_DDO_a1": {
+   "diff_per_seed": [
+    1.5096816540859876,
+    0.8861174926156821,
+    1.4440433212996382
+   ],
+   "n_positive": 3,
+   "mean": 1.2799474893337692
+  },
+  "isda_vs_CE": {
+   "diff_per_seed": [
+    7.942238267148014,
+    7.35149327207089,
+    7.35149327207089
+   ],
+   "n_positive": 3,
+   "mean": 7.548408270429931
+  },
+  "pgd_vs_DDO_a2": {
+   "diff_per_seed": [
+    -4.200853298326223,
+    -3.708565802428616,
+    -4.2336724647193975
+   ],
+   "n_positive": 0,
+   "mean": -4.047697188491412
+  },
+  "pgd_vs_DDO_a1": {
+   "diff_per_seed": [
+    -2.691171644240235,
+    -2.8552674762061088,
+    -2.1988841483426356
+   ],
+   "n_positive": 0,
+   "mean": -2.58177442292966
+  },
+  "pgd_vs_CE": {
+   "diff_per_seed": [
+    3.741384968821791,
+    3.610108303249099,
+    3.708565802428616
+   ],
+   "n_positive": 3,
+   "mean": 3.686686358166502
+  },
+  "langfull_vs_randfull_same_budget": {
+   "diff_per_seed": [
+    6.826386609780116,
+    6.170003281916642,
+    6.695109944207417
+   ],
+   "n_positive": 3,
+   "mean": 6.563833278634725
+  },
+  "langfull_vs_identity_same_budget": {
+   "diff_per_seed": [
+    6.071545782737125,
+    5.77617328519856,
+    5.776173285198553
+   ],
+   "n_positive": 3,
+   "mean": 5.87463078437808
+  },
+  "langfull_vs_lang32_same_budget": {
+   "diff_per_seed": [
+    0.0,
+    -0.09845749917951707,
+    0.1312766655726918
+   ],
+   "n_positive": 1,
+   "mean": 0.010939722131058241
+  },
+  "langfull_vs_isda_same_budget": {
+   "diff_per_seed": [
+    -1.115851657367898,
+    -1.1486708237610728,
+    -0.9189366590088639
+   ],
+   "n_positive": 0,
+   "mean": -1.0611530467126116
+  }
+ },
+ "gates": {
+  "langfull_vs_DDO_a2": false,
+  "langfull_vs_DDO_a1": false,
+  "langfull_vs_CE": true,
+  "randfull_vs_DDO_a2": false,
+  "randfull_vs_DDO_a1": false,
+  "randfull_vs_CE": false,
+  "lang32_vs_DDO_a2": false,
+  "lang32_vs_DDO_a1": false,
+  "lang32_vs_CE": true,
+  "identity_vs_DDO_a2": false,
+  "identity_vs_DDO_a1": false,
+  "identity_vs_CE": true,
+  "isda_vs_DDO_a2": false,
+  "isda_vs_DDO_a1": true,
+  "isda_vs_CE": true,
+  "pgd_vs_DDO_a2": false,
+  "pgd_vs_DDO_a1": false,
+  "pgd_vs_CE": true,
+  "langfull_vs_randfull_same_budget": true,
+  "langfull_vs_identity_same_budget": true,
+  "langfull_vs_lang32_same_budget": false,
+  "langfull_vs_isda_same_budget": false
+ },
+ "core_questions": {
+  "q1_langfull_beats_selected_ddo_a2": false,
+  "q2_langfull_beats_spectral_random_same_budget": true
+ },
+ "fixed_anchor": {
+  "langfull_x1_vs_randfull_same": {
+   "diff_per_seed": [
+    4.725959960617004,
+    4.529044962257956,
+    4.890055792582871
+   ],
+   "n_positive": 3,
+   "mean": 4.715020238485944
+  },
+  "langfull_x1_vs_pgd_x1": {
+   "diff_per_seed": [
+    0.9517558254020386,
+    1.0502133245815557,
+    0.7876599934361721
+   ],
+   "n_positive": 3,
+   "mean": 0.9298763811399221
+  },
+  "langfull_x1_vs_identity_x1": {
+   "diff_per_seed": [
+    3.938299967180839,
+    4.2336724647193975,
+    3.839842468001315
+   ],
+   "n_positive": 3,
+   "mean": 4.003938299967184
+  },
+  "langfull_x1_vs_isda_x1": {
+   "diff_per_seed": [
+    -1.6081391532655047,
+    -1.0502133245815557,
+    -1.247128322940597
+   ],
+   "n_positive": 0,
+   "mean": -1.3018269335958859
+  },
+  "langfull_x1_vs_DDO_a2": {
+   "diff_per_seed": [
+    -3.249097472924184,
+    -2.6583524778470604,
+    -3.4460124712832254
+   ],
+   "n_positive": 0,
+   "mean": -3.11782080735149
+  }
+ },
+ "baselines": {
+  "ce": [
+   48.40827042993108,
+   48.14571709878569,
+   48.834919593042336
+  ],
+  "a1": [
+   54.840827042993105,
+   54.611092878240896,
+   54.74236954381359
+  ],
+  "a2": [
+   56.35050869707909,
+   55.4643912044634,
+   56.77715786019035
+  ]
+ },
+ "pgd_search_quality": {
+  "n_records": 24,
+  "all_chain_ok": true,
+  "worst_strong_minus_train": 1.52587890625e-05,
+  "final_records": [
+   {
+    "seed": 1,
+    "tag": "final",
+    "pgd_train_bound": 1.0395711660385132,
+    "pgd_strong_bound": 1.0395864248275757,
+    "ld_closed": 1.154414415359497,
+    "strong_minus_train": 1.52587890625e-05,
+    "chain_ok": true
+   },
+   {
+    "seed": 2,
+    "tag": "final",
+    "pgd_train_bound": 1.0392992496490479,
+    "pgd_strong_bound": 1.0393140316009521,
+    "ld_closed": 1.1531078815460205,
+    "strong_minus_train": 1.4781951904296875e-05,
+    "chain_ok": true
+   },
+   {
+    "seed": 3,
+    "tag": "final",
+    "pgd_train_bound": 1.0180104970932007,
+    "pgd_strong_bound": 1.0180249214172363,
+    "ld_closed": 1.1303058862686157,
+    "strong_minus_train": 1.4424324035644531e-05,
+    "chain_ok": true
+   }
+  ]
+ },
+ "created": "2026-11-26 18:34:27",
+ "code": {
+  "commit": "80b031f6db3484c21d830ce0c4ad45efebbe58ec",
+  "dirty": true
+ },
+ "selection_lock_commit": "80b031f6db3484c21d830ce0c4ad45efebbe58ec",
+ "selection_sha256": "361e6ea54489f5cde5903da5039f9213760192167b878901f4f9a9b12acc494b",
+ "target_eval_sha256": "c22fda2f52aeb1466d270cffe20a7eda9dd97d7ca7449a278fea2e422849c632",
+ "target_cache": {
+  "path": "cache\\CUB_target_test.pt",
+  "sha256": "3caa3a29f54cd67e555bbc1130c8bddb6ab2fe223ac0d0d3fd32b5fde900320d",
+  "n": 3047
+ }
+}
