@@ -48,8 +48,11 @@ CFG_SKIP = {"run_tag", "seed", "alpha", "ld_mode", "ld_eps", "ld_lam", "ld_ell",
             "pgd_seed", "ld_calib", "device", "wandb", "descriptor_bank", "isda_warmup_epochs"}
 
 
+RUN_PREFIX = {"langfull": "s1c_langfull", "isda": "s1c_isda", "sdb_isda": "sdb_isda"}
+
+
 def _tag_of(arm, m, s):
-    return f"CUB_{arm}_{MTAG[m]}_seed{s}"
+    return f"CUB_{RUN_PREFIX[arm]}_{MTAG[m]}_seed{s}"
 
 
 def load_runs():
@@ -209,11 +212,11 @@ def stage_source():
     with open(os.path.join("experiment_results", "Stage0D-Independent", "p1_source_selection.json"),
               encoding="utf-8") as f:
         p1 = json.load(f)
-    p1_curve = {str(r["alpha"]): r["mean_aug_acc"] for r in p1["table"]}
+    p1_curve = {float(r["alpha"]): r["mean_aug_acc"] for r in p1["table"]}
     for dt in DOSES:
-        a = {"dose_a0": "0", "dose_a0p125": "0.125", "dose_a0p25": "0.25", "dose_a0p5": "0.5",
-             "dose_a1": "1", "dose_a2": "2", "dose_a4": "4"}[dt]
-        L.append(f"| {a} | {_f(sel['sdb_dose_curve'][dt])} | {_f(p1_curve[a])} |")
+        a = {"dose_a0": 0.0, "dose_a0p125": 0.125, "dose_a0p25": 0.25, "dose_a0p5": 0.5,
+             "dose_a1": 1.0, "dose_a2": 2.0, "dose_a4": 4.0}[dt]
+        L.append(f"| {a:g} | {_f(sel['sdb_dose_curve'][dt])} | {_f(p1_curve[a])} |")
     L += ["", "## 选择结果", ""]
     for tag in sel["scan"]:
         sc = sel["scan"][tag]
