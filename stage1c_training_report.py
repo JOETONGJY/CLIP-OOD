@@ -69,6 +69,13 @@ def sha256_file(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
+def _same(got, want):
+    try:
+        return float(got) == float(want)
+    except (TypeError, ValueError):
+        return got == want
+
+
 def _tag_of(arm_tag, m, s):
     return f"CUB_s1c_{arm_tag}_{MTAG[m]}_seed{s}"
 
