@@ -123,15 +123,12 @@ def top_axes(G, k=32):
 
 
 def subspace_angles(V1, V2):
-    """两个 (K, k) 正交标架的逐对主轴余弦（贪心配对的近似；只作描述）。"""
-    M = (V1.T @ V2).abs()
-    out, W = [], M.clone()
-    for _ in range(min(V1.size(1), V2.size(1))):
-        i, j = divmod(int(W.argmax()), W.size(1))
-        out.append(float(M[i, j]))
-        W[i, :] = -1
-        W[:, j] = -1
-    return out
+    """两个 (K, k) 正交标架所张子空间的主角余弦: svd(V1ᵀ V2) 的奇异值（降序，σ_i = cos θ_i）。
+    外审第十一轮更正: 此前的"贪心配对余弦"不等价于子空间主角——同一子空间内换一组基读数就会变，
+    且贪心逐对最大化会系统性高估重合度；主角是子空间的不变量（基的选择无关）。
+    返回 min(k1, k2) 个奇异值（降序）。"""
+    M = V1.T @ V2
+    return torch.linalg.svdvals(M).tolist()
 
 
 def uniform_G(U_flat, N, C):
@@ -198,8 +195,21 @@ def self_test():
     check("T6 谱摘要: tr = sum(λ), 有效秩熵 ∈ [1, K]",
           abs(sp["tr"] - float(G_u.trace())) < 1e-12 and 1.0 <= sp["eff_rank_entropy_all"] <= K)
     V = top_axes(G_u, 8)
-    check("T7 主轴标架正交; 同标架主轴余弦全为 1",
+    check("T7 主轴标架正交; 同标架的主角余弦全为 1",
           float((V.T @ V - torch.eye(8, dtype=torch.float64)).abs().max()) < 1e-10 and min(subspace_angles(V, V)) > 1 - 1e-9)
+    # 外审第十一轮: 主角是子空间不变量 —— 同一子空间换一组基, 主角不变; 半重合的子空间给出一半 1 一半 0
+    Q, _ = torch.linalg.qr(torch.randn(K, K, dtype=torch.float64))
+    W = Q[:, :K - 8] - V @ (V.T @ Q[:, :K - 8])                      # 与 span(V) 正交
+    W = torch.linalg.qr(W)[0]                                        # 再正交化: WᵀV = 0, WᵀW = I
+    V_rot = V @ torch.linalg.qr(torch.randn(8, 8, dtype=torch.float64))[0]   # 同一子空间, 换一组基
+    a_same = subspace_angles(V, V_rot)
+    V_half = torch.cat([V[:, :4], W[:, :4]], dim=1)                  # 前 4 列在 span(V) 内, 后 4 列与其正交
+    a_half = subspace_angles(V, V_half)
+    check("T7b 主角是子空间不变量: 同一子空间换基后主角不变且全 1 (贪心配对做不到)",
+          max(abs(a - 1.0) for a in a_same) < 1e-9 and torch.allclose(torch.tensor(a_same), torch.tensor(subspace_angles(V, V)), atol=1e-9))
+    check("T7c 半重合子空间的主角 = 4 个 1 + 4 个 ~0",
+          min(a_half[:4]) > 1 - 1e-9 and max(a_half[4:]) < 1e-9,
+          f"{[round(x, 3) for x in a_half]}")
     inj = inject_stats(G_u, U3, "exact", 1)
     inj_n = inject_stats(G_u, U3, "near", 1)
     check("T8 注入统计: N 项都记录, 首轴余弦 ≤ 1 (浮点容差), 有效秩熵不增 (精确注入使谱更集中; 近注入允许略增)",
