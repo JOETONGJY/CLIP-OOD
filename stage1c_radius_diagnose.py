@@ -21,8 +21,11 @@
   rand32     Random-32        与 lang32 同谱
   identity   Identity-H       H / (K−1)
 随机椭球的种子与分类头的训练种子配对 (1 / 2 / 3), 不只依赖一个偶然的随机矩阵。
+每个分类头的有效权重 (A, c) 在加载时单独存一份, 并核对它能复现该头自己的 logits (2026-11-26 的首次正式运行
+共用了会话里的分类头, 收敛头部分的数字无效, 已重算)。
 
 用法: python stage1c_radius_diagnose.py [--selftest] [--smoke]
+  --conv_extra "1/128,1/64": 事后补充的 PGD 收敛检查 (不在预注册范围内), 结果写到单独的文件
   --smoke: 缩小规模的真实数据冒烟 (1 个 seed、3 个 ε、不做收敛检查、不写产物), 只用来在正式运行前检查流程能否走通
 产物: experiment_results/Stage1C-Radius/stage1c_radius_cub.{json,md} (md 由同一份结果生成)
 """
@@ -296,6 +299,14 @@ def build_session(cfg, seed):
     return _NoTargetSession(argparse.Namespace(**c))
 
 
+def head_state(sess, bias_free=False):
+    """分类头的有效权重 A = W⊙γ 与偏置 c = W·β + b, 在加载之后立刻单独存一份 (clone)。
+    同一结构的多个分类头共用一个会话对象, 会话里的分类头会被下一个头覆盖 —— 之后再用会话去取就拿到了别人的。
+    无偏置路径 (full_bf / split_bf) 的 logits 里没有偏置, c 记为 0。"""
+    A, c = effective_response(sess.model.classifier)
+    return {"sess": sess, "A": A.detach().clone(), "c": (torch.zeros_like(c) if bias_free else c.detach().clone())}
+
+
 def _sha(path):
     with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
@@ -310,24 +321,9 @@ def _f(x, nd=3):
     return "nan" if x is None or x != x else f"{x:.{nd}f}"
 
 
-def main():
-    if "--selftest" in sys.argv[1:]:
-        return self_test()
-    smoke = "--smoke" in sys.argv[1:]
-    if smoke:
-        global SEEDS, ARMS, MAIN_ARMS, GRID_MULT, CONV_HEADS, CONV_MULT
-        SEEDS, ARMS, MAIN_ARMS = (1,), ("ce_a0", "full_a1"), ("ce_a0",)
-        GRID_MULT, CONV_HEADS, CONV_MULT = (1 / 16, 1 / 4, 1.0), (), ()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    t0 = time.time()
-    code = git_info()
-    ok = True
-
-    def check(name, cond, detail=""):
-        nonlocal ok
-        ok &= bool(cond)
-        print(("  OK  " if cond else "  BAD  ") + name + ("  [%s]" % detail if detail else ""), flush=True)
-
+def prepare(device, check):
+    """准备工作 (步骤 1–4): 初始化会话 → 概念矩阵 E / 域方向 / G → 五个椭球 → 量纲锚点 → 分类头与 heldout_val 上的 logits。
+    正式诊断与事后补充检查共用这一段, 保证两者用的是同一批对象。"""
     # ===== 1. 初始化会话: 概念矩阵 E、域方向、固定批次 =====
     init_cfg, init_ref = {}, {}
     for s in SEEDS:
@@ -401,7 +397,10 @@ def main():
             sess.model.eval()
             return sess.model(clean_val)[1].detach()
 
-    heads = {("init", s): {"sess": init_sess[s], "logits": logits_of(init_sess[s]), "sha": None} for s in SEEDS}
+    heads = {}
+    for s in SEEDS:
+        sess = init_sess[s]
+        heads[("init", s)] = {**head_state(sess, False), "logits": logits_of(sess), "sha": None, "ddo_dirs": "full"}
     conv_sess, head_sha = {}, {}
     for arm in ARMS:
         for s in SEEDS:
@@ -412,16 +411,106 @@ def main():
                 conv_sess[key] = build_session(h["run_config"], 1)
             sess = conv_sess[key]
             sess.model.classifier.load_state_dict(h["classifier"], strict=True)
-            heads[(arm, s)] = {"sess": sess, "logits": logits_of(sess)}
+            bf = h["run_config"].get("ddo_dirs") in ("full_bf", "split_bf")      # 无偏置路径: logits 里没有偏置
+            heads[(arm, s)] = {**head_state(sess, bf), "logits": logits_of(sess), "ddo_dirs": h["run_config"].get("ddo_dirs")}
             head_sha[f"{arm}|{s}"] = _sha(path)
     check("全部分类头都已就位 (每个 seed: 1 个初始化 + 9 个收敛)", len(heads) == len(SEEDS) * (1 + len(ARMS)))
+    # 一致性核对: 每个头存下的有效权重 (A, c) 必须能复现它自己的 logits —— 同一结构的多个头共用会话时,
+    # 这能发现"拿错了头" (2026-11-26 的正式运行就出过这个错: 惩罚用了同一组里最后一个头的 A)
+    u_val64 = ln0(clean_val.double().cpu() @ E.T)
+    worst_head = 0.0
+    for hkey, H in heads.items():
+        rec = u_val64 @ H["A"].double().cpu().T + H["c"].double().cpu()
+        worst_head = max(worst_head, float((rec - H["logits"].double().cpu()).abs().max()))
+    check("每个分类头的有效权重 (A, c) 都能复现它自己的 logits (最大绝对差 < 1e-2)", worst_head < 1e-2, f"{worst_head:.2e}")
+
+    return {"device": device, "init_sess": init_sess, "init_ref": init_ref, "E": E, "U": U, "G": G, "K": K,
+            "ELL": ELL, "ell_meta": ell_meta, "rand_seed_used": rand_seed_used, "dom": dom, "eps_dom": eps_dom,
+            "vis": vis, "du_norm": du_norm, "aug_names": aug_names, "heads": heads, "y_val": y_val, "head_sha": head_sha,
+            "val_idx": val_idx}
+
+
+def conv_extra(mults):
+    """事后补充的 PGD 收敛检查 (不在预注册范围内; RESULTS §3y 里明确标注为事后补充)。
+    预注册的收敛检查只覆盖 ε ≥ ε_dom/16, 而配平出来的半径约为 ε_dom/60; 这里对同样的 3 个分类头 × 5 个椭球,
+    在给定的更小半径 (× ε_dom) 上重复同一个判据。与正式运行共用 prepare(), 结果写到单独的文件。"""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    ok = True
+
+    def check(name, cond, detail=""):
+        nonlocal ok
+        ok &= bool(cond)
+        print(("  OK  " if cond else "  BAD  ") + name + ("  [%s]" % detail if detail else ""), flush=True)
+
+    ctx = prepare(device, check)
+    heads, ELL, y_val, eps_dom = ctx["heads"], ctx["ELL"], ctx["y_val"], ctx["eps_dom"]
+
+    def M_of(hkey, e):
+        return heads[hkey]["A"] @ ELL[hkey[1]][e].float().to(device)
+
+    conv = []
+    for hkey in CONV_HEADS:
+        for e in ELL_ORDER:
+            M = M_of(hkey, e)
+            lg, yy = heads[hkey]["logits"][:N_CONV], y_val[:N_CONV]
+            for mult in mults:
+                eps = eps_dom * mult
+                b1 = pgd_worst_per_sample(lg, M, yy, eps, PGD_STEPS, PGD_RESTARTS, PGD_SEED)
+                b2 = pgd_worst_per_sample(lg, M, yy, eps, CONV_STEPS, CONV_RESTARTS, PGD_SEED + 1)
+                inc = b2 - b1
+                conv.append({"head": f"{hkey[0]}|{hkey[1]}", "ell": e, "eps": eps, "mult": mult, "mean_inc": float(inc.mean()),
+                             "max_inc": float(inc.max()), "n_gt_1e-3": int((inc > 1e-3).sum()),
+                             "converged": bool(inc.mean() < CONV_MEAN_TOL and inc.max() < CONV_MAX_TOL)})
+        print(f"  事后收敛检查完成 {hkey}", flush=True)
+    n_ok = sum(c["converged"] for c in conv)
+    check("事后补充检查: 全部检查点都满足收敛判据", n_ok == len(conv),
+          f"{n_ok}/{len(conv)}; 最大平均增量 {_f(max(c['mean_inc'] for c in conv), 6)}, 最大单样本增量 {_f(max(c['max_inc'] for c in conv), 4)}")
+    os.makedirs(OUT_DIR, exist_ok=True)
+    out = {"posthoc": True, "created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(),
+           "note": "事后补充的 PGD 收敛检查, 不在预注册 (RESULTS §3x) 范围内; 预注册的检查只覆盖 ε ≥ ε_dom/16",
+           "eps_dom": eps_dom, "mults": list(mults), "settings": {"steps": CONV_STEPS, "restarts": CONV_RESTARTS, "n": N_CONV,
+                                                                    "eval_steps": PGD_STEPS, "eval_restarts": PGD_RESTARTS,
+                                                                    "mean_tol": CONV_MEAN_TOL, "max_tol": CONV_MAX_TOL},
+           "convergence": conv, "n_converged": n_ok, "all_converged": n_ok == len(conv)}
+    with open(os.path.join(OUT_DIR, "stage1c_radius_cub_conv_extra.json"), "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"[saved] {OUT_DIR}/stage1c_radius_cub_conv_extra.json  ({n_ok}/{len(conv)} 个检查点收敛)")
+    return 0 if ok else 1
+
+
+def main():
+    if "--selftest" in sys.argv[1:]:
+        return self_test()
+    if "--conv_extra" in sys.argv[1:]:
+        toks = sys.argv[sys.argv.index("--conv_extra") + 1].split(",")
+        return conv_extra([int(a) / int(b) for a, b in (t.split("/") for t in toks)])
+    smoke = "--smoke" in sys.argv[1:]
+    if smoke:
+        global SEEDS, ARMS, MAIN_ARMS, GRID_MULT, CONV_HEADS, CONV_MULT
+        SEEDS, ARMS, MAIN_ARMS = (1,), ("ce_a0", "full_a1"), ("ce_a0",)
+        GRID_MULT, CONV_HEADS, CONV_MULT = (1 / 16, 1 / 4, 1.0), (), ()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    t0 = time.time()
+    code = git_info()
+    ok = True
+
+    def check(name, cond, detail=""):
+        nonlocal ok
+        ok &= bool(cond)
+        print(("  OK  " if cond else "  BAD  ") + name + ("  [%s]" % detail if detail else ""), flush=True)
+
+    ctx = prepare(device, check)                                # 步骤 1–4
+    ELL, eps_dom, heads, y_val = ctx["ELL"], ctx["eps_dom"], ctx["heads"], ctx["y_val"]
+    dom, vis, du_norm, aug_names = ctx["dom"], ctx["vis"], ctx["du_norm"], ctx["aug_names"]
+    init_sess, init_ref, head_sha, val_idx = ctx["init_sess"], ctx["init_ref"], ctx["head_sha"], ctx["val_idx"]
+    ell_meta, rand_seed_used, E, U, G, K = ctx["ell_meta"], ctx["rand_seed_used"], ctx["E"], ctx["U"], ctx["G"], ctx["K"]
 
     # ===== 5. 逐 (分类头, 椭球): 单位半径、ε 网格上的闭式量、PGD 下界 =====
     grid = [eps_dom * m for m in GRID_MULT]
     table = {}
 
     def A_of(hkey):
-        return effective_response(heads[hkey]["sess"].model.classifier)[0].detach()   # (A, c) 取 A = W⊙γ
+        return heads[hkey]["A"]
 
     def M_of(hkey, e):
         return A_of(hkey) @ ELL[hkey[1]][e].float().to(device)
