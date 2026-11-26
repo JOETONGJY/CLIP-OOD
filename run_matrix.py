@@ -243,6 +243,13 @@ MATRICES = {
     # 第十一轮 P2 (预注册 §3ad): SDB-204 × {DDO 七剂量, ISDA 五强度}, 12 配置 × 3 seeds = 36 run。
     # Original+DDO 复用 p1 的七剂量; Original+ISDA 复用 stage1c 的 x0p5/x1/x2 + s1c_ext 的 x4/x8
     "sdb22": ("SDB-2x2", _sdb22_entries()),
+    # 第十一轮 P3 (预注册 §3ad): ISDA 线性 warmup 消融 —— 在源域选中的 λ (8×) 上加前 20 epoch 线性 warmup,
+    # 3 seeds, 与固定 λ 的选中 run 严格配对 (同 seed 同 λ 值)。矩阵在选择锁定 (35d9985) 之后注册, λ 由此冻结
+    "s11_warmup": ("Stage1C-Training", [
+        ("CUB", "isda_warm_x8",
+         EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                  "--ld_lam", repr(float(LD_ARMS["isda"]["anchor"]) * 8), "--isda_warmup_epochs", "20"] + LD_P1),
+    ]),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -336,6 +343,12 @@ def _self_test_expected():
             and os.path.normpath(e["ld_calib"]) == os.path.normpath(SDB_CALIB)), e
     e = expected(COMMON + MATRICES["sdb22"][1][11][2], "CUB", 1, "sdb_isda_x8")
     assert float(e["ld_lam"]) == float(repr(float(_SCAL["isda"]["anchor"]) * 8)), e
+    # P3: warmup 矩阵 1 配置 × 3 seeds; λ 与 Original-ISDA 的 x8 逐位相同 (配对对象), warmup=20
+    assert len(MATRICES["s11_warmup"][1]) == 1
+    e = expected(COMMON + MATRICES["s11_warmup"][1][0][2], "CUB", 1, "isda_warm_x8")
+    e8 = expected(COMMON + MATRICES["s1c_ext"][1][3][2], "CUB", 1, "s1c_isda_x8")
+    assert (e["ld_lam"] == e8["ld_lam"] and e["isda_warmup_epochs"] == "20"
+            and e8.get("isda_warmup_epochs", 0) == 0 and e["ld_calib"] == e8["ld_calib"]), (e, e8)
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
