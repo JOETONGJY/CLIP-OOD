@@ -24,8 +24,61 @@ Reliability-Weighted DDO: 可复用的可靠性计算与权重生成模块。
     # prior_residual 策略下, domain_weights = reliability_scores (作为 prior 透传给 model)
 """
 from typing import List, Optional
+import json
+import os
+import sys
+import time
 import torch
 from tqdm import tqdm
+
+
+# ============================================================
+# 0. 缓存键的辅助 (2026-11-26, 外审第九轮 P4; 说明见 doc/描述符库接口.md)
+# ============================================================
+def clip_file_identity(path):
+    """CLIP 权重文件的身份: 文件 sha256 的前 16 位。带记忆 —— cache/reliability/clip_identity.json 按
+    (路径, 大小, 修改时间) 记住算过的值, 不必每次运行都读完整个权重文件。path 为空或文件不存在时返回 None。"""
+    if not path or not os.path.isfile(path):
+        return None
+    path = os.path.abspath(path)
+    st = os.stat(path)
+    memo_path = os.path.join("cache", "reliability", "clip_identity.json")
+    try:
+        with open(memo_path, encoding="utf-8") as f:
+            memo = json.load(f)
+    except (OSError, ValueError):
+        memo = {}
+    import hashlib
+    sig = {"path": path, "size": st.st_size, "mtime": int(st.st_mtime)}
+    k = f"{st.st_size}:{int(st.st_mtime)}:{hashlib.md5(path.encode('utf-8')).hexdigest()[:8]}"
+    got = (memo.get(k) or {}).get("sha256") if (memo.get(k) or {}).get("sig") == sig else None
+    if got and len(got) == 16 and all(c in "0123456789abcdef" for c in got):
+        return got
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 24), b""):
+            h.update(chunk)
+    memo[k] = {"sig": sig, "sha256": h.hexdigest()[:16]}
+    try:
+        os.makedirs(os.path.dirname(memo_path), exist_ok=True)
+        with open(memo_path, "w", encoding="utf-8") as f:
+            json.dump(memo, f, ensure_ascii=False, indent=1)
+    except OSError:
+        pass                                                 # 记不住就每次重算, 不影响正确性
+    return memo[k]["sha256"]
+
+
+def _clip_path_from_argv():
+    """命令行里 --CLIP_type 的值 (训练入口与各个诊断脚本都这样传 CLIP 权重); 没有就返回 None。"""
+    a = sys.argv
+    return a[a.index("--CLIP_type") + 1] if "--CLIP_type" in a and a.index("--CLIP_type") + 1 < len(a) else None
+
+
+def resolve_cache(cache_path, legacy_path):
+    """缓存查找顺序: 新键的文件 -> 旧键的文件 -> 都没有。"hit" | "legacy" | "miss" """
+    if os.path.exists(cache_path):
+        return "hit"
+    return "legacy" if os.path.exists(legacy_path) else "miss"
 
 
 # ============================================================
@@ -231,6 +284,7 @@ def attach_domain_reliability(
     binary_high: float = 1.8,
     binary_low: float = 0.75,
     verbose: bool = True,
+    clip_path: Optional[str] = None,
 ):
     """
     把 domain_diffs / domain_weights / reliability_scores 挂到 dataset 上。
@@ -243,6 +297,10 @@ def attach_domain_reliability(
           - dataset.domain_diffs       (num_prompts, num_classes, feat_dim)
           - dataset.reliability_scores (num_prompts,)
           - dataset.domain_weights     (num_prompts,)  根据 strategy 生成
+        另挂 reliability_cache_key 与 descriptor_bank_info (词库身份; 训练入口写进结果 json)。
+    clip_path : str, 可选
+        CLIP 权重文件的路径, 用来算缓存键里的 CLIP 身份; 不传时从命令行的 --CLIP_type 取。
+        概念名取自 dataset.concept2id (如果有)。
     weight_strategy : str
         "binary"         : 旧的手调二值化 (复现用)
         "soft"           : 连续软加权 (方案 1, 零超参)
@@ -253,26 +311,48 @@ def attach_domain_reliability(
         return
 
     # ---- 缓存: 大类数数据集 (如 DomainNet 345 类) 需 ~3 小时, 必须缓存 ----
-    # 键组成: src prompts + class_names(实际顺序) + tgt prompts (2026-11-22/23 外审修复:
-    # 旧键不含 src 模板; sorted(class_names) 与 diffs 的实际类别顺序不一致,
-    # 类别集合相同而排列不同时会错误命中)。注意: 键不含 CLIP 权重标识,
-    # 更换 CLIP_type 后需手动清理 cache/reliability (项目实际只用 ViT-L-14.pt)。
-    import hashlib, os
-    cache_key = hashlib.md5(
-        ("\u0000".join(src_dm_texts) + "\u0000" + "\u0000".join(class_names)
-         + "\u0000" + "\u0000".join(tgt_dm_texts)
-        ).encode("utf-8")
-    ).hexdigest()[:16]
+    # 键 (2026-11-26, 外审第九轮 P4): 三个文本序列 (源模板 + 类别名 (实际顺序) + 目标模板) + 概念名 (名称与顺序)
+    #       + CLIP 权重身份。完整文本、顺序、类别表、概念表、CLIP 版本都在键里, 新旧词库的缓存不会串用。
+    # 旧键 (2026-11-26 之前) 只含三个文本序列 (2026-11-22/23 的修复已把源模板与类别顺序纳入): 保留用来认领旧的缓存文件。
+    import os
+    from descriptor_bank import cache_key, text_sha256
+    from run_status import git_info
+    concept_names = list(dataset.concept2id.keys()) if isinstance(getattr(dataset, "concept2id", None), dict) else None
+    clip_path = clip_path or _clip_path_from_argv()
+    clip_id = clip_file_identity(clip_path)
+    if clip_id is None and verbose:
+        print("[reliability cache] 注意: 取不到 CLIP 权重文件, 缓存键里没有 CLIP 身份")
+    legacy_key, key = cache_key(src_dm_texts, class_names, tgt_dm_texts, concept_names, clip_id)
     cache_dir = "cache/reliability"
     os.makedirs(cache_dir, exist_ok=True)
-    cache_path = os.path.join(cache_dir, f"reliability_{cache_key}.pt")
+    cache_path = os.path.join(cache_dir, f"reliability_{key}.pt")
+    legacy_path = os.path.join(cache_dir, f"reliability_{legacy_key}.pt")
+    meta = {"key": key, "legacy_key": legacy_key,
+            "bank_sha256": text_sha256([text_sha256(src_dm_texts), text_sha256(tgt_dm_texts)]),
+            "n_source": len(src_dm_texts), "n_target": len(tgt_dm_texts), "n_classes": len(class_names),
+            "class_names_sha256": text_sha256(class_names),
+            "n_concepts": len(concept_names) if concept_names else None,
+            "concept_names_sha256": text_sha256(concept_names) if concept_names else None,
+            "clip_identity": clip_id, "clip_file": os.path.basename(clip_path) if clip_path else None,
+            "created": time.strftime("%Y-%m-%d %H:%M:%S"), "git": git_info()}
+    mode = resolve_cache(cache_path, legacy_path)                 # "hit" | "legacy" | "miss"
 
-    if os.path.exists(cache_path):
+    if mode == "hit":
         if verbose:
             print(f"[reliability cache] hit: {cache_path}")
         cached = torch.load(cache_path, map_location=device)
         domain_diffs = cached["diffs"].to(device)
         reliability_scores = cached["scores"].to(device)
+    elif mode == "legacy":
+        # 认领旧键的缓存: 直接沿用它的数值 (不重算), 既有实验的训练路径因此逐位不变。这里假定旧缓存也是由同一份
+        # CLIP 权重产生的 (项目实际只用 ViT-L-14.pt); 该假定记录在缓存里, CUB 上做过一次重算核对 (descriptor_bank_audit.py)。
+        if verbose:
+            print(f"[reliability cache] 认领旧键的缓存: {legacy_path} -> {cache_path}")
+        cached = torch.load(legacy_path, map_location=device)
+        domain_diffs = cached["diffs"].to(device)
+        reliability_scores = cached["scores"].to(device)
+        torch.save({"diffs": domain_diffs.cpu(), "scores": reliability_scores.cpu(),
+                    "meta": {**meta, "legacy_adopted": True}}, cache_path)
     else:
         if verbose:
             print(f"[reliability cache] miss, computing... ({len(class_names)} classes)")
@@ -280,13 +360,19 @@ def attach_domain_reliability(
             clip_model, src_dm_texts, tgt_dm_texts, class_names, device, verbose=verbose
         )
         torch.save(
-            {"diffs": domain_diffs.cpu(), "scores": reliability_scores.cpu()},
+            {"diffs": domain_diffs.cpu(), "scores": reliability_scores.cpu(),
+             "meta": {**meta, "legacy_adopted": False}},
             cache_path,
         )
         if verbose:
             print(f"[reliability cache] saved: {cache_path}")
         domain_diffs = domain_diffs.to(device)
         reliability_scores = reliability_scores.to(device)
+
+    dataset.reliability_cache_key = key
+    # 词库身份 (训练入口写进结果 json): 词库同时决定 DDO 约束的方向与语言域椭球的几何
+    dataset.descriptor_bank_info = {"bank_sha256": meta["bank_sha256"], "n_source": meta["n_source"],
+                                    "n_target": meta["n_target"], "cache_key": key, "clip_identity": clip_id}
 
     dataset.domain_diffs = domain_diffs
     dataset.reliability_scores = reliability_scores

@@ -87,6 +87,11 @@ def get_args():
     parser.add_argument('--CBM_type', type=str, default='clip_cbm') # clip_cbm, cliplp
     parser.add_argument('--model_save_path', type=str, default=r'logs')
     parser.add_argument('--prompt_type', type=str, default=r'origin') # origin, others
+    # ---- 描述符库 (2026-11-26, 外审第九轮 P4 准备; 说明见 doc/描述符库接口.md) ----
+    parser.add_argument('--descriptor_bank', type=str, default='original',
+                        help="描述符库: original = prompts/prompt200new.py 的 Original-204 (默认, 与原来的硬编码导入逐条相同, "
+                             "保持不变); 或一个词库文件的路径 (.json 冻结格式 / 含 source_text_prompts 与 target_text_prompts "
+                             "两个列表的 .py)。词库身份 (完整文本的 sha256) 进入可靠性缓存的键, 并写进结果 json")
     parser.add_argument("--save_model", action="store_true", default=True)
     # 2026-11-25: store_true + default=True 意味着命令行无法关闭保存 —— 11-20 的
     # 1-epoch smoke 正是这样覆盖了 best_CUB.pth。补一个显式关闭开关 (默认行为不变)。

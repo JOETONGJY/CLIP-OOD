@@ -910,6 +910,8 @@ class TrainingSession:
                 # (两者都只含 float / int / str / None, 可直接写 json; run_status.jsonable 只处理标量, 不能用来包字典)
                 'source_val': getattr(self, "source_val", None),
                 'train_subset': getattr(self, "train_subset_info", None),
+                # 描述符库身份 (2026-11-26, 外审第九轮 P4): 这个 run 用的是哪一份词库 (完整文本的 sha256)
+                'descriptor_bank': getattr(self.train_dataset, "descriptor_bank_info", None),
                 **self.best_metrics,
                 # 严格 DG 口径: 训练结束模型的指标 (final 协议下与 best 不同)
                 **{f'sel_{k}': v for k, v in sel.items()},

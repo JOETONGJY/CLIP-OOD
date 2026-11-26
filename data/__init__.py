@@ -5,11 +5,17 @@ from .RIVAL10.rival10_data import CBM_RIVAL10, CBM_RIVAL10S
 from .LAD_animal.lad_A_data import Processed_LADA,Processed_LADAS
 from .LAD_vehicle.lad_V_data import Processed_LADV,Processed_LADV3
 
-from prompts.prompt200new import source_text_prompts, target_text_prompts
+from descriptor_bank import load_descriptor_bank
 import torch
 from torch.utils.data import DataLoader
 
 def get_dataset_classes(args):
+    # 2026-11-26 (外审第九轮 P4): 词库由 --descriptor_bank 指定, 经统一入口加载并校验。默认 original =
+    # prompts/prompt200new.py 的 Original-204, 与原来的硬编码导入逐条相同。词库不合格在这里就报错,
+    # 不会带着半截词库往下走。数据集对象上挂 descriptor_bank_info (词库身份), 由训练入口写进结果 json。
+    bank = load_descriptor_bank(getattr(args, "descriptor_bank", "original") or "original")
+    source_text_prompts = bank["source_text_prompts"]
+    target_text_prompts = bank["target_text_prompts"]
     if args.dataset == "CUB":
         # source train
         train_dataset = Processed_CUB_Dataset(args,
@@ -170,5 +176,8 @@ def get_dataset_classes(args):
 
     else:
         raise NotImplementedError
+    _bank_info = getattr(train_dataset, "descriptor_bank_info", None)   # 由 reliability.attach_domain_reliability 挂上
+    if _bank_info is not None:
+        _bank_info.update({"id": bank["id"], "path": bank["path"], "n_source": bank["n_source"], "n_target": bank["n_target"]})
     torch.cuda.empty_cache()
     return train_dataset, train_loader, test_dataset, test_loader, target_test_dataset, target_test_loader
