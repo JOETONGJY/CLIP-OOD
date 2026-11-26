@@ -51,7 +51,9 @@ def pen_stats(logits, M, y, strength, kind="ld"):
     """逐 batch 的监控统计（detach 后计算，不参与梯度）。键名与 §3y 的命名更正一致：
     pen_maxpair_* = 每个样本在全部竞争类上的最大惩罚（"平均最大类别对惩罚"；历史叫法"绑定惩罚"名不副实）；
     pen_worstcomp_mean = 实际最坏竞争类（鲁棒间隔最小者）上的惩罚；
-    robust_margin_mean = min_k (m_yk − pen)；clean_margin_mean = 干净最坏间隔；clean_ce = 干净 CE。"""
+    robust_margin_mean = min_{k≠y} (m_yk − pen)；clean_margin_mean = 干净最坏间隔
+    min_{k≠y} (ℓ_y − ℓ_k) —— 外审第十一轮修正：此前未排除正确类自身（m_yk 对角恒 0，min 被它截断，
+    正确类为 argmax 的样本读数恒为 0），修正后才是真正的干净最坏间隔；clean_ce = 干净 CE。"""
     with torch.no_grad():
         rows = torch.arange(y.numel(), device=y.device)
         d2 = (M[None] - M[y][:, None, :]).pow(2).sum(-1)             # (B, C)
@@ -64,9 +66,11 @@ def pen_stats(logits, M, y, strength, kind="ld"):
         m_rob = rob.min(1).values
         wc = rob.argmin(1)
         pen_max = pen.max(1).values
+        m_clean = m_yk.clone()
+        m_clean[rows, y] = float("inf")                              # 排除正确类自身 (外审第十一轮)
         return {"pen_maxpair_mean": float(pen_max.mean()), "pen_maxpair_std": float(pen_max.std()),
                 "pen_worstcomp_mean": float(pen[rows, wc].mean()),
-                "robust_margin_mean": float(m_rob.mean()), "clean_margin_mean": float(m_yk.min(1).values.mean()),
+                "robust_margin_mean": float(m_rob.mean()), "clean_margin_mean": float(m_clean.min(1).values.mean()),
                 "clean_ce": float(F.cross_entropy(logits, y))}
 
 
@@ -161,13 +165,23 @@ def self_test():
     rob = m_yk - pen
     rob[rows, y] = float("inf")
     wc = rob.argmin(1)
-    check("L8 pen_stats: 最大对惩罚的均值/标准差、最坏竞争类惩罚、鲁棒/干净间隔、干净 CE 与手算一致",
+    m_clean = m_yk.clone()
+    m_clean[rows, y] = float("inf")                                  # 排除正确类自身 (外审第十一轮)
+    check("L8 pen_stats: 最大对惩罚的均值/标准差、最坏竞争类惩罚、鲁棒/干净间隔、干净 CE 与手算一致 (干净间隔排除自身类)",
           abs(ps["pen_maxpair_mean"] - float(pen.max(1).values.mean())) < 1e-6
           and abs(ps["pen_maxpair_std"] - float(pen.max(1).values.std())) < 1e-6
           and abs(ps["pen_worstcomp_mean"] - float(pen[rows, wc].mean())) < 1e-6
           and abs(ps["robust_margin_mean"] - float(rob.min(1).values.mean())) < 1e-6
-          and abs(ps["clean_margin_mean"] - float(m_yk.min(1).values.mean())) < 1e-6
+          and abs(ps["clean_margin_mean"] - float(m_clean.min(1).values.mean())) < 1e-6
           and abs(ps["clean_ce"] - float(ce)) < 1e-7)
+    # 干净间隔的修正核对: 全部正确类为 argmax 的样本, 修正后的干净间隔必须为正 (旧实现对角 0 使其恒为 0)
+    lg_ok = logits.detach().clone()
+    rows_ok = torch.arange(B)
+    lg_ok[rows_ok, y] = lg_ok.max(1).values + 0.5                    # 强制正确类为 argmax
+    ps_ok = pen_stats(lg_ok, M, y, 2.0, kind="ld")
+    check("L8b 修正后的干净最坏间隔在正确类为 argmax 时为正 (旧实现对角 0 使其恒为 0, 外审第十一轮)",
+          bool((ps_ok["clean_margin_mean"] > 0) if isinstance(ps_ok["clean_margin_mean"], (int, float)) else True)
+          and ps_ok["clean_margin_mean"] > 0, f"{ps_ok['clean_margin_mean']:.4f}")
     check("L9 pen_stats: 最坏竞争类惩罚 ≤ 最大对惩罚; ISDA 口径用 (lam/2)·r²",
           ps["pen_worstcomp_mean"] <= ps["pen_maxpair_mean"] + 1e-12
           and abs(pen_stats(logits.detach(), M, y, 4.0, kind="isda")["pen_maxpair_mean"]
