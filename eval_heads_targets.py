@@ -17,6 +17,8 @@ cache/<ds>_target_test.pt 上评估。不另写一套前向计算。
   python eval_heads_targets.py --validate_stage0                    # 等价性验证 (27 个 Stage 0 分类头)
   python eval_heads_targets.py [--seeds 1 2 3]                      # P1: 矩阵 p1 的 7 个剂量 (先检查选择已锁定)
   python eval_heads_targets.py --stage1c [--seeds 1 2 3]            # Stage 1C 八臂 (预注册 §3z; 门是 s1c 的选择文件)
+  python eval_heads_targets.py --s11 [--seeds 1 2 3]                # 第十一轮 (预注册 §3ad; 门是 s11 的选择文件)
+  python eval_heads_targets.py --s12 [--seeds 1 2 3]                # 第十二轮 (预注册 §3ag; 门是 s12 的选择文件)
 """
 import argparse
 import hashlib
@@ -42,6 +44,7 @@ OUT_DIR = os.path.join("experiment_results", "Stage0D-Independent")
 SELECT_JSON = os.path.join(OUT_DIR, "p1_source_selection.json")
 SEL1C_JSON = os.path.join("experiment_results", "Stage1C-Training", "s1c_source_selection.json")
 SEL11_JSON = os.path.join("experiment_results", "Stage1C-Training", "s11_source_selection.json")
+SEL12_JSON = os.path.join("experiment_results", "Stage1C-Training", "s12_source_selection.json")
 # 不影响模型结构的配置项: 这些不同也共用同一个重建的模型 (只换分类头)
 KEY_SKIP = {"run_tag", "seed", "alpha", "epochs", "lr", "weight_decay", "target_eval", "save_head", "grad_diag",
             "save_model", "overwrite_run", "train_subset_cache", "source_val_cache", "device", "wandb"}
@@ -257,11 +260,53 @@ def eval_s11(seeds):
     return 0
 
 
+def eval_s12(seeds):
+    """第十二轮（预注册 §3ag）的事后目标域评估：门是 s12 的源域选择文件；
+    覆盖 s12_geom 的全部 45 个分类头（几何对照 36 + 同 λ 6 + warmup 3）。"""
+    from run_matrix import MATRICES
+    locked, why = selection_is_locked(SEL12_JSON)
+    if not locked:
+        print("拒绝运行: 第十二轮的源域选择结果尚未锁定 —— " + why)
+        print("必须先运行 round12_report.py --stage source 并提交其输出, 再做事后目标域评估。")
+        return 2
+    ev = HeadEvaluator()
+    heads = {}
+    entries = MATRICES["s12_geom"][1]
+    for ds, tag, _ in entries:
+        for s in seeds:
+            run = f"{ds}_{tag}_seed{s}"
+            heads[run] = ev.evaluate(f"logs/heads/{run}.pt", f"logs/results/{run}.json")
+    with open(SEL12_JSON, encoding="utf-8") as f:
+        sel = json.load(f)
+
+    def same(r):
+        v, w = heads.get(r), sel["runs"].get(r, {})
+        return bool(w) and v is not None and w.get("head_sha256") == v["head_sha256"] \
+            and w.get("result_sha256") == v["result_sha256"]
+
+    missing = [r for r in sorted(heads) if not same(r)]
+    if missing:
+        print("拒绝: 已评估 run 与锁定不一致: " + ", ".join(missing[:8]))
+        return 3
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "selection_lock_commit": why,
+           "selection_sha256": sha256_file(SEL12_JSON), "target_cache": ev.target_meta, "heads": heads}
+    out_path = os.path.join(os.path.dirname(SEL12_JSON), "s12_target_eval.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"选择锁定于提交 {why[:7]}; 评估了 {len(heads)} 个分类头; 目标域 {ev.target_meta['n']} 个样本")
+    for ds, tag, _ in entries:
+        accs = [heads[f"{ds}_{tag}_seed{s}"]["target_acc"] for s in seeds]
+        print(f"  {tag:28s} " + " / ".join(f"{x:.2f}" for x in accs))
+    print(f"[saved] {out_path}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate_stage0", action="store_true")
     ap.add_argument("--stage1c", action="store_true")
     ap.add_argument("--s11", action="store_true")
+    ap.add_argument("--s12", action="store_true")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     a = ap.parse_args()
     if a.validate_stage0:
@@ -270,6 +315,8 @@ def main():
         return eval_stage1c(a.seeds)
     if a.s11:
         return eval_s11(a.seeds)
+    if a.s12:
+        return eval_s12(a.seeds)
 
     locked, why = selection_is_locked()
     if not locked:

@@ -1,0 +1,199 @@
+{
+ "created": "2026-11-27 11:44:03",
+ "code": {
+  "commit": "41106aeb43e78009f0a998ff45f39a087a1428b0",
+  "dirty": true
+ },
+ "note": "第十二轮 P1 的几何冻结 (预注册 §3ag)：随机谱椭球的三个训练 seed 各一帧，禁止事后筛选；λ 取自统一批次标定 stage1c_calibration_traincore.json，不在本脚本重算。",
+ "E_sha256": "776184621135ba284d6d5b047c7155e646ecf072db4aa476c186eddab7038e1a",
+ "G_sha256": "12edff4577f93aad5fbf89132f532ad4e8b9125fdfd2e925efcdc5d2cb9f8b43",
+ "calibration_sha256": "75a49e9fc881fa98099d568602dbd47a7821eb0f73fb0a4aae0fdc709fae4078",
+ "frames": {
+  "1": {
+   "lang_full": {
+    "sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+    "r": 311,
+    "ell_seed_used": 1,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.050768
+    }
+   },
+   "rand_full": {
+    "sha256": "46b09b98ede51143c34082cca36a0598f7f7b437844357dd98505dcdeaf7781b",
+    "r": 311,
+    "ell_seed_used": 1,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.050768
+    }
+   },
+   "identity": {
+    "sha256": "1aea801f91137499ff576bc8924b523eab0ea0b1aaa8630f6ba42e460db9670a",
+    "r": 312,
+    "ell_seed_used": 1,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.050768
+    }
+   }
+  },
+  "2": {
+   "lang_full": {
+    "sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+    "r": 311,
+    "ell_seed_used": 2,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.001217
+    }
+   },
+   "rand_full": {
+    "sha256": "2abaa2c87b3bf9c5517abd2a45f120402282adc118dd3234a4078026930a5a6a",
+    "r": 311,
+    "ell_seed_used": 2,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.001217
+    }
+   },
+   "identity": {
+    "sha256": "1aea801f91137499ff576bc8924b523eab0ea0b1aaa8630f6ba42e460db9670a",
+    "r": 312,
+    "ell_seed_used": 2,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.001217
+    }
+   }
+  },
+  "3": {
+   "lang_full": {
+    "sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+    "r": 311,
+    "ell_seed_used": 3,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.111281
+    }
+   },
+   "rand_full": {
+    "sha256": "b63e33a5cd9023f29de6582071d2f773f96dc52ac80089066ce6da343814ab4d",
+    "r": 311,
+    "ell_seed_used": 3,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.111281
+    }
+   },
+   "identity": {
+    "sha256": "1aea801f91137499ff576bc8924b523eab0ea0b1aaa8630f6ba42e460db9670a",
+    "r": 312,
+    "ell_seed_used": 3,
+    "spectrum": {
+     "r": 311,
+     "energy_captured_by_r": 1.0000000000000004,
+     "effective_rank_entropy_trunc": 10.604812416422638,
+     "lambda_max_over_lambda_min_trunc": 3826552.621721067,
+     "cos_first_axis_language_vs_random": 0.111281
+    }
+   }
+  }
+ },
+ "lambda_pen": {
+  "lang_full": 123.47691911241694,
+  "rand_full": 125.26143176378564,
+  "identity": 359.32238586783006
+ },
+ "lambda_grid": {
+  "lang_full": {
+   "0.5": 61.73845955620847,
+   "1": 123.47691911241694,
+   "2": 246.95383822483387,
+   "4": 493.90767644966775,
+   "8": 987.8153528993355
+  },
+  "rand_full": {
+   "0.5": 62.63071588189282,
+   "1": 125.26143176378564,
+   "2": 250.52286352757127,
+   "4": 501.04572705514255,
+   "8": 1002.0914541102851
+  },
+  "identity": {
+   "0.5": 179.66119293391503,
+   "1": 359.32238586783006,
+   "2": 718.6447717356601,
+   "4": 1437.2895434713203,
+   "8": 2874.5790869426405
+  }
+ },
+ "same_lambda": {
+  "value": 493.90767644966775,
+  "note": "Language-ISDA 4× 的 λ；随机/Identity 臂在同一数值下的对照 (外审第十二轮 P1 第 1 项)"
+ },
+ "warmup": {
+  "lang_full_x4": 493.90767644966775,
+  "rand_full_x8": 1002.0914541102851,
+  "identity_x8": 2874.5790869426405,
+  "epochs": 20
+ },
+ "cross_check": {
+  "CUB_s1c_randfull_x1_seed1": {
+   "old_sha256": "46b09b98ede51143c34082cca36a0598f7f7b437844357dd98505dcdeaf7781b",
+   "new_sha256": "46b09b98ede51143c34082cca36a0598f7f7b437844357dd98505dcdeaf7781b",
+   "same": true
+  },
+  "CUB_s1c_isda_x1_seed1": {
+   "old_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "new_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "same": true
+  },
+  "CUB_s1c_randfull_x1_seed2": {
+   "old_sha256": "2abaa2c87b3bf9c5517abd2a45f120402282adc118dd3234a4078026930a5a6a",
+   "new_sha256": "2abaa2c87b3bf9c5517abd2a45f120402282adc118dd3234a4078026930a5a6a",
+   "same": true
+  },
+  "CUB_s1c_isda_x1_seed2": {
+   "old_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "new_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "same": true
+  },
+  "CUB_s1c_randfull_x1_seed3": {
+   "old_sha256": "b63e33a5cd9023f29de6582071d2f773f96dc52ac80089066ce6da343814ab4d",
+   "new_sha256": "b63e33a5cd9023f29de6582071d2f773f96dc52ac80089066ce6da343814ab4d",
+   "same": true
+  },
+  "CUB_s1c_isda_x1_seed3": {
+   "old_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "new_sha256": "a0dc61684d701ceee27dc0ed95926c3d8ff855560938e09f42e11d865d0aae2b",
+   "same": true
+  }
+ },
+ "all_checks_passed": true,
+ "elapsed_seconds": 36.8
+}

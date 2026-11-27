@@ -99,6 +99,39 @@ SDB_P1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CA
           "--source_val_cache", AUG_CACHE, "--descriptor_bank", SDB_BANK]
 
 
+# ---- 第十二轮 P1 (预注册 §3ag): ISDA 的几何对照 + warmup 消融 ----
+# 随机帧与 λ 由 s12_freeze_geometry.py 在任何 run 之前冻结 (manifest 已提交); 导入时断言 manifest 与标定一致,
+# 防止标定文件被改动后矩阵悄悄变化。随机帧的 sha256 在报告脚本里逐 run 断言 (禁止事后筛选)。
+S12_MANIFEST = os.path.join(ROOT, "experiment_results", "Stage1C-Training", "s12_geometry_manifest.json")
+with open(S12_MANIFEST, encoding="utf-8") as _f:
+    _S12 = json.load(_f)
+for _e in ("lang_full", "rand_full", "identity"):
+    assert abs(_S12["lambda_pen"][_e] - float(_CAL["calibration"][_e]["lam_pen"])) < 1e-12, \
+        f"s12 冻结的 λ_pen 与统一批次标定漂移: {_e}"
+assert _S12["all_checks_passed"] is True and len(_S12["cross_check"]) == 6, "s12 几何冻结清单不完整"
+S12_MULT = ["0.5", "1", "2", "4", "8"]
+
+
+def _s12_entries():
+    """随机谱 / 各向同性两臂 × 五倍数 + 同 λ 对照 + 三个 warmup 消融 = 15 配置 × 3 seeds。"""
+    out = []
+    for ell, pfx in (("rand_full", "s12_isda_rand"), ("identity", "s12_isda_ident")):
+        for m in S12_MULT:
+            out.append(("CUB", f"{pfx}_{MTAG8[m]}",
+                        EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", ell,
+                                 "--ld_lam", repr(float(_S12["lambda_grid"][ell][m]))] + LD_P1))
+        out.append(("CUB", f"{pfx}_samelam4",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", ell,
+                             "--ld_lam", repr(float(_S12["same_lambda"]["value"]))] + LD_P1))
+    for tag, ell, key in (("lang_x4_warm20", "lang_full", "lang_full_x4"),
+                          ("rand_x8_warm20", "rand_full", "rand_full_x8"),
+                          ("ident_x8_warm20", "identity", "identity_x8")):
+        out.append(("CUB", f"s12_isda_{tag}",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", ell,
+                             "--ld_lam", repr(float(_S12["warmup"][key])), "--isda_warmup_epochs", "20"] + LD_P1))
+    return out
+
+
 def _ld_ext_entries():
     out = []
     for m in ("4", "8"):
@@ -250,6 +283,9 @@ MATRICES = {
          EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
                   "--ld_lam", repr(float(LD_ARMS["isda"]["anchor"]) * 8), "--isda_warmup_epochs", "20"] + LD_P1),
     ]),
+    # 第十二轮 P1 (预注册 §3ag): Language-ISDA 的几何对照 —— Random-SpecMatched / Identity-H 各五倍数
+    # + 同 λ 对照, 以及三个 warmup 消融。15 配置 × 3 seeds = 45 run; Language 的五倍数复用第十一轮 (不重跑)
+    "s12_geom": ("Stage1C-Training", _s12_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -349,6 +385,21 @@ def _self_test_expected():
     e8 = expected(COMMON + MATRICES["s1c_ext"][1][3][2], "CUB", 1, "s1c_isda_x8")
     assert (e["ld_lam"] == e8["ld_lam"] and e["isda_warmup_epochs"] == "20"
             and e8.get("isda_warmup_epochs", 0) == 0 and e["ld_calib"] == e8["ld_calib"]), (e, e8)
+    # 第十二轮 (§3ag): 15 配置; 同 λ 对照两臂逐位相同且 = Language 4×; 倍数臂取 manifest 冻结值;
+    # warmup 与对应固定 λ 逐位配对 (只差 isda_warmup_epochs)
+    assert len(MATRICES["s12_geom"][1]) == 15, len(MATRICES["s12_geom"][1])
+    by_tag = {t: expected(COMMON + ex, "CUB", 1, t) for _, t, ex in MATRICES["s12_geom"][1]}
+    assert (float(by_tag["s12_isda_rand_samelam4"]["ld_lam"]) == float(by_tag["s12_isda_ident_samelam4"]["ld_lam"])
+            == float(repr(float(_S12["same_lambda"]["value"])))), by_tag["s12_isda_rand_samelam4"]
+    assert float(by_tag["s12_isda_rand_x4"]["ld_lam"]) == float(repr(float(_S12["lambda_grid"]["rand_full"]["4"])))
+    assert float(by_tag["s12_isda_ident_x8"]["ld_lam"]) == float(repr(float(_S12["lambda_grid"]["identity"]["8"])))
+    e_x4 = expected(COMMON + [x for x in MATRICES["s1c_ext"][1] if x[1] == "s1c_isda_x4"][0][2], "CUB", 1, "s1c_isda_x4")
+    assert by_tag["s12_isda_lang_x4_warm20"]["ld_lam"] == e_x4["ld_lam"] \
+        and by_tag["s12_isda_lang_x4_warm20"]["isda_warmup_epochs"] == "20" and e_x4.get("isda_warmup_epochs", 0) == 0
+    assert by_tag["s12_isda_rand_x8_warm20"]["ld_lam"] == by_tag["s12_isda_rand_x8"]["ld_lam"]
+    assert by_tag["s12_isda_ident_x8_warm20"]["ld_lam"] == by_tag["s12_isda_ident_x8"]["ld_lam"]
+    assert all(by_tag[t]["ld_mode"] == "isda" and float(by_tag[t]["alpha"]) == 0.0 and by_tag[t]["target_eval"] == "none"
+               for t in by_tag)
     # 完成判定: 配置按数值比对; epochs 必须是正整数; 任一项不匹配都不算完成
     base = {"status": "completed", "completed_epochs": 2, "run_config": {
         "epochs": 2, "lambda_kl": 0.0, "alpha": 1.0, "grad_diag": True, "save_model": False, "ddo_k": 8}}
