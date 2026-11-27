@@ -151,6 +151,8 @@ def _p4_entries(ds):
     assert cal["dataset"] == ds and cal["all_checks_passed"] is True, f"{ds}: 标定文件与数据集不符或未通过自检"
     cache = os.path.join("cache", f"{ds}_train_aug.pt")
     p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", cache, "--source_val_cache", cache]
+    if ds == "PACS":                       # 小数据集沿用 §2c-2b 的协议 (batch 128); 其余数据集 batch 256
+        p1 = ["--batch_size", "128"] + p1
     out = [(ds, f"p4_{t}", EQUAL + ["--alpha", str(a)] + p1) for a, t in DOSE]
     for arm, ell, key in P4_ARMS:
         for m in P4_MULT:
@@ -468,6 +470,9 @@ def main():
     ap.add_argument("--dry_run", action="store_true", help="只打印每个 run 的配置与完成状态, 不训练、不加锁")
     ap.add_argument("--overwrite_run", action="store_true",
                     help="全部重跑: 不跳过已完成的 run, 并把覆盖开关传给训练入口")
+    ap.add_argument("--max_runs", type=int, default=0,
+                    help="本次最多新启动的 run 数（0 = 不限）。已完成的按完成状态跳过，不计入上限；"
+                         "用于把长矩阵切成多段执行，下次调用自动续跑")
     opt = ap.parse_args()
 
     out_dir, entries = MATRICES[opt.matrix]
@@ -532,6 +537,9 @@ def _drive(jobs, opt, log_dir, path_of, lock):
         why = "" if ok else (f"exit={r.returncode}" if r.returncode != 0
                              else "exit=0, 但结果不完整或与命令行配置不匹配")
         print(f"       -> {'OK' if ok else 'FAIL ' + why}  (日志 {os.path.relpath(log, ROOT)})", flush=True)
+        if getattr(opt, "max_runs", 0) and (done + failed) >= opt.max_runs:
+            print(f"[--max_runs {opt.max_runs}] 本次已达到上限, 停止 (下次调用自动续跑)", flush=True)
+            break
 
     print(f"\n新完成 {done} | 跳过 {skipped} | 失败 {failed} | 耗时 {(time.time() - t0) / 60:.1f} 分钟", flush=True)
     if failures:
