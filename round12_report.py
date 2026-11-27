@@ -216,6 +216,13 @@ def _target_curve(t, arm, keys):
     return {a: float(np.mean([t[_curve_name(arm, a, s)] for s in SEEDS])) for a in keys}
 
 
+def _seed_vec(t, arm, key):
+    """某臂在某强度下的逐 seed 目标域精度。"""
+    if arm == "ddo":
+        return [t[f"{_ddo_runs()[key]}_seed{s}"] for s in SEEDS]
+    return [t[_curve_name(arm, key, s)] for s in SEEDS]
+
+
 def _ranks(v):
     """平均秩（并列取平均）。"""
     order = sorted(range(len(v)), key=lambda i: v[i])
@@ -247,9 +254,7 @@ def final_analysis(runs, man, sel, tgt):
     T = out["target_curves"]
     # 2. G1 / G1b / G1c
     def pair_curves(arm_a, key_a, arm_b, key_b):
-        x = [tgt[_curve_name(arm_a, key_a, s) if arm_a != "ddo" else f"{_ddo_runs()[key_a]}_seed{s}"] for s in SEEDS]
-        y = [tgt[_curve_name(arm_b, key_b, s) if arm_b != "ddo" else f"{_ddo_runs()[key_b]}_seed{s}"] for s in SEEDS]
-        return _paired(x, y)
+        return _paired(_seed_vec(tgt, arm_a, key_a), _seed_vec(tgt, arm_b, key_b))
 
     def one(name, pa):
         out["paired"][name] = pa
@@ -305,7 +310,19 @@ def final_analysis(runs, man, sel, tgt):
         sm["post_hoc_best"] = {"strength": max(tc, key=lambda k: tc[k]), "target_acc": best}
         sm["default"] = {"strength": "1" if arm != "ddo" else "1", "target_acc": tc.get("1")}
         out["selection"][arm] = sm
-    # 6. 判定文本
+    # 6. Q1（源域选参后的核心判读）：Language-ISDA 对 DDO 强基线，两条规则各算一次
+    out["q1"] = {}
+    for rule in ("R_aug", "R_joint"):
+        s_lang, s_ddo = sel["language"][rule], sel["ddo"][rule]
+        pa = _paired(_seed_vec(tgt, "language", s_lang), _seed_vec(tgt, "ddo", s_ddo))
+        out["paired"][f"Q1_{rule}_lang_vs_ddo"] = pa
+        out["gates"][f"Q1_{rule}_lang_vs_ddo"] = gate(pa)
+        out["q1"][rule] = {"lang_strength": s_lang, "ddo_strength": s_ddo,
+                           "lang_acc": float(np.mean(_seed_vec(tgt, "language", s_lang))),
+                           "ddo_acc": float(np.mean(_seed_vec(tgt, "ddo", s_ddo))),
+                           "diff_per_seed": pa["diff_per_seed"], "mean": pa["mean"],
+                           "n_positive": pa["n_positive"], "gate": gate(pa)}
+    # 7. 判定文本
     g1 = out["gates"]["G1_lang_x4_vs_rand_x4"]
     p1 = out["paired"]["G1_lang_x4_vs_rand_x4"]
     out["verdict"]["G1"] = ("几何成立" if g1 else
@@ -411,7 +428,15 @@ def stage_final():
           f"- **G2**（warmup）：lang@4× {_f(fin['paired']['G2_lang_warm4_vs_lang_x4']['mean'])} pp "
           f"({fin['paired']['G2_lang_warm4_vs_lang_x4']['n_positive']}/3)，"
           f"rand@8× {_f(fin['paired']['G2_rand_warm8_vs_rand_x8']['mean'])} pp，"
-          f"identity@8× {_f(fin['paired']['G2_ident_warm8_vs_ident_x8']['mean'])} pp", "",
+          f"identity@8× {_f(fin['paired']['G2_ident_warm8_vs_ident_x8']['mean'])} pp", ""
+          ]
+    for rule in ("R_aug", "R_joint"):
+        q = fin["q1"][rule]
+        L.append(f"- **Q1（{rule}）**：Language@{q['lang_strength']}× = {_f(q['lang_acc'])} 对 DDO@{q['ddo_strength']}× "
+                 f"= {_f(q['ddo_acc'])}，Δ = {_f(q['mean'])} pp，逐 seed "
+                 f"{[round(x, 2) for x in q['diff_per_seed']]}，{q['n_positive']}/3 正向 → "
+                 f"**{'过门槛' if q['gate'] else '未过门槛'}**")
+    L += ["",
           "## 选参（两条规则，目标域事后）", "",
           "| 臂 | 规则 | 选中 | 目标域 Acc | Regret | ρ(源域, 目标域) |", "|---|---|---|---|---|---|"]
     for arm in ("ddo", "language", "random", "identity", "ld", "sdb_isda"):
