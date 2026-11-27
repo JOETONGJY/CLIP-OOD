@@ -1,0 +1,24 @@
+# 外审第十五轮: 全套回归与自测记录
+运行提交: SEE-GIT (本文件提交时的 HEAD)
+说明: 生成时唯一的未跟踪文件就是本记录自身 (随后提交); r15_bench 冒烟产物已删除。
+
+== 默认训练路径逐位回归 (REGRESS_BATCH=128) ==
+REGRESSION_RESULT: PASS 默认路径与 11-20 留档逐位一致
+(--ddo_l2_closed 默认关闭; grad_diag 的 L2 新字段只在 ddo_norm=l2 时写入, 默认路径行为不变)
+
+== 端到端工程检查 ==
+ENG_FIX_CHECK: PASS (37 项)
+ENG_FIX_CHECK2: PASS (33 项)
+
+== 自测 ==
+tests_l2_equivalences: PASS (10 项; E2b 精确恒等式 / E4 双算法互证 / E5b-E5c 偏置表述更正)
+ld_dro / ld_training / stage1b_l2_closed / stage1b_c2_report / stage1c_training_report / round11_report / descriptor_bank: 全部 PASS
+eval_decision_fidelity --selftest: PASS (114 头运行前)
+
+== 事后评估等价性 ==
+VALIDATE: PASS (27/27 逐位)
+
+== 本轮关键数值核对 ==
+ISDA@λ_pen=123.476919 的初始正则梯度比 = 0.1348 (逐 seed 0.1384/0.1203/0.1455) —— 精确复现外审数字, C3 等压表述撤回成立
+闭式 vs 显式 (真实数据 3 头 × {full_bf, full}): 损失相对差 ≤ 1.7e-07, 梯度相对差 ≤ 5.4e-07
+闭式基准 (full_bf 2-epoch): 0.55 → 0.40 秒/epoch, epoch-1 损失一致到 1e-6
