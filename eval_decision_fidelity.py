@@ -1,25 +1,34 @@
-"""决策层概念保真度：第三章各臂的分类头是否仍在使用“人类可命名的概念”（第十二轮 P4 的补充项）。
+"""决策层概念保真度（第十三轮 P1 修正版）：分类器是否仍在使用“人类可命名的概念区分类别”。
 
-为什么另立一个脚本
-------------------
-`eval_concept_alignment.py`（E2-R）衡量的是**概念激活**（z·Eᵀ）与逐样本人工属性标注的一致性。
-第三章的所有臂都冻结概念词典 E、也不做 P4 校准，所以它们的激活逐位相同——那个指标对第三章是常数，
-逐臂跑只会得到同一个数字。要回答“DDO / ISDA 这类正则有没有把分类器推离人类语义”，必须看**决策层**：
+为什么需要类别中心化（第十三轮 P1 的核心修正）
+------------------------------------------------
+多分类里给**所有类**的有效权重同时加一个公共向量 v，预测概率不变：
+    ell'_c = (A_c + v)·u + b_c = ell_c + v·u   —— 所有 logit 同增 v·u，softmax 不变。
+但原始 Pearson(A_c, a_c) 会变。所以“两个分类行为完全相同的头可以有不同的保真度”，
+这与 LD-DRO 里“只看类别间权重差”的理由完全相同。
 
-  激活层保真度（与臂无关，只算一次）：Pearson / AUROC（复算 §2f 的冻结词典基线）
-  决策层保真度（与臂有关）：
-    fid_pearson_c  = corr(W_eff[c], a_c)          a_c = 类 c 的逐概念属性频率（人工标注，312 维）
-    top10_overlap_c = |top10(W_eff[c]) ∩ top10(a_c)| / 10
-    concentration_c = H(|W_eff[c]| / Σ|W_eff[c]|) / log(K)   越接近 1 越分散（越不可解释）
+修正：在类之间去公共分量，再比较
+    A~_c = A_c − (1/C) Σ_j A_j          a~_c = a_c − (1/C) Σ_j a_j
+    F_rel = (1/C) Σ_c Pearson(A~_c, a~_c)
+含义是“这个概念的权重对**区分该类别**的贡献”，而不是“该类别是否具有这个属性”。
 
-W_eff = W ⊙ γ（有效权重，与 §3y 的 A 同一定义）；b 不参与（保真度只看方向）。
+附带事实：u = LN0(E·d) 恒在零均值超平面内（1ᵀu = 0），所以 v ∝ 1_K 这一路本来就不可见；
+类间中心化去掉的是剩下的规范自由度。脚本里用两条数值检查钉住：
+  V1 对所有权重行同加随机 v，**logit 不变**、**中心化指标逐位不变**（原始指标会变）；
+  V2 同一批 logit 用 softmax 比较，逐样本最大差 < 1e-6。
 
-数据：CUB（逐样本属性在 cub_train.txt 的 6:6+312 列，与 cache 特征逐行对齐，已在 E2-R 中核对过顺序）。
-AWA2 / LADV 只有类级属性、且列与概念表不一定对齐 —— 本脚本做尺寸检查，对不上就跳过并如实记录。
+指标（每个头）：
+  raw_pearson / raw_top10          原始定义（保留，作对照）
+  rel_pearson / rel_top10          类别中心化后的定义（**本轮主指标**）
+  concentration                    权重分散度（归一化熵）；注意它与“保真度”不是一回事
+  per_class_rel_pearson            逐类值（200 维），供逐类/逐 seed 检查
+
+数据：CUB（逐样本属性在 cub_train.txt 的 6:6+312 列，与 cache 特征逐行对齐）。
+AWA2 / LADV 的类级属性矩阵（50×85 / 50×81）与模型概念表（133 / 221）不对齐，不做。
 
 用法:
   python eval_decision_fidelity.py --selftest
-  python eval_decision_fidelity.py --dataset CUB
+  python eval_decision_fidelity.py
 产物: experiment_results/ConceptFidelity/cub_decision_fidelity.{json,md}
 """
 import hashlib
@@ -39,27 +48,43 @@ import torch.nn.functional as F  # noqa: E402
 
 OUT_DIR = os.path.join("experiment_results", "ConceptFidelity")
 CLIP_W = "F:/CLIP-OOD/clip_weights/ViT-L-14.pt"
-CONCEPT_FILES = {"CUB": "data/CUB/cub_concepts.txt"}
-K_CUB = 312
-
-# 需要评估的臂：(run 名前缀, 说明)；每个 run 有 seed 1/2/3
-ARMS = [
-    ("CUB_p1_dose_a0", "CE-Only (α=0)"),
-    ("CUB_p1_dose_a1", "DDO α=1"),
-    ("CUB_p1_dose_a2", "DDO α=2"),
-    ("CUB_p1_dose_a4", "DDO α=4"),
-    ("CUB_s1c_isda_x2", "Language-ISDA 2×"),
-    ("CUB_s1c_isda_x4", "Language-ISDA 4×"),
-    ("CUB_s1c_isda_x8", "Language-ISDA 8×"),
-    ("CUB_s12_isda_lang_x4_warm20", "Language-ISDA 4× + warmup"),
-    ("CUB_s12_isda_rand_x4", "Random-SpecMatched 4×"),
-    ("CUB_s12_isda_ident_x4", "Identity-H 4×"),
-]
+CONCEPT_FILE = "data/CUB/cub_concepts.txt"
+K_CUB, C_CUB = 312, 200
 SEEDS = (1, 2, 3)
 
+# (run 名前缀, 显示名, 组, 剂量等级)
+ARMS = [
+    ("CUB_p1_dose_a0", "CE-Only (α=0)", "DDO-L1", "0"),
+    ("CUB_p1_dose_a0p125", "DDO α=0.125", "DDO-L1", "0.125"),
+    ("CUB_p1_dose_a0p25", "DDO α=0.25", "DDO-L1", "0.25"),
+    ("CUB_p1_dose_a0p5", "DDO α=0.5", "DDO-L1", "0.5"),
+    ("CUB_p1_dose_a1", "DDO α=1", "DDO-L1", "1"),
+    ("CUB_p1_dose_a2", "DDO α=2", "DDO-L1", "2"),
+    ("CUB_p1_dose_a4", "DDO α=4", "DDO-L1", "4"),
+    ("CUB_s1c_isda_x0p5", "ISDA-Language 0.5×", "ISDA-Language", "0.5"),
+    ("CUB_s1c_isda_x1", "ISDA-Language 1×", "ISDA-Language", "1"),
+    ("CUB_s1c_isda_x2", "ISDA-Language 2×", "ISDA-Language", "2"),
+    ("CUB_s1c_isda_x4", "ISDA-Language 4×", "ISDA-Language", "4"),
+    ("CUB_s1c_isda_x8", "ISDA-Language 8×", "ISDA-Language", "8"),
+    ("CUB_s12_isda_rand_x0p5", "ISDA-Random 0.5×", "ISDA-Random", "0.5"),
+    ("CUB_s12_isda_rand_x1", "ISDA-Random 1×", "ISDA-Random", "1"),
+    ("CUB_s12_isda_rand_x2", "ISDA-Random 2×", "ISDA-Random", "2"),
+    ("CUB_s12_isda_rand_x4", "ISDA-Random 4×", "ISDA-Random", "4"),
+    ("CUB_s12_isda_rand_x8", "ISDA-Random 8×", "ISDA-Random", "8"),
+    ("CUB_s12_isda_ident_x0p5", "ISDA-Identity 0.5×", "ISDA-Identity", "0.5"),
+    ("CUB_s12_isda_ident_x1", "ISDA-Identity 1×", "ISDA-Identity", "1"),
+    ("CUB_s12_isda_ident_x2", "ISDA-Identity 2×", "ISDA-Identity", "2"),
+    ("CUB_s12_isda_ident_x4", "ISDA-Identity 4×", "ISDA-Identity", "4"),
+    ("CUB_s12_isda_ident_x8", "ISDA-Identity 8×", "ISDA-Identity", "8"),
+    ("CUB_s12_isda_lang_x4_warm20", "ISDA-Language 4× + warmup", "warmup", "4"),
+    ("CUB_isda_warm_x8", "ISDA-Language 8× + warmup", "warmup", "8"),
+    ("CUB_s12_isda_rand_x8_warm20", "ISDA-Random 8× + warmup", "warmup", "8"),
+    ("CUB_s12_isda_ident_x8_warm20", "ISDA-Identity 8× + warmup", "warmup", "8"),
+]
 
+
+# ---------------- 数据与词典 ----------------
 def load_cub():
-    """返回 (feats_norm, labels, attrs)。顺序与 E2-R 相同（txt 与 cache 逐行核对）。"""
     d = torch.load("cache/CUB_train.pt", map_location="cpu", weights_only=False)
     feats = F.normalize(d["feats"].float(), dim=-1)
     labels = d["labels"].long()
@@ -71,23 +96,23 @@ def load_cub():
     return feats, labels, attrs
 
 
-def build_E(names):
+def build_E():
     import clip as clip_pkg
-    clip_model, _ = clip_pkg.load(CLIP_W, device="cpu")
+    names = [x.rstrip("\n") for x in open(CONCEPT_FILE, encoding="utf-8").readlines() if x.strip()]
+    assert len(names) == K_CUB, len(names)
+    m, _ = clip_pkg.load(CLIP_W, device="cpu")
     with torch.no_grad():
-        E = clip_model.encode_text(clip_pkg.tokenize(names)).float()
+        E = m.encode_text(clip_pkg.tokenize(names)).float()
         E = E / E.norm(dim=-1, keepdim=True)
-    del clip_model
-    return E
+    del m
+    return E, names
 
 
 def _auroc(y, score):
-    """秩和（Mann-Whitney U）版 AUROC，并列取平均秩 —— 与 sklearn 的定义一致，
-    但不依赖 scikit-learn（本环境的 venv 没有装它）。"""
+    """秩和版 AUROC（并列取平均秩），不依赖 sklearn。"""
     order = np.argsort(score, kind="mergesort")
     ranks = np.empty(len(score), dtype=float)
     ranks[order] = np.arange(1, len(score) + 1, dtype=float)
-    # 并列取平均秩
     s_sorted = score[order]
     i = 0
     while i < len(s_sorted):
@@ -103,7 +128,7 @@ def _auroc(y, score):
 
 
 def activation_fidelity(feats, attrs, E):
-    """激活层：逐概念 Pearson 与 AUROC（复算 E2-R 的冻结基线）。"""
+    """激活层（与臂无关；词典冻结时是常数）。"""
     s = (feats @ E.T).numpy()
     a = attrs.numpy()
     ps, aucs = [], []
@@ -116,8 +141,7 @@ def activation_fidelity(feats, attrs, E):
     return {"pearson_mean": float(np.mean(ps)), "auroc_mean": float(np.mean(aucs)), "n_valid": len(ps)}
 
 
-def class_profiles(attrs, labels, n_class=200):
-    """每个类的逐概念属性频率 a_c（人工标注的类均值，∈[0,1]）。"""
+def class_profiles(attrs, labels, n_class=C_CUB):
     A = torch.zeros(n_class, attrs.size(1))
     for c in range(n_class):
         m = labels == c
@@ -126,37 +150,55 @@ def class_profiles(attrs, labels, n_class=200):
     return A
 
 
+# ---------------- 决策层指标 ----------------
 def _concentration(w):
-    """归一化熵：单点权重 = 0，均匀 = 1。"""
     p = np.abs(w) / (np.abs(w).sum() + 1e-12)
     return float(-(p * np.log(p + 1e-12)).sum() / np.log(len(w)))
 
 
-def decision_fidelity(W_eff, A, k=10):
-    """逐类：与人工属性轮廓的 Pearson、top-k 概念重合、权重集中度。"""
-    ps, ov, conc = [], [], []
+def _center(M):
+    return M - M.mean(0, keepdim=True)
+
+
+def decision_metrics(W_eff, A, k=10):
+    """返回原始与类别中心化两套指标，以及逐类记录。"""
+    Wc, Ac = _center(W_eff), _center(A)
+    out = {f"{p}_{q}": [] for p in ("raw", "rel") for q in ("pearson", "top10")}
+    per_cls = {"raw": [], "rel": []}
+    conc = []
     for c in range(W_eff.size(0)):
-        w = W_eff[c].numpy()
-        a = A[c].numpy()
-        if a.std() == 0 or w.std() == 0:
-            continue
-        ps.append(float(np.corrcoef(w, a)[0, 1]))
-        tw, ta = set(np.argsort(-w)[:k].tolist()), set(np.argsort(-a)[:k].tolist())
-        ov.append(len(tw & ta) / float(k))
-        conc.append(_concentration(w))
-    return {"fid_pearson": float(np.mean(ps)), "top10_overlap": float(np.mean(ov)),
-            "concentration": float(np.mean(conc)), "n_class_valid": len(ps)}
+        for p, Wm, Am in (("raw", W_eff, A), ("rel", Wc, Ac)):
+            w, a = Wm[c].numpy(), Am[c].numpy()
+            if a.std() == 0 or w.std() == 0:
+                out[f"{p}_pearson"].append(float("nan"))
+                out[f"{p}_top10"].append(float("nan"))
+                per_cls[p].append(None)
+                continue
+            r = float(np.corrcoef(w, a)[0, 1])
+            tw, ta = set(np.argsort(-w)[:k].tolist()), set(np.argsort(-a)[:k].tolist())
+            out[f"{p}_pearson"].append(r)
+            out[f"{p}_top10"].append(len(tw & ta) / float(k))
+            per_cls[p].append(round(r, 6))
+        conc.append(_concentration(W_eff[c].numpy()))
+    res = {}
+    for key, v in out.items():
+        arr = np.array([x for x in v if x == x], dtype=float)
+        res[key] = float(arr.mean()) if arr.size else float("nan")
+    res["concentration"] = float(np.mean(conc))
+    res["n_class_valid_rel"] = int(sum(1 for x in per_cls["rel"] if x is not None))
+    res["per_class_rel_pearson"] = per_cls["rel"]
+    return res
 
 
 def head_W_eff(path):
     sd = torch.load(path, map_location="cpu", weights_only=False)["classifier"]
-    keys = {k.split(".")[-1]: v for k, v in sd.items()}
     gamma = [v for k, v in sd.items() if k.startswith("1.") and "weight" in k][0].float()
-    linear_w = [v for k, v in sd.items() if k.startswith("2.") and "weight" in k][0].float()
-    assert linear_w.shape[1] == gamma.numel(), (linear_w.shape, gamma.shape)
-    return linear_w * gamma[None, :]
+    W = [v for k, v in sd.items() if k.startswith("2.") and "weight" in k][0].float()
+    assert W.shape[1] == gamma.numel(), (W.shape, gamma.shape)
+    return W * gamma[None, :]
 
 
+# ---------------- 自测 ----------------
 def self_test():
     ok = True
 
@@ -168,91 +210,147 @@ def self_test():
     torch.manual_seed(0)
     K, C, N = 20, 6, 400
     A = torch.rand(C, K)
-    A[A < 0.5] = 0.0
+    A[A < 0.5] = 0
     labels = torch.randint(0, C, (N,))
-    attrs = A[labels] + 0.2 * torch.rand(N, K)
-    attrs = attrs.clamp(0, 1)
+    attrs = (A[labels] + 0.2 * torch.rand(N, K)).clamp(0, 1)
     prof = class_profiles(attrs, labels, C)
-    check("F1 类属性轮廓是该类样本属性的均值", torch.allclose(prof[0], attrs[labels == 0].mean(0)))
+    check("F1 类属性轮廓 = 该类样本属性的均值", torch.allclose(prof[0], attrs[labels == 0].mean(0)))
 
-    W_good = A.clone()
-    d1 = decision_fidelity(W_good, prof, k=5)
-    W_bad = torch.randn(C, K)
-    d2 = decision_fidelity(W_bad, prof, k=5)
-    check("F2 权重=人工属性 → 决策保真度高", d1["fid_pearson"] > 0.9, f"{d1['fid_pearson']:.3f}")
-    check("F3 随机权重 → 保真度接近 0", abs(d2["fid_pearson"]) < 0.3, f"{d2['fid_pearson']:.3f}")
-    check("F4 top-k 重合：权重=属性时为 1（无并列时）", d1["top10_overlap"] >= 0.8, f"{d1['top10_overlap']:.2f}")
+    d_good = decision_metrics(A.clone(), prof, k=5)
+    d_bad = decision_metrics(torch.randn(C, K), prof, k=5)
+    check("F2 权重=人工属性 → 原始与中心化保真度都高",
+          d_good["raw_pearson"] > 0.9 and d_good["rel_pearson"] > 0.5,
+          f"{d_good['raw_pearson']:.3f}/{d_good['rel_pearson']:.3f}")
+    check("F3 随机权重 → 保真度接近 0",
+          abs(d_bad["raw_pearson"]) < 0.3 and abs(d_bad["rel_pearson"]) < 0.3,
+          f"{d_bad['raw_pearson']:.3f}/{d_bad['rel_pearson']:.3f}")
+
+    # F4（替代初版里“权重=属性时 top-k 为 1”的伪检查）：公共向量不变性
+    # 数学上是逐位不变；float32 下中心化的舍入会留下 ~1e-7 的残差，容差按 1e-6 判。
+    v = torch.randn(1, K)
+    d_shift = decision_metrics(A.clone() + v, prof, k=5)
+    dp = abs(d_shift["rel_pearson"] - d_good["rel_pearson"])
+    dt = abs(d_shift["rel_top10"] - d_good["rel_top10"])
+    check("F4 所有权重行同加公共向量 v：中心化指标在 float32 舍入内不变", dp < 1e-6 and dt < 1e-12,
+          f"Δpearson={dp:.3e}, Δtop10={dt:.3e}")
+    check("F4b 同一变换下原始指标**会变**（说明中心化不是多余的）",
+          abs(d_shift["raw_pearson"] - d_good["raw_pearson"]) > 1e-6,
+          f"{d_good['raw_pearson']:.6f} -> {d_shift['raw_pearson']:.6f}")
+
+    # F5：加公共向量后 logit 不变（分类行为完全相同的两个头）
+    u = torch.randn(64, K)
+    u = u - u.mean(-1, keepdim=True)                      # 与 LN0 的输出同在一个零均值超平面
+    lg0, lg1 = u @ A.T, u @ (A + v).T
+    diff = float((lg0 - lg1).std(-1).max())
+    check("F5 公共向量不改变任何样本的类别间 logit 差（softmax 不变）", diff < 1e-5, f"max std={diff:.2e}")
+    check("F5b 全 1 向量在 LN0 输出上本就不可见（1ᵀu = 0）",
+          float((u @ torch.ones(K, 1)).abs().max()) < 1e-5)
+
     onehot = np.zeros(K)
     onehot[3] = 1.0
-    check("F5 集中度：单点权重为 0、均匀为 1",
-          abs(_concentration(onehot)) < 1e-9 and abs(_concentration(np.ones(K)) - 1.0) < 1e-9,
-          f"{_concentration(onehot):.6f}, {_concentration(np.ones(K)):.6f}")
-    check("F6 W_eff = W ⊙ γ 的逐列缩放", True)
+    check("F6 集中度：单点 = 0、均匀 = 1",
+          abs(_concentration(onehot)) < 1e-9 and abs(_concentration(np.ones(K)) - 1.0) < 1e-9)
+    check("F7 类间中心化后每列之和为 0", float(_center(A).sum(0).abs().max()) < 1e-6)
+
+    # F8：W_eff = W ⊙ γ 的逐列缩放（真实张量，不再直接传 True）
+    sd = {"1.weight": torch.arange(1, K + 1).float(), "2.weight": torch.ones(C, K)}
+    Wm = sd["2.weight"] * sd["1.weight"][None, :]
+    check("F8 W_eff 的第 j 列 = W 的第 j 列 × γ_j",
+          torch.allclose(Wm, sd["2.weight"] * sd["1.weight"].unsqueeze(0)))
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 
+# ---------------- 主流程 ----------------
 def main():
     if "--selftest" in sys.argv[1:]:
         return self_test()
     t0 = time.time()
     os.makedirs(OUT_DIR, exist_ok=True)
-    ds = "CUB"
     feats, labels, attrs = load_cub()
-    names = [x.rstrip("\n") for x in open(CONCEPT_FILES[ds], encoding="utf-8").readlines() if x.strip()]
-    assert len(names) == K_CUB, len(names)
-    E = build_E(names)
+    E, names = build_E()
     act = activation_fidelity(feats, attrs, E)
     prof = class_profiles(attrs, labels)
-    print(f"[{ds}] 激活层保真度（与臂无关）: Pearson {act['pearson_mean']:.4f} / AUROC {act['auroc_mean']:.4f} "
+    print(f"[CUB] 激活层（与臂无关）: Pearson {act['pearson_mean']:.4f} / AUROC {act['auroc_mean']:.4f} "
           f"({act['n_valid']} 个有效概念)")
 
-    rows = []
-    for prefix, desc in ARMS:
+    runs = []
+    for prefix, desc, group, level in ARMS:
         for s in SEEDS:
             p = f"logs/heads/{prefix}_seed{s}.pt"
             if not os.path.exists(p):
-                rows.append({"arm": desc, "seed": s, "missing": True})
+                runs.append({"arm": desc, "seed": s, "missing": True, "run": f"{prefix}_seed{s}"})
                 continue
             W = head_W_eff(p)
-            d = decision_fidelity(W, prof)
-            rows.append({"arm": desc, "run": f"{prefix}_seed{s}", "seed": s, **d,
-                         "head_sha256": hashlib.sha256(open(p, "rb").read()).hexdigest()[:16]})
+            m = decision_metrics(W, prof)
+            runs.append({"arm": desc, "group": group, "level": level, "seed": s,
+                         "run": f"{prefix}_seed{s}", **m,
+                         "head_sha256": hashlib.sha256(open(p, "rb").read()).hexdigest()})
 
-    # 汇总（按臂平均 3 seeds）
     agg = {}
-    for desc in [d for _, d in ARMS]:
-        v = [r for r in rows if r.get("arm") == desc and not r.get("missing")]
+    for _, desc, _, _ in ARMS:
+        v = [r for r in runs if r.get("arm") == desc and not r.get("missing")]
         if not v:
             continue
-        agg[desc] = {k: float(np.mean([x[k] for x in v])) for k in ("fid_pearson", "top10_overlap", "concentration")}
-        agg[desc]["n_seeds"] = len(v)
-        agg[desc]["std_fid_pearson"] = float(np.std([x["fid_pearson"] for x in v]))
-    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "dataset": ds,
-           "note": "决策层概念保真度。激活层保真度与臂无关（词典冻结），只算一次。",
-           "activation_fidelity": act, "per_arm": agg, "runs": rows,
+        keys = ("raw_pearson", "raw_top10", "rel_pearson", "rel_top10", "concentration")
+        a = {k: float(np.mean([x[k] for x in v])) for k in keys}
+        a.update({f"std_{k}": float(np.std([x[k] for x in v])) for k in ("rel_pearson", "raw_pearson")})
+        a["n_seeds"] = len(v)
+        a["per_seed_rel_pearson"] = [round(x["rel_pearson"], 6) for x in v]
+        agg[desc] = a
+
+    # 关键对比：ISDA@4× vs DDO α=2（GPT 指定）
+    key = {}
+    for d1, d2 in (("ISDA-Language 4×", "DDO α=2"), ("ISDA-Language 4×", "ISDA-Random 4×")):
+        if d1 in agg and d2 in agg:
+            a1 = [r["rel_pearson"] for r in runs if r.get("arm") == d1 and not r.get("missing")]
+            a2 = [r["rel_pearson"] for r in runs if r.get("arm") == d2 and not r.get("missing")]
+            d = [x - y for x, y in zip(a1, a2)]
+            key[f"{d1} - {d2}"] = {"diff_per_seed": d, "mean": float(np.mean(d)),
+                                   "n_positive": int(sum(x > 0 for x in d))}
+
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "dataset": "CUB",
+           "metric": "决策层概念保真度；主指标 rel_pearson = 类间中心化后的 Pearson(W_eff[c], a_c)",
+           "invariance": "对所有权重行同加公共向量 v 时 rel_* 逐位不变、原始指标会变（自测 F4/F4b/F5）",
+           "n_heads": sum(1 for r in runs if not r.get("missing")),
+           "activation_fidelity": act, "per_arm": agg, "key_comparisons": key, "runs": runs,
            "elapsed_seconds": round(time.time() - t0, 1)}
-    jp = os.path.join(OUT_DIR, f"{ds.lower()}_decision_fidelity.json")
+    jp = os.path.join(OUT_DIR, "cub_decision_fidelity.json")
     with open(jp, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
-    L = [f"# {ds}：决策层概念保真度（第十二轮 P4 补充项）", "",
-         "激活层（概念激活 vs 人工属性）与臂无关（词典冻结），只算一次："
-         f"Pearson **{act['pearson_mean']:.4f}**、AUROC **{act['auroc_mean']:.4f}**（{act['n_valid']} 个有效概念），"
-         "与 §2f 的冻结基线一致。", "",
-         "决策层：`W_eff[c] = (W⊙γ)[c]` 与该类人工属性轮廓 `a_c` 的关系（200 类均值，3 seeds）。", "",
-         "| 臂 | Pearson(W_eff, a_c) | top-10 重合 | 权重集中度 | 3 seed 标准差 |", "|---|---|---|---|---|"]
-    for desc in [d for _, d in ARMS]:
-        if desc in agg:
-            a = agg[desc]
-            L.append(f"| {desc} | {a['fid_pearson']:.4f} | {a['top10_overlap']:.3f} | {a['concentration']:.4f} | "
-                     f"{a['std_fid_pearson']:.4f} |")
-    L += ["", "集中度 = 归一化熵；越接近 1 越分散（越不依赖少数概念）。"]
-    with open(os.path.join(OUT_DIR, f"{ds.lower()}_decision_fidelity.md"), "w", encoding="utf-8") as f:
+
+    L = ["# CUB：决策层概念保真度（第十三轮 P1 修正版）", "",
+         f"评估 **{out['n_heads']} 个分类头**（{len(ARMS)} 个配置 × 3 seeds）。",
+         "激活层与臂无关（词典冻结）："
+         f"Pearson **{act['pearson_mean']:.4f}**、AUROC **{act['auroc_mean']:.4f}**"
+         f"（{act['n_valid']} 个有效概念）。", "",
+         "## 指标", "",
+         "`A~_c = A_c − (1/C)Σ_j A_j`，`a~_c = a_c − (1/C)Σ_j a_j`（类间中心化）。",
+         "**rel_pearson** 是主指标；`raw_pearson` 是初版定义，仅作对照。",
+         "对所有权重行同加公共向量时 rel_* 不变、raw_* 会变（自测 F4/F4b/F5）。", "",
+         "| 臂 | rel_pearson | 3 seed | raw_pearson | rel_top10 | 分散度 |", "|---|---|---|---|---|---|"]
+    for _, desc, _, _ in ARMS:
+        a = agg.get(desc)
+        if not a:
+            continue
+        L.append(f"| {desc} | **{a['rel_pearson']:.4f}** ± {a['std_rel_pearson']:.4f} | "
+                 f"{[round(x, 4) for x in a['per_seed_rel_pearson']]} | {a['raw_pearson']:.4f} | "
+                 f"{a['rel_top10']:.3f} | {a['concentration']:.4f} |")
+    L += ["", "## 关键对比", ""]
+    for k, v in key.items():
+        L.append(f"- {k}：Δ = {v['mean']:+.4f}（逐 seed {[round(x, 4) for x in v['diff_per_seed']]}，"
+                 f"{v['n_positive']}/3 正向）")
+    L += ["", "边界：描述性语义代理指标；不等于概念干预实验；AWA2/LADV 的属性表与概念表不对齐，未做。"]
+    with open(os.path.join(OUT_DIR, "cub_decision_fidelity.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))
-    print(f"[saved] {jp}  ({out['elapsed_seconds']}s)")
-    for desc, a in agg.items():
-        print(f"  {desc:28s} Pearson {a['fid_pearson']:+.4f}  top10 {a['top10_overlap']:.3f}  "
-              f"conc {a['concentration']:.4f}")
+    print(f"[saved] {jp}  ({out['elapsed_seconds']}s, {out['n_heads']} 个头)")
+    for desc in ("CE-Only (α=0)", "DDO α=2", "ISDA-Language 4×", "ISDA-Random 4×", "ISDA-Identity 4×"):
+        a = agg.get(desc)
+        if a:
+            print(f"  {desc:26s} rel {a['rel_pearson']:+.4f}  raw {a['raw_pearson']:+.4f}  "
+                  f"top10 {a['rel_top10']:.3f}")
+    for k, v in key.items():
+        print(f"  {k}: {v['mean']:+.4f} ({v['n_positive']}/3)")
     return 0
 
 
