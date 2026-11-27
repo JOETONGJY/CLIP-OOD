@@ -142,6 +142,10 @@ def get_args():
     parser.add_argument('--ddo_norm', type=str, default='l1', choices=['l1', 'l2'],
                         help='DDO 正则的范数: l1 = mean|h| (默认, 与历史逐位一致); '
                              'l2 = mean(h^2) (第十三轮 Stage 1B 的 L1/L2 消融, 预注册见 RESULTS §3ao)')
+    parser.add_argument('--ddo_l2_closed', action='store_true', default=False,
+                        help='DDO-L2 的二阶矩闭式实现 (外审第十五轮 P1): 不逐方向计算分类响应, 用预计算的'
+                             '语言方向二阶矩 G 与均值 μ 直接算 (1/C)[tr(AGAᵀ)+2cᵀAμ+‖c‖²] (含偏置) 或'
+                             'tr(AGAᵀ)/C (Bias-Free, 精确等价)。数学等价性见 §3ar; 默认关闭=逐方向显式路径')
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')

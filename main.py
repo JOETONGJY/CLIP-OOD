@@ -130,6 +130,8 @@ class TrainingSession:
         if reg_loss is None:
             return 0.0
         if getattr(self.args, "ddo_norm", "l1") == "l2":
+            if getattr(self.args, "ddo_l2_closed", False) and hasattr(self.model, "ddo_l2_closed_loss"):
+                return self.model.ddo_l2_closed_loss()      # 二阶矩闭式 (§3ar; 数学等价)
             return (reg_loss ** 2).mean()
         return torch.abs(reg_loss).mean()
 
@@ -714,6 +716,16 @@ class TrainingSession:
                         'grad_cos_ce_regtrain': float((g_ce @ g_rt) / (g_ce.norm() * g_rt.norm()).clamp_min(1e-12))})
             if unused:
                 rec['reg_params_without_grad'] = unused
+            # 外审第十五轮 P0: ddo_norm=l2 时, 上面的 reg_train/grad_reg_train_norm 监控的是 |h| 的 L1
+            # (历史字段, 保持不变); 这里补记实际参与训练的 L2 正则 (含闭式路径) 的值与梯度。
+            if getattr(self.args, "ddo_norm", "l1") == "l2":
+                rt_actual = self._ddo_norm_loss(reg_loss)
+                raw_actual = torch.autograd.grad(rt_actual, params, retain_graph=True, allow_unused=True)
+                g_actual = torch.cat([(t if t is not None else torch.zeros_like(pp)).reshape(-1)
+                                      for t, pp in zip(raw_actual, params)])
+                rec.update({'reg_train_actual': float(rt_actual), 'grad_reg_actual_norm': float(g_actual.norm()),
+                            'grad_norm_ratio_actual_over_ce': float(g_actual.norm() / g_ce.norm().clamp_min(1e-12)),
+                            'grad_cos_ce_actual': float((g_ce @ g_actual) / (g_ce.norm() * g_actual.norm()).clamp_min(1e-12))})
         # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用
         ddo = self._ddo_loss_equal_weight()
         if ddo is not None:

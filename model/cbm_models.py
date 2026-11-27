@@ -343,6 +343,13 @@ class clip_cbm_orth(nn.Module):
                 self.class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
                 self.classifier[2].weight = nn.Parameter(class_embeddings @ self.concept_embeddings.T)
 
+        # DDO-L2 闭式 (外审第十五轮 P1): 只在显式开启时预计算 (默认关闭, 行为不变)
+        if getattr(args, "ddo_norm", "l1") == "l2" and getattr(args, "ddo_l2_closed", False):
+            if ddo_dirs not in ("full", "full_bf"):
+                raise ValueError("--ddo_l2_closed 目前支持 --ddo_dirs full / full_bf")
+            self._build_l2_closed_buffers()
+            print(f"[DDO-L2 closed] G {tuple(self.l2_G.shape)}, mu {tuple(self.l2_mu.shape)} (buffers, 不参与梯度)")
+
     def get_domain_weights(self):
         """
         计算最终权重, 返回 (weights, residual_softmax):
@@ -421,6 +428,42 @@ class clip_cbm_orth(nn.Module):
             q_in = e / den[a]
             w = Q0[a] * q_in
             return w * (self.num_prompts / w.sum())
+
+    def _build_l2_closed_buffers(self):
+        """DDO-L2 的二阶矩闭式 (外审第十五轮 P1; §3ar): 预计算 ū 的 G 与 μ。
+        full (LN-affine 路径): 响应 = A·LN0(p) + c → ū = LN0(P); full_bf (无偏置 ln-free 路径):
+        P 已 LN0, 响应 = A·P → ū = P。G = ūᵀū/M (K,K), μ = ū.mean(0) (K,)。
+        数值等价性 (损失与梯度) 见 stage1b_l2_closed.py 的真实数据核对。"""
+        P = self.domain_concept_projection
+        P2 = P.reshape(-1, P.size(-1)).double()
+        if getattr(self, "_ddo_dirs_ln_free", False):
+            ubar = P2                                   # full_bf: 已经 LN0
+        else:
+            ubar = (P2 - P2.mean(-1, keepdim=True)) / torch.sqrt(
+                P2.var(-1, unbiased=False, keepdim=True) + 1e-5)
+        self.register_buffer("l2_G", (ubar.T @ ubar / ubar.size(0)).float())
+        self.register_buffer("l2_mu", ubar.mean(0).float())
+        self._l2_closed_ready = True
+
+    def ddo_l2_closed_loss(self):
+        """(1/C_cls)·[tr(Â G Âᵀ) + 2 cᵀÂμ + ‖c‖²]，Â = A·H = A − 行均值（超平面投影）。
+        G·1 = 0 (方向已 LN0) ⇒ tr(AGAᵀ) = tr(ÂGÂᵀ) 严格成立；先投影并在 float64 下计算，
+        否则 A 沿 1_K 的大分量在 float32 双线性求和里造成灾难性消去 (实测相对误差 ~4e-3,
+        梯度 ~1e-1 —— 本实现的第一次数值核对就抓到了)。Bias-Free (c=0) 时 = tr(ÂGÂᵀ)/C_cls,
+        与显式 mean(h²) 精确等价 (§3ar); 含偏置时与显式 mean((A·ū+c)²) 等价。"""
+        assert getattr(self, "_l2_closed_ready", False), "--ddo_l2_closed 需要先 _build_l2_closed_buffers"
+        ln, lin = self.classifier[1], self.classifier[2]
+        A = (lin.weight * ln.weight[None, :]).double()
+        A = A - A.mean(-1, keepdim=True)                         # Â = A·H (G·1=0 ⇒ 恒等变换, 数值去消去)
+        G = self.l2_G.double()
+        C_cls = A.size(0)
+        if getattr(self, "_ddo_dirs_ln_free", False):
+            # full_bf: 损失路径无偏置 (F.linear(x·γ, W, None)), 闭式 = tr(ÂGÂᵀ)/C —— 不能加 c 项!
+            return (((A @ G) * A).sum() / C_cls).float()
+        c = (lin.weight @ ln.bias + lin.bias).double()
+        mu = self.l2_mu.double()
+        out = ((A @ G) * A).sum() / C_cls + 2 * (c @ (A @ mu)) / C_cls + (c * c).sum() / C_cls
+        return out.float()
 
     def ddo_loss_equal_weight(self):
         """统一的等权 DDO 评价指标 (2026-11-25): 在原始完整方向集上不加权地计算 |h(P)| 的均值。

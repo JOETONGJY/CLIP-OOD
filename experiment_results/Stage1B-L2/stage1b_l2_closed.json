@@ -1,0 +1,161 @@
+{
+ "created": "2026-11-27 23:53:13",
+ "code": {
+  "commit": "926982ed8b79f1f1e3f76c9cc89b6865c4379742",
+  "dirty": true
+ },
+ "device": "cuda",
+ "note": "DDO-L2 二阶矩闭式的验证与基准 (外审第十五轮 P1; §3ar)。V1 前向全类输出; V2 真实数据等价 (损失/梯度, float64 参考); V4 短程基准 (2-epoch, full_bf)。",
+ "verification": {
+  "bf": {
+   "per_seed": [
+    {
+     "explicit": 0.3347572386264801,
+     "closed": 0.3347572088241577,
+     "float64_ref": 0.3347572189317064,
+     "rel_loss_diff": 8.902667048005242e-08,
+     "grad_rel_diff": 2.2942991506624821e-07
+    },
+    {
+     "explicit": 0.3288716971874237,
+     "closed": 0.3288716971874237,
+     "float64_ref": 0.3288716877023866,
+     "rel_loss_diff": 0.0,
+     "grad_rel_diff": 2.3104341551061225e-07
+    },
+    {
+     "explicit": 0.3458693027496338,
+     "closed": 0.3458692729473114,
+     "float64_ref": 0.3458692677959172,
+     "rel_loss_diff": 8.616643043524164e-08,
+     "grad_rel_diff": 2.2746563388409413e-07
+    }
+   ],
+   "max_rel_loss_diff": 8.902667048005242e-08,
+   "max_grad_rel_diff": 2.3104341551061225e-07
+  },
+  "orig": {
+   "per_seed": [
+    {
+     "explicit": 0.33333948254585266,
+     "closed": 0.3333394527435303,
+     "float64_ref": 0.3333394660811379,
+     "rel_loss_diff": 8.940531870393897e-08,
+     "grad_rel_diff": 5.160600267117843e-07
+    },
+    {
+     "explicit": 0.33002451062202454,
+     "closed": 0.33002451062202454,
+     "float64_ref": 0.3300245186786646,
+     "rel_loss_diff": 0.0,
+     "grad_rel_diff": 5.352075618247909e-07
+    },
+    {
+     "explicit": 0.346663236618042,
+     "closed": 0.34666329622268677,
+     "float64_ref": 0.3466632825882447,
+     "rel_loss_diff": 1.7193818280247797e-07,
+     "grad_rel_diff": 5.196400820750569e-07
+    }
+   ],
+   "max_rel_loss_diff": 1.7193818280247797e-07,
+   "max_grad_rel_diff": 5.352075618247909e-07
+  }
+ },
+ "benchmark": {
+  "explicit": {
+   "epochs": [
+    {
+     "epoch": 1,
+     "cls": 5.430966427231631,
+     "ddo": 0.26470164667838303,
+     "ddo_own_unweighted": 0.408841476273686,
+     "ddo_full_eval": 0.3716725707054138,
+     "kl": 0.0,
+     "source_acc": 0.3626943005181347,
+     "source_ce": 5.336242872445695,
+     "target_acc": null,
+     "clean_ce": null,
+     "robust_loss": null,
+     "pen_maxpair_mean": null,
+     "pen_maxpair_std": null,
+     "worstcomp_pen_mean": null,
+     "robust_margin_mean": null,
+     "ld_lam_effective": null
+    },
+    {
+     "epoch": 2,
+     "cls": 5.266246847021306,
+     "ddo": 0.19311765869126687,
+     "ddo_own_unweighted": 0.346647326657568,
+     "ddo_full_eval": 0.32470008730888367,
+     "kl": 0.0,
+     "source_acc": 0.8117443868739206,
+     "source_ce": 5.189122142692922,
+     "target_acc": null,
+     "clean_ce": null,
+     "robust_loss": null,
+     "pen_maxpair_mean": null,
+     "pen_maxpair_std": null,
+     "worstcomp_pen_mean": null,
+     "robust_margin_mean": null,
+     "ld_lam_effective": null
+    }
+   ],
+   "elapsed": 1.1,
+   "mem_MiB": 2414.46044921875,
+   "loss_step0": 0.408841476273686
+  },
+  "closed": {
+   "epochs": [
+    {
+     "epoch": 1,
+     "cls": 5.430966427231631,
+     "ddo": 0.2647016357591605,
+     "ddo_own_unweighted": 0.40884147786646147,
+     "ddo_full_eval": 0.3716725707054138,
+     "kl": 0.0,
+     "source_acc": 0.3626943005181347,
+     "source_ce": 5.336242859433558,
+     "target_acc": null,
+     "clean_ce": null,
+     "robust_loss": null,
+     "pen_maxpair_mean": null,
+     "pen_maxpair_std": null,
+     "worstcomp_pen_mean": null,
+     "robust_margin_mean": null,
+     "ld_lam_effective": null
+    },
+    {
+     "epoch": 2,
+     "cls": 5.26624679605249,
+     "ddo": 0.1931176531165527,
+     "ddo_own_unweighted": 0.34664732984311897,
+     "ddo_full_eval": 0.32470008730888367,
+     "kl": 0.0,
+     "source_acc": 0.8117443868739206,
+     "source_ce": 5.189122121609966,
+     "target_acc": null,
+     "clean_ce": null,
+     "robust_loss": null,
+     "pen_maxpair_mean": null,
+     "pen_maxpair_std": null,
+     "worstcomp_pen_mean": null,
+     "robust_margin_mean": null,
+     "ld_lam_effective": null
+    }
+   ],
+   "elapsed": 0.8,
+   "mem_MiB": 2414.46044921875,
+   "loss_step0": 0.40884147786646147
+  },
+  "note": "epoch_metrics 无 train_acc; 判据用训练损失与源域 Acc",
+  "speedup_total": 1.375,
+  "mem_MiB_explicit": 2414.46044921875,
+  "mem_MiB_closed": 2414.46044921875,
+  "sec_per_epoch_explicit": 0.55,
+  "sec_per_epoch_closed": 0.4
+ },
+ "all_checks_passed": true,
+ "elapsed_seconds": 110.0
+}
