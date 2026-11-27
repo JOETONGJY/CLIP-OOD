@@ -212,8 +212,8 @@ def main():
     check("等权与 rw/group 的权重均值都是 1 (同尺度可比; 真实张量断言, 第十二轮 P0-B 修正)",
           all(abs(res[bk]["geoms"][g]["w_mean"] - 1.0) < 1e-9 for bk in res for g in GEOMS),
           "；".join(f"{bk}: " + "/".join(f"{g} {res[bk]['geoms'][g]['w_mean']:.12f}" for g in GEOMS) for bk in res))
-    check("等权自比较的余弦为 1、相对差为 0 (对照的定义域自检)",
-          all(abs(res[bk]["geoms"]["uniform"]["cos_vs_uniform_mean"] - 1.0) < 1e-9
+    check("等权自比较的余弦为 1、相对差为 0 (对照的定义域自检; float32 噪声容差 1e-6)",
+          all(abs(res[bk]["geoms"]["uniform"]["cos_vs_uniform_mean"] - 1.0) < 1e-6
               and res[bk]["geoms"]["uniform"]["rel_diff_vs_uniform_mean"] < 1e-6 for bk in res))
     prev_sha = None
     if os.path.exists(NEW_JSON):                                  # 记录本版替换掉的上一版内容摘要 (审计用)
