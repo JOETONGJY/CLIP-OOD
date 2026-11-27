@@ -1,0 +1,256 @@
+{
+ "created": "2026-11-27 17:00:28",
+ "code": {
+  "commit": "f2137ac5e36bd4f4581987329bb66153396a91fb",
+  "dirty": true
+ },
+ "dataset": "AWA2",
+ "selection_lock_commit": "f2137ac5e36bd4f4581987329bb66153396a91fb",
+ "selection_sha256": "72b695431e069e84a35fac4cfe892dbb624d42e9881a2fc9369527b09706b16c",
+ "target_eval_sha256": "4ca8c992f3ed5b92b3572fd54bfcd67165405f2044257ed6a7060d88d83cd805",
+ "target_curves": {
+  "ddo": {
+   "0": 85.62386413486244,
+   "0.125": 86.75816256188506,
+   "0.25": 86.75189571974681,
+   "0.5": 86.426019928558,
+   "1": 85.42959202857679,
+   "2": 82.77871780409852,
+   "4": 75.29610829103216
+  },
+  "lang": {
+   "0.5": 86.56389045559943,
+   "1": 86.79576361471455,
+   "2": 87.18430782728582,
+   "4": 87.340978880742,
+   "8": 87.06523782665914
+  },
+  "rand": {
+   "0.5": 85.7805351883186,
+   "1": 85.89333834680706,
+   "2": 86.00614150529547,
+   "4": 85.99987466315724,
+   "8": 85.96227361032776
+  },
+  "ident": {
+   "0.5": 86.84589835182051,
+   "1": 86.72682835119383,
+   "2": 85.99987466315724,
+   "4": 82.52804411856864,
+   "8": 72.67030143510685
+  }
+ },
+ "paired": {
+  "G1_lang_x4_vs_rand_x4": {
+   "diff_per_seed": [
+    1.316036849031775,
+    1.7484489565707833,
+    0.9588268471517267
+   ],
+   "n_positive": 3,
+   "mean": 1.3411042175847616
+  },
+  "G1b_lang_x4_vs_ident_x4": {
+   "diff_per_seed": [
+    5.000940026320734,
+    4.963338973491261,
+    4.47452528670803
+   ],
+   "n_positive": 3,
+   "mean": 4.812934762173342
+  },
+  "Q1_R_aug_lang_vs_ddo": {
+   "diff_per_seed": [
+    0.0,
+    0.0564015792442234,
+    0.0564015792442234
+   ],
+   "n_positive": 2,
+   "mean": 0.037601052829482264
+  },
+  "Q1_R_joint_lang_vs_ddo": {
+   "diff_per_seed": [
+    -0.30080842263582497,
+    -0.11280315848843259,
+    -0.16920473773265599
+   ],
+   "n_positive": 0,
+   "mean": -0.19427210628563785
+  },
+  "G2_lang_warm4_vs_fixed": {
+   "diff_per_seed": [
+    0.018800526414736396,
+    -0.018800526414736396,
+    -0.0752021056589598
+   ],
+   "n_positive": 1,
+   "mean": -0.025067368552986597
+  },
+  "G2_lang_warm8_vs_fixed": {
+   "diff_per_seed": [
+    0.0564015792442234,
+    0.0564015792442234,
+    0.0
+   ],
+   "n_positive": 2,
+   "mean": 0.037601052829482264
+  }
+ },
+ "gates": {
+  "G1_lang_x4_vs_rand_x4": true,
+  "G1b_lang_x4_vs_ident_x4": true,
+  "Q1_R_aug_lang_vs_ddo": false,
+  "Q1_R_joint_lang_vs_ddo": false,
+  "G2_lang_warm4_vs_fixed": false,
+  "G2_lang_warm8_vs_fixed": false
+ },
+ "q1": {
+  "R_aug": {
+   "lang_strength": "1",
+   "ddo_strength": "0.125",
+   "lang_acc": 86.79576361471455,
+   "ddo_acc": 86.75816256188506,
+   "mean": 0.037601052829482264,
+   "n_positive": 2,
+   "diff_per_seed": [
+    0.0,
+    0.0564015792442234,
+    0.0564015792442234
+   ],
+   "gate": false
+  },
+  "R_joint": {
+   "lang_strength": "0.5",
+   "ddo_strength": "0.125",
+   "lang_acc": 86.56389045559943,
+   "ddo_acc": 86.75816256188506,
+   "mean": -0.19427210628563785,
+   "n_positive": 0,
+   "diff_per_seed": [
+    -0.30080842263582497,
+    -0.11280315848843259,
+    -0.16920473773265599
+   ],
+   "gate": false
+  }
+ },
+ "selection": {
+  "ddo": {
+   "R_aug": {
+    "strength": "0.125",
+    "target_acc": 86.75816256188506,
+    "regret": 0.0,
+    "rho_vs_target": 1.0,
+    "per_seed_strength": [
+     "0.125",
+     "0.125",
+     "0.125"
+    ]
+   },
+   "R_joint": {
+    "strength": "0.125",
+    "target_acc": 86.75816256188506,
+    "regret": 0.0,
+    "rho_vs_target": 0.9642857142857145,
+    "per_seed_strength": [
+     "0.125",
+     "0.125",
+     "0.125"
+    ]
+   },
+   "post_hoc_best": {
+    "strength": "0.125",
+    "target_acc": 86.75816256188506
+   }
+  },
+  "lang": {
+   "R_aug": {
+    "strength": "1",
+    "target_acc": 86.79576361471455,
+    "regret": 0.545215266027455,
+    "rho_vs_target": -0.3,
+    "per_seed_strength": [
+     "2",
+     "1",
+     "1"
+    ]
+   },
+   "R_joint": {
+    "strength": "0.5",
+    "target_acc": 86.56389045559943,
+    "regret": 0.7770884251425656,
+    "rho_vs_target": -0.7,
+    "per_seed_strength": [
+     "0.5",
+     "0.5",
+     "1"
+    ]
+   },
+   "post_hoc_best": {
+    "strength": "4",
+    "target_acc": 87.340978880742
+   }
+  },
+  "rand": {
+   "R_aug": {
+    "strength": "0.5",
+    "target_acc": 85.7805351883186,
+    "regret": 0.22560631697687938,
+    "rho_vs_target": -0.6,
+    "per_seed_strength": [
+     "0.5",
+     "0.5",
+     "0.5"
+    ]
+   },
+   "R_joint": {
+    "strength": "0.5",
+    "target_acc": 85.7805351883186,
+    "regret": 0.22560631697687938,
+    "rho_vs_target": -0.6,
+    "per_seed_strength": [
+     "0.5",
+     "0.5",
+     "1"
+    ]
+   },
+   "post_hoc_best": {
+    "strength": "2",
+    "target_acc": 86.00614150529547
+   }
+  },
+  "ident": {
+   "R_aug": {
+    "strength": "0.5",
+    "target_acc": 86.84589835182051,
+    "regret": 0.0,
+    "rho_vs_target": 0.9999999999999999,
+    "per_seed_strength": [
+     "0.5",
+     "0.5",
+     "0.5"
+    ]
+   },
+   "R_joint": {
+    "strength": "0.5",
+    "target_acc": 86.84589835182051,
+    "regret": 0.0,
+    "rho_vs_target": 0.9999999999999999,
+    "per_seed_strength": [
+     "0.5",
+     "0.5",
+     "0.5"
+    ]
+   },
+   "post_hoc_best": {
+    "strength": "0.5",
+    "target_acc": 86.84589835182051
+   }
+  }
+ },
+ "verdict": {
+  "G1": "几何成立",
+  "Q1_R_joint": false,
+  "Q1_R_aug": false
+ }
+}
