@@ -64,10 +64,6 @@ REUSE = {
 }
 
 
-def _runs_of(matrix, tag, s):
-    return f"CUB_{tag}_seed{s}"
-
-
 def _ddo_runs():
     return {a: f"CUB_p1_{t}" for a, t in DOSES}
 
@@ -124,13 +120,14 @@ def load_runs():
     # ---- 复用的 Language 五倍数 / LD / SDB-ISDA 与 P1 的 DDO 七剂量 ----
     for arm, table in REUSE.items():
         for m_, (mname, tag) in table.items():
+            full = f"{tag}_{MTAG[m_]}"
             for s in SEEDS:
-                name = _runs_of(mname, tag, s)
-                ex = [x for _, t, x in MATRICES[mname][1] if t == tag]
+                name = f"CUB_{full}_seed{s}"
+                ex = [x for _, t, x in MATRICES[mname][1] if t == full]
                 assert len(ex) == 1, f"{name}: 在 {mname} 里找不到唯一配置"
                 r, mm = read(name, ex[0])
-                assert mm["ld_calib"] == cal_sha, f"{name}: 标定引用不符"
-                if arm != "sdb_isda":
+                if arm != "sdb_isda":                           # SDB 侧引用的是 SDB 自己的标定文件
+                    assert mm["ld_calib"] == cal_sha, f"{name}: 标定引用不符"
                     assert mm["generator"]["sha256"] == man["frames"][str(s)]["lang_full"]["sha256"], \
                         f"{name}: language 生成元与冻结清单不一致"
                 mm.update({"arm": arm, "kind": "grid", "mult": m_})
