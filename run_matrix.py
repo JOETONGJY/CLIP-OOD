@@ -189,6 +189,26 @@ def _s1b_entries():
     return out
 
 
+# ---- 第十五轮 P2 (预注册 §3as): 补齐 2×2 的 Bias-Free × L1 格 (12 run) ----
+# 等压标定 (stage1b_calibration_bfl1.json): full_bf 等权 L1 在 alpha=1 的初始梯度比恰为 rho_bar
+# (0.104922, 逐 seed 0.103993/0.104861/0.105914), 故 1× 的 alpha = 1.0, 网格 = 字面 alpha {0.5,1,2,4},
+# 与 DDO-L1 的四剂量逐项同 alpha —— 直接可比。
+BFL1_CALIB = os.path.join(ROOT, "experiment_results", "Stage1B-L2", "stage1b_calibration_bfl1.json")
+with open(BFL1_CALIB, encoding="utf-8") as _f:
+    _BFL1 = json.load(_f)
+assert abs(_BFL1["cells"]["biasfree_l1"]["anchor_alpha_1x"] - 1.0) < 1e-12     and abs(_BFL1["rho_bar_target"] - 0.10492240885893504) < 1e-12, "BF-L1 标定与 §3ao 的 rho_bar 不一致"
+
+
+def _s1b_c2_entries():
+    out = []
+    p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE]
+    for m, tag in S1B_MTAG.items():
+        a = float(_BFL1["cells"]["biasfree_l1"]["scan"][m])
+        out.append(("CUB", f"s1b_bf_l1_a{tag}",
+                    EQUAL + ["--alpha", repr(a), "--ddo_dirs", "full_bf", "--ddo_norm", "l1"] + p1))
+    return out
+
+
 def _ld_ext_entries():
     out = []
     for m in ("4", "8"):
@@ -349,6 +369,8 @@ MATRICES = {
     "p4_pacs": ("P4-CrossDataset", _p4_entries("PACS")),
     # 第十三轮 Stage 1B (预注册 §3ao): Original/Bias-Free × L2, 各四强度, 8 配置 × 3 seeds = 24 run
     "stage1b": ("Stage1B-L2", _s1b_entries()),
+    # 第十五轮 P2: Bias-Free × L1 (§3ao 2×2 的最后一格), 4 强度 × 3 seeds = 12 run
+    "stage1b_c2": ("Stage1B-L2", _s1b_c2_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -442,6 +464,12 @@ def _self_test_expected():
             and os.path.normpath(e["ld_calib"]) == os.path.normpath(SDB_CALIB)), e
     e = expected(COMMON + MATRICES["sdb22"][1][11][2], "CUB", 1, "sdb_isda_x8")
     assert float(e["ld_lam"]) == float(repr(float(_SCAL["isda"]["anchor"]) * 8)), e
+    # 第十五轮: stage1b_c2 = 4 配置; bf_l1 用字面 alpha (标定锚点恰为 1.0), full_bf + ddo_norm l1
+    assert len(MATRICES["stage1b_c2"][1]) == 4, len(MATRICES["stage1b_c2"][1])
+    e = expected(COMMON + MATRICES["stage1b_c2"][1][0][2], "CUB", 1, "s1b_bf_l1_a0p5")
+    assert (e["ddo_dirs"] == "full_bf" and e["ddo_norm"] == "l1" and float(e["alpha"]) == 0.5
+            and e["target_eval"] == "none" and e["save_head"] is True), e
+    assert float(expected(COMMON + MATRICES["stage1b_c2"][1][1][2], "CUB", 1, "s1b_bf_l1_a1")["alpha"]) == 1.0
     # P3: warmup 矩阵 1 配置 × 3 seeds; λ 与 Original-ISDA 的 x8 逐位相同 (配对对象), warmup=20
     assert len(MATRICES["s11_warmup"][1]) == 1
     e = expected(COMMON + MATRICES["s11_warmup"][1][0][2], "CUB", 1, "isda_warm_x8")

@@ -1,0 +1,22 @@
+{
+ "note": "Bias-Free L1 (full_bf, \u7b49\u6743) \u7684\u7b49\u538b\u6807\u5b9a: 1\u00d7 = \u4e0e DDO alpha=1 \u540c\u521d\u59cb\u68af\u5ea6\u6bd4 (\u00a73ao \u7684 2\u00d72 \u8bed\u4e49)",
+ "rho_bar_target": 0.10492240885893504,
+ "ratio_at_alpha1_per_seed": {
+  "1": 0.1039930060505867,
+  "2": 0.10486067831516266,
+  "3": 0.10591354221105576
+ },
+ "ratio_at_alpha1": 0.10492240885893504,
+ "cells": {
+  "biasfree_l1": {
+   "anchor_alpha_1x": 1.0,
+   "scan": {
+    "0.5": 0.5,
+    "1": 1.0,
+    "2": 2.0,
+    "4": 4.0
+   }
+  }
+ },
+ "all_checks_passed": true
+}
