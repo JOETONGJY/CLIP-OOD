@@ -96,7 +96,8 @@ def load_runs(ds):
                     f"{rp}: 标定引用不是本数据集的标定文件"
                 arm = _arm_of(tag)
                 key = {"lang": "isda", "rand": "isda_rand", "ident": "isda_identity"}[arm]
-                m = "1" if "warm20" in tag else _key_of(tag)
+                # warm20 标签形如 p4_isda_lang_x4_warm20 —— 强度仍是 x4/x8, 只是多了 warmup
+                m = [k for k, t in MTAG.items() if f"_{t}_warm20" in tag][0] if "warm20" in tag else _key_of(tag)
                 want = float(cal["arms"][key]["scan"][m])
                 assert float(cfg["ld_lam"]) == want, f"{rp}: λ 与重标定值不符 ({cfg['ld_lam']} vs {want})"
             runs[_name(ds, tag, s)] = {"clean_acc": sv["clean"]["acc"], "mean_aug_acc": sv["mean_aug_acc"],
