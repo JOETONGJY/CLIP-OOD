@@ -80,6 +80,19 @@ ARMS = [
     ("CUB_isda_warm_x8", "ISDA-Language 8× + warmup", "warmup", "8"),
     ("CUB_s12_isda_rand_x8_warm20", "ISDA-Random 8× + warmup", "warmup", "8"),
     ("CUB_s12_isda_ident_x8_warm20", "ISDA-Identity 8× + warmup", "warmup", "8"),
+    # 第十五轮 P2 (§3as): Stage 1B 的 36 个头 (24 L2 + 12 BF-L1) —— 精度-语义对齐的 L2 补充
+    ("CUB_s1b_orig_l2_a0p5", "DDO-L2 (Original) 0.5×", "DDO-L2-Orig", "0.5"),
+    ("CUB_s1b_orig_l2_a1", "DDO-L2 (Original) 1×", "DDO-L2-Orig", "1"),
+    ("CUB_s1b_orig_l2_a2", "DDO-L2 (Original) 2×", "DDO-L2-Orig", "2"),
+    ("CUB_s1b_orig_l2_a4", "DDO-L2 (Original) 4×", "DDO-L2-Orig", "4"),
+    ("CUB_s1b_bf_l2_a0p5", "DDO-L2 (Bias-Free) 0.5×", "DDO-L2-BF", "0.5"),
+    ("CUB_s1b_bf_l2_a1", "DDO-L2 (Bias-Free) 1×", "DDO-L2-BF", "1"),
+    ("CUB_s1b_bf_l2_a2", "DDO-L2 (Bias-Free) 2×", "DDO-L2-BF", "2"),
+    ("CUB_s1b_bf_l2_a4", "DDO-L2 (Bias-Free) 4×", "DDO-L2-BF", "4"),
+    ("CUB_s1b_bf_l1_a0p5", "DDO-L1 (Bias-Free) 0.5×", "DDO-L1-BF", "0.5"),
+    ("CUB_s1b_bf_l1_a1", "DDO-L1 (Bias-Free) 1×", "DDO-L1-BF", "1"),
+    ("CUB_s1b_bf_l1_a2", "DDO-L1 (Bias-Free) 2×", "DDO-L1-BF", "2"),
+    ("CUB_s1b_bf_l1_a4", "DDO-L1 (Bias-Free) 4×", "DDO-L1-BF", "4"),
 ]
 
 
