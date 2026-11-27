@@ -301,12 +301,56 @@ def eval_s12(seeds):
     return 0
 
 
+def eval_p4(ds, seeds):
+    """第十二轮 P4（预注册 §3ai）：某个数据集的 72 个分类头。门是该数据集的源域选择文件。"""
+    from run_matrix import MATRICES
+    out_dir = os.path.join("experiment_results", "P4-CrossDataset")
+    sel_json = os.path.join(out_dir, f"{ds}_source_selection.json")
+    locked, why = selection_is_locked(sel_json)
+    if not locked:
+        print(f"拒绝运行: {ds} 的源域选择尚未锁定 —— " + why)
+        print(f"必须先运行 p4_report.py --dataset {ds} --stage source 并提交其输出。")
+        return 2
+    ev = HeadEvaluator()
+    heads = {}
+    entries = MATRICES[f"p4_{ds.lower()}"][1]
+    for _, tag, _ex in entries:
+        for s in seeds:
+            run = f"{ds}_{tag}_seed{s}"
+            heads[run] = ev.evaluate(f"logs/heads/{run}.pt", f"logs/results/{run}.json")
+    with open(sel_json, encoding="utf-8") as f:
+        sel = json.load(f)
+
+    def same(r):
+        v, w = heads.get(r), sel["runs"].get(r, {})
+        return bool(w) and v is not None and w.get("head_sha256") == v["head_sha256"] \
+            and w.get("result_sha256") == v["result_sha256"]
+
+    missing = [r for r in sorted(heads) if not same(r)]
+    if missing:
+        print("拒绝: 已评估 run 与锁定不一致: " + ", ".join(missing[:8]))
+        return 3
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "dataset": ds,
+           "selection_lock_commit": why, "selection_sha256": sha256_file(sel_json),
+           "target_cache": ev.target_meta, "heads": heads}
+    out_path = os.path.join(out_dir, f"{ds}_target_eval.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"[{ds}] 选择锁定于 {why[:7]}; 评估 {len(heads)} 个头; 目标域 {ev.target_meta['n']} 个样本")
+    for _, tag, _ex in entries:
+        accs = [heads[f"{ds}_{tag}_seed{s}"]["target_acc"] for s in seeds]
+        print(f"  {tag:28s} " + " / ".join(f"{x:.2f}" for x in accs))
+    print(f"[saved] {out_path}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate_stage0", action="store_true")
     ap.add_argument("--stage1c", action="store_true")
     ap.add_argument("--s11", action="store_true")
     ap.add_argument("--s12", action="store_true")
+    ap.add_argument("--p4", choices=["AWA2", "LADV", "PACS"])
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     a = ap.parse_args()
     if a.validate_stage0:
@@ -317,6 +361,8 @@ def main():
         return eval_s11(a.seeds)
     if a.s12:
         return eval_s12(a.seeds)
+    if a.p4:
+        return eval_p4(a.p4, a.seeds)
 
     locked, why = selection_is_locked()
     if not locked:

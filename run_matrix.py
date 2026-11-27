@@ -132,6 +132,39 @@ def _s12_entries():
     return out
 
 
+# ---- 第十二轮 P4 (预注册 §3ai): 跨数据集验证 ----
+# 每个数据集一个矩阵 (p4_awa2 / p4_ladv / p4_pacs), 便于分批执行; λ 从各自的重标定 JSON 取,
+# 不照搬 CUB 数值。每个数据集 24 配置 × 3 seeds = 72 run (DDO 七剂量 + 三几何 × 五倍数 + lang warmup 4×/8×)。
+P4_DS = ("AWA2", "LADV", "PACS")
+P4_MULT = ["0.5", "1", "2", "4", "8"]
+P4_ARMS = (("lang", "lang_full", "isda"), ("rand", "rand_full", "isda_rand"), ("ident", "identity", "isda_identity"))
+
+
+def _p4_calib(ds):
+    p = os.path.join(ROOT, "experiment_results", "Stage1C-Radius", f"stage1c_calibration_{ds}.json")
+    with open(p, encoding="utf-8") as f:
+        return json.load(f), p
+
+
+def _p4_entries(ds):
+    cal, path = _p4_calib(ds)
+    assert cal["dataset"] == ds and cal["all_checks_passed"] is True, f"{ds}: 标定文件与数据集不符或未通过自检"
+    cache = os.path.join("cache", f"{ds}_train_aug.pt")
+    p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", cache, "--source_val_cache", cache]
+    out = [(ds, f"p4_{t}", EQUAL + ["--alpha", str(a)] + p1) for a, t in DOSE]
+    for arm, ell, key in P4_ARMS:
+        for m in P4_MULT:
+            out.append((ds, f"p4_isda_{arm}_{MTAG8[m]}",
+                        EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", ell,
+                                 "--ld_lam", repr(float(cal["arms"][key]["scan"][m])), "--ld_calib", path] + p1))
+    for m in ("4", "8"):
+        out.append((ds, f"p4_isda_lang_{MTAG8[m]}_warm20",
+                    EQUAL + ["--alpha", "0", "--ld_mode", "isda", "--ld_ell", "lang_full",
+                             "--ld_lam", repr(float(cal["arms"]["isda"]["scan"][m])),
+                             "--isda_warmup_epochs", "20", "--ld_calib", path] + p1))
+    return out
+
+
 def _ld_ext_entries():
     out = []
     for m in ("4", "8"):
@@ -286,6 +319,10 @@ MATRICES = {
     # 第十二轮 P1 (预注册 §3ag): Language-ISDA 的几何对照 —— Random-SpecMatched / Identity-H 各五倍数
     # + 同 λ 对照, 以及三个 warmup 消融。15 配置 × 3 seeds = 45 run; Language 的五倍数复用第十一轮 (不重跑)
     "s12_geom": ("Stage1C-Training", _s12_entries()),
+    # 第十二轮 P4 (预注册 §3ai): 三个数据集各自一个矩阵, 每个 24 配置 × 3 seeds = 72 run
+    "p4_awa2": ("P4-CrossDataset", _p4_entries("AWA2")),
+    "p4_ladv": ("P4-CrossDataset", _p4_entries("LADV")),
+    "p4_pacs": ("P4-CrossDataset", _p4_entries("PACS")),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False

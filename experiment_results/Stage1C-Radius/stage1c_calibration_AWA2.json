@@ -1,0 +1,195 @@
+{
+ "created": "2026-11-27 13:06:41",
+ "code": {
+  "commit": "187b96ad16737b47078a7d1d82199ba8ad897564",
+  "dirty": true
+ },
+ "device": "cuda",
+ "dataset": "AWA2",
+ "note": "第十二轮 P4 的初始强度标定（方程与 §3z / traincore 版完全相同；数据集不同，λ 必须重算）",
+ "base_run_config": "logs/results/CUB_p1_dose_a1_seed1.json",
+ "split_cache": "cache/AWA2_train_aug.pt",
+ "split_cache_sha256": "ef7ffb395d228cc2dd7990b8845d9f7bdb70a118c7dadcc85cdd183b9bb8ab9f",
+ "K": 133,
+ "C": 50,
+ "N_desc": 204,
+ "tr_G": 131.43170315423552,
+ "rho_ddo": {
+  "1": 0.07251306623220444,
+  "2": 0.06646318733692169,
+  "3": 0.06662486493587494
+ },
+ "cos_ddo": {
+  "1": 0.01936497539281845,
+  "2": 0.028751039877533913,
+  "3": 0.02037273347377777
+ },
+ "rho_bar": 0.0685337061683337,
+ "p_star": 0.2598287889412891,
+ "r_max_mean_tc": {
+  "lang_full": 0.13842000315586725,
+  "rand_full": 0.1001652330160141,
+  "lang32": 0.14235326399405798,
+  "rand32": 0.1054361363252004,
+  "identity": 0.07646352052688599
+ },
+ "r_max_sq_mean_tc": {
+  "lang_full": 0.019333291488389175,
+  "rand_full": 0.01016693701967597,
+  "lang32": 0.02045281728108724,
+  "rand32": 0.011221750949819883,
+  "identity": 0.00584904740874966
+ },
+ "calibration": {
+  "lang_full": {
+   "eps_grad": 1.8771043419837954,
+   "eps_grad_bracketed": true,
+   "lam_grad": 21.6575288772583,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.16690278549989065,
+   "eps_pen": 1.8771043419837954,
+   "lam_pen": 26.87889841182317
+  },
+  "rand_full": {
+   "eps_grad": 3.5933147668838505,
+   "eps_grad_bracketed": true,
+   "lam_grad": 50.61066246032714,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": -0.00042426586151123047,
+   "eps_pen": 2.5940017420989623,
+   "lam_pen": 51.11250093089887
+  },
+  "lang32": {
+   "eps_grad": 1.749051511287689,
+   "eps_grad_bracketed": true,
+   "lam_grad": 20.066880226135254,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.1638203759988149,
+   "eps_pen": 1.8252394195340311,
+   "lam_pen": 25.407628237265218
+  },
+  "rand32": {
+   "eps_grad": 4.012639284133911,
+   "eps_grad_bracketed": true,
+   "lam_grad": 57.212423324584954,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.09124605741817504,
+   "eps_pen": 2.464323883605617,
+   "lam_pen": 46.308065488739
+  },
+  "identity": {
+   "eps_grad": 11.445992946624754,
+   "eps_grad_bracketed": true,
+   "lam_grad": 164.04293060302734,
+   "lam_grad_bracketed": true,
+   "cos_ld_at_eps_grad": 0.2060737907886505,
+   "eps_pen": 3.3980751494423864,
+   "lam_pen": 88.8448223389703
+  }
+ },
+ "arms": {
+  "lang_full": {
+   "anchor": 1.8771043419837954,
+   "scan": {
+    "0.5": 0.9385521709918977,
+    "1": 1.8771043419837954,
+    "2": 3.7542086839675908,
+    "4": 7.5084173679351816,
+    "8": 15.016834735870363
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "rand_full": {
+   "anchor": 2.5940017420989623,
+   "scan": {
+    "0.5": 1.2970008710494811,
+    "1": 2.5940017420989623,
+    "2": 5.188003484197925,
+    "4": 10.37600696839585,
+    "8": 20.7520139367917
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "lang32": {
+   "anchor": 1.8252394195340311,
+   "scan": {
+    "0.5": 0.9126197097670156,
+    "1": 1.8252394195340311,
+    "2": 3.6504788390680623,
+    "4": 7.3009576781361245,
+    "8": 14.601915356272249
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "identity": {
+   "anchor": 3.3980751494423864,
+   "scan": {
+    "0.5": 1.6990375747211932,
+    "1": 3.3980751494423864,
+    "2": 6.796150298884773,
+    "4": 13.592300597769546,
+    "8": 27.18460119553909
+   },
+   "equation": "eps_pen (train_core 固定批次)"
+  },
+  "isda": {
+   "anchor": 26.87889841182317,
+   "scan": {
+    "0.5": 13.439449205911584,
+    "1": 26.87889841182317,
+    "2": 53.75779682364634,
+    "4": 107.51559364729268,
+    "8": 215.03118729458535
+   },
+   "equation": "lam_pen (train_core 固定批次)"
+  },
+  "isda_rand": {
+   "anchor": 51.11250093089887,
+   "scan": {
+    "0.5": 25.556250465449434,
+    "1": 51.11250093089887,
+    "2": 102.22500186179774,
+    "4": 204.45000372359547,
+    "8": 408.90000744719094
+   },
+   "equation": "lam_pen (随机谱椭球, train_core 固定批次)"
+  },
+  "isda_identity": {
+   "anchor": 88.8448223389703,
+   "scan": {
+    "0.5": 44.42241116948515,
+    "1": 88.8448223389703,
+    "2": 177.6896446779406,
+    "4": 355.3792893558812,
+    "8": 710.7585787117624
+   },
+   "equation": "lam_pen (各向同性椭球, train_core 固定批次)"
+  }
+ },
+ "mults": [
+  0.5,
+  1.0,
+  2.0,
+  4.0,
+  8.0
+ ],
+ "ell_sha256": {
+  "1|lang_full": "e35d7108bd254c1c75e4448cf2688a32a9fd76454d3b76d3638d34d2961b8e10",
+  "1|rand_full": "8db442b36187cff5e7e0b7fdcf0806ff066695e5f1408ed247e99638849419ac",
+  "1|lang32": "6bfb582069ea1744aca553bfdc7d838cf57a5551bccab3afd2b2687da86bbdf6",
+  "1|rand32": "0324cda4ecc0637c205649bacd07e3a0b45ecf76b158c1ca83f96772964eb815",
+  "1|identity": "ab09fe6bfc4bcf315806e63772bdf8a8e3c80f65d85b52420a109ad28fd22dc5",
+  "2|lang_full": "e35d7108bd254c1c75e4448cf2688a32a9fd76454d3b76d3638d34d2961b8e10",
+  "2|rand_full": "3267287264162062c488a03d93bafdca4a336b242c6c96434cf06c9bf636105d",
+  "2|lang32": "6bfb582069ea1744aca553bfdc7d838cf57a5551bccab3afd2b2687da86bbdf6",
+  "2|rand32": "8115393fbb99ed995a94d15cbbc6de0422297f1e10e86f52a8c77fbe4ba9eaf6",
+  "2|identity": "ab09fe6bfc4bcf315806e63772bdf8a8e3c80f65d85b52420a109ad28fd22dc5",
+  "3|lang_full": "e35d7108bd254c1c75e4448cf2688a32a9fd76454d3b76d3638d34d2961b8e10",
+  "3|rand_full": "dc062d76d1cf568c382baad60b8ce9b85cd3b980413e640fde4f68cb0ab76e5a",
+  "3|lang32": "6bfb582069ea1744aca553bfdc7d838cf57a5551bccab3afd2b2687da86bbdf6",
+  "3|rand32": "fed3fcb9f69f8bfcdff140b843bf98e61bea1d23c58a5d549487a85afc2e2871",
+  "3|identity": "ab09fe6bfc4bcf315806e63772bdf8a8e3c80f65d85b52420a109ad28fd22dc5"
+ },
+ "all_checks_passed": true,
+ "elapsed_seconds": 41.5
+}
