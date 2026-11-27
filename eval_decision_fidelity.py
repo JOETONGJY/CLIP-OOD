@@ -160,6 +160,12 @@ def _center(M):
     return M - M.mean(0, keepdim=True)
 
 
+def _project_H(v):
+    """去掉沿全 1 方向的分量。u = LN0(E·d) 恒在零均值超平面内（1ᵀu = 0），所以给某一行加上 c·1_K
+    不改变任何 logit；Pearson 内部已减去均值、自动免疫，但 top-k 排序会被它改掉，必须先投影。"""
+    return v - v.mean()
+
+
 def decision_metrics(W_eff, A, k=10):
     """返回原始与类别中心化两套指标，以及逐类记录。"""
     Wc, Ac = _center(W_eff), _center(A)
@@ -175,7 +181,9 @@ def decision_metrics(W_eff, A, k=10):
                 per_cls[p].append(None)
                 continue
             r = float(np.corrcoef(w, a)[0, 1])
-            tw, ta = set(np.argsort(-w)[:k].tolist()), set(np.argsort(-a)[:k].tolist())
+            # top-k 在零均值超平面内的分量上算（去掉 1_K 这一路不可辨识方向）
+            tw = set(np.argsort(-_project_H(w))[:k].tolist())
+            ta = set(np.argsort(-_project_H(a))[:k].tolist())
             out[f"{p}_pearson"].append(r)
             out[f"{p}_top10"].append(len(tw & ta) / float(k))
             per_cls[p].append(round(r, 6))
@@ -251,6 +259,20 @@ def self_test():
     check("F6 集中度：单点 = 0、均匀 = 1",
           abs(_concentration(onehot)) < 1e-9 and abs(_concentration(np.ones(K)) - 1.0) < 1e-9)
     check("F7 类间中心化后每列之和为 0", float(_center(A).sum(0).abs().max()) < 1e-6)
+
+    # F9：给某一行加 c·1_K（LayerNorm 的不可辨识方向）不改变任何 logit，也不应改变 H 内投影后的 top-k
+    c0 = 1.7
+    A_one = A.clone()
+    A_one[0] = A_one[0] + c0 * torch.ones(K)
+    d_one = decision_metrics(A_one, prof, k=5)
+    proj_w = _project_H(A[0].numpy())
+    proj_w1 = _project_H(A_one[0].numpy())
+    check("F9 加 c·1_K 后投影到 H 的向量逐位相同（top-k 因此不变）",
+          float(np.abs(proj_w - proj_w1).max()) < 1e-6,
+          f"max|Δ|={float(np.abs(proj_w - proj_w1).max()):.2e}")
+    check("F9b 该变换不改变该行与其它类的间隔（1ᵀu = 0）",
+          abs(d_one["rel_pearson"] - d_good["rel_pearson"]) < 1e-6,
+          f"{d_good['rel_pearson']:.6f} -> {d_one['rel_pearson']:.6f}")
 
     # F8：W_eff = W ⊙ γ 的逐列缩放（真实张量，不再直接传 True）
     sd = {"1.weight": torch.arange(1, K + 1).float(), "2.weight": torch.ones(C, K)}

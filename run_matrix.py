@@ -167,6 +167,28 @@ def _p4_entries(ds):
     return out
 
 
+# ---- 第十三轮 Stage 1B (预注册 §3ao): L1/L2 × 偏置 ----
+# 新跑两格 × 四强度 × 3 seeds = 24 run; α 从 stage1b_calibration_l2.json 现算 (与 ρ̄_DDO 同初始梯度比)。
+S1B_CALIB = os.path.join(ROOT, "experiment_results", "Stage1B-L2", "stage1b_calibration_l2.json")
+with open(S1B_CALIB, encoding="utf-8") as _f:
+    _S1B = json.load(_f)
+assert abs(_S1B["rho_bar_target"] - 0.10492240885893504) < 1e-12 and _S1B["all_checks_passed"] is True, \
+    "Stage 1B 的 L2 标定文件与 §3ao 的 ρ̄ 不一致或未通过自检"
+S1B_CELLS = {"orig_l2": ("full", "original_l2"), "bf_l2": ("full_bf", "biasfree_l2")}
+S1B_MTAG = {"0.5": "0p5", "1": "1", "2": "2", "4": "4"}
+
+
+def _s1b_entries():
+    out = []
+    p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE]
+    for short, (dirs, key) in S1B_CELLS.items():
+        for m, tag in S1B_MTAG.items():
+            a = float(_S1B["cells"][key]["scan"][m])
+            out.append(("CUB", f"s1b_{short}_a{tag}",
+                        EQUAL + ["--alpha", repr(a), "--ddo_dirs", dirs, "--ddo_norm", "l2"] + p1))
+    return out
+
+
 def _ld_ext_entries():
     out = []
     for m in ("4", "8"):
@@ -325,6 +347,8 @@ MATRICES = {
     "p4_awa2": ("P4-CrossDataset", _p4_entries("AWA2")),
     "p4_ladv": ("P4-CrossDataset", _p4_entries("LADV")),
     "p4_pacs": ("P4-CrossDataset", _p4_entries("PACS")),
+    # 第十三轮 Stage 1B (预注册 §3ao): Original/Bias-Free × L2, 各四强度, 8 配置 × 3 seeds = 24 run
+    "stage1b": ("Stage1B-L2", _s1b_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False

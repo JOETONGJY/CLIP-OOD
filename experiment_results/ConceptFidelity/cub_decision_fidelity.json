@@ -1,5 +1,5 @@
 {
- "created": "2026-11-27 20:11:51",
+ "created": "2026-11-27 20:16:42",
  "dataset": "CUB",
  "metric": "决策层概念保真度；主指标 rel_pearson = 类间中心化后的 Pearson(W_eff[c], a_c)",
  "invariance": "对所有权重行同加公共向量 v 时 rel_* 逐位不变、原始指标会变（自测 F4/F4b/F5）",
@@ -17271,5 +17271,5 @@
    "head_sha256": "80a4802fc2010262ba7150ae7e1d64fac2f71c7c808f82217660a4d8437f0ae8"
   }
  ],
- "elapsed_seconds": 18.1
+ "elapsed_seconds": 17.2
 }

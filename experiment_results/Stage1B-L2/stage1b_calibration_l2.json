@@ -1,0 +1,81 @@
+{
+ "created": "2026-11-27 20:18:44",
+ "code": {
+  "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+  "dirty": true
+ },
+ "note": "Stage 1B 的 L2 强度标定；目标 = ρ̄_DDO（DDO-L1 α=1 的初始梯度比）",
+ "rho_bar_target": 0.10492240885893504,
+ "calibration_source": "experiment_results\\Stage1C-Radius\\stage1c_calibration_traincore.json",
+ "cells": {
+  "original_l2": {
+   "ddo_dirs": "full",
+   "anchor": 0.7191922366638289,
+   "per_seed": {
+    "1": {
+     "alpha_star": 0.7204187214393268,
+     "bracketed": true,
+     "ratio_at_1": 0.14564086299827514,
+     "grad_reg": 0.7003198266029358,
+     "grad_ce": 4.808539390563965
+    },
+    "2": {
+     "alpha_star": 0.7349883616036764,
+     "bracketed": true,
+     "ratio_at_1": 0.14275384012633233,
+     "grad_reg": 0.6920167803764343,
+     "grad_ce": 4.847622871398926
+    },
+    "3": {
+     "alpha_star": 0.7021696269484836,
+     "bracketed": true,
+     "ratio_at_1": 0.14942602998769497,
+     "grad_reg": 0.7162802219390869,
+     "grad_ce": 4.793543815612793
+    }
+   },
+   "scan": {
+    "0.5": 0.35959611833191446,
+    "1": 0.7191922366638289,
+    "2": 1.4383844733276578,
+    "4": 2.8767689466553157
+   },
+   "all_bracketed": true
+  },
+  "biasfree_l2": {
+   "ddo_dirs": "full_bf",
+   "anchor": 0.7217671970618604,
+   "per_seed": {
+    "1": {
+     "alpha_star": 0.719612747432676,
+     "bracketed": true,
+     "ratio_at_1": 0.14580398885865248,
+     "grad_reg": 0.7011042237281799,
+     "grad_ce": 4.808539390563965
+    },
+    "2": {
+     "alpha_star": 0.7398261129898098,
+     "bracketed": true,
+     "ratio_at_1": 0.14182036713415688,
+     "grad_reg": 0.6874916553497314,
+     "grad_ce": 4.847622871398926
+    },
+    "3": {
+     "alpha_star": 0.7058627307630955,
+     "bracketed": true,
+     "ratio_at_1": 0.14864421966439167,
+     "grad_reg": 0.7125325798988342,
+     "grad_ce": 4.793543815612793
+    }
+   },
+   "scan": {
+    "0.5": 0.3608835985309302,
+    "1": 0.7217671970618604,
+    "2": 1.4435343941237209,
+    "4": 2.8870687882474417
+   },
+   "all_bracketed": true
+  }
+ },
+ "all_checks_passed": true
+}

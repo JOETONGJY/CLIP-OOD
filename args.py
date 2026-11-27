@@ -139,6 +139,9 @@ def get_args():
     parser.add_argument('--ddo_k', type=int, default=32, help='DDO-Subspace: pca / random 的维数 k')
     parser.add_argument('--ddo_dirs_seed', type=int, default=0,
                         help='DDO-Subspace: 随机标架的种子 (与训练 seed 相互独立; 同一标架的不同剂量实验之间保持不变)')
+    parser.add_argument('--ddo_norm', type=str, default='l1', choices=['l1', 'l2'],
+                        help='DDO 正则的范数: l1 = mean|h| (默认, 与历史逐位一致); '
+                             'l2 = mean(h^2) (第十三轮 Stage 1B 的 L1/L2 消融, 预注册见 RESULTS §3ao)')
     parser.add_argument("--model_selection", type=str, default='final',
                         choices=['final', 'target'],
                         help='F1 选模协议: final=固定epoch/严格DG(默认); target=按target_acc选best(历史对照)')

@@ -1,0 +1,337 @@
+{
+ "created": "2026-11-27 20:37:38",
+ "code": {
+  "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+  "dirty": true
+ },
+ "target_info_present": false,
+ "curves": {
+  "orig_l1": {
+   "0.5": 51.68253968253968,
+   "1": 53.09920634920635,
+   "2": 54.468253968253975,
+   "4": 51.82142857142858
+  },
+  "orig_l1_clean": {
+   "0.5": 77.1111111111111,
+   "1": 77.41666666666667,
+   "2": 76.69444444444444,
+   "4": 69.75
+  },
+  "orig_l2": {
+   "0.5": 53.32936507936508,
+   "1": 54.62698412698413,
+   "2": 55.8095238095238,
+   "4": 56.0515873015873
+  },
+  "orig_l2_clean": {
+   "0.5": 77.66666666666667,
+   "1": 77.80555555555556,
+   "2": 77.80555555555556,
+   "4": 76.44444444444444
+  },
+  "bf_l2": {
+   "0.5": 53.35714285714286,
+   "1": 54.67460317460317,
+   "2": 55.75,
+   "4": 56.01190476190476
+  },
+  "bf_l2_clean": {
+   "0.5": 77.55555555555556,
+   "1": 77.86111111111111,
+   "2": 77.66666666666667,
+   "4": 76.25
+  }
+ },
+ "protocol_warning": "Bias-Free × L1 的旧 run（CUB_bf_full8_a*）是完整训练集协议（§3q），与本轮 train_core 不可比；C2 的 2×2 需另补 12 个 train_core 协议的 BF-L1 run。",
+ "runs": {
+  "CUB_s1b_orig_l2_a0p5_seed1": {
+   "clean": 77.66666666666667,
+   "aug": 53.238095238095234,
+   "ce": 1.5700930341084798,
+   "elapsed": 26.1,
+   "head_sha256": "3eb92e7f194eeb6bd6fd6da56605249030535b9a1829451fc6ae41fbdb7c2d78",
+   "result_sha256": "9042cfe51250992d4f1652e8bd8f237a0ca9c2f4cbf839a7ed2253785ce1dfbd"
+  },
+  "CUB_s1b_orig_l2_a0p5_seed2": {
+   "clean": 77.66666666666667,
+   "aug": 53.273809523809526,
+   "ce": 1.5704149452845255,
+   "elapsed": 25.0,
+   "head_sha256": "85856346c0a3700771e60e5cdc5b6f2a7705f8493532b26c4673197fba7d68a3",
+   "result_sha256": "e71923fa7c6855ff42428465ee80da142935d0dbfa3aa926a7764a4a02eb1981"
+  },
+  "CUB_s1b_orig_l2_a0p5_seed3": {
+   "clean": 77.66666666666667,
+   "aug": 53.476190476190474,
+   "ce": 1.5663169813156128,
+   "elapsed": 25.0,
+   "head_sha256": "4bcbd664a807384c42f0cfd7f8dd0c3055d3b76944ef9f7decfe8d30c2e2d1c8",
+   "result_sha256": "ff9c371a67be08b3a4d50e6b38e9758c90e6a1d5f281101554735339435519d9"
+  },
+  "CUB_s1b_orig_l2_a1_seed1": {
+   "clean": 77.58333333333333,
+   "aug": 54.285714285714285,
+   "ce": 1.7911455217997234,
+   "elapsed": 25.8,
+   "head_sha256": "b1236a7adf01b983712a32e2372abfe11e4f357a334f1d6a19f2bf7c3a690858",
+   "result_sha256": "a917f34664f60fb7d14f5626f112e7f4b1e2e82c06d6ae8d300926acaa825061"
+  },
+  "CUB_s1b_orig_l2_a1_seed2": {
+   "clean": 77.91666666666667,
+   "aug": 54.607142857142854,
+   "ce": 1.7913533751169841,
+   "elapsed": 25.9,
+   "head_sha256": "b46d822d8e4e78c95cf4206269cc0c6f540d6666d87a4412a60faa9cb6cf5349",
+   "result_sha256": "da1cccb55162bbcf2eb1906a9b2d3b0a5c9a547e251c8fbc2f3dabeb31dc69a5"
+  },
+  "CUB_s1b_orig_l2_a1_seed3": {
+   "clean": 77.91666666666667,
+   "aug": 54.98809523809524,
+   "ce": 1.7883179966608684,
+   "elapsed": 26.0,
+   "head_sha256": "73c46d987883515de2a14c20ae7b228305d97b793b04e42115d261443fae3bcc",
+   "result_sha256": "26c1838ca165d67879103988540e106d1ac6bc2261fe9503ca5c6843b1224eb0"
+  },
+  "CUB_s1b_orig_l2_a2_seed1": {
+   "clean": 77.41666666666667,
+   "aug": 55.48809523809524,
+   "ce": 2.120192200342814,
+   "elapsed": 25.0,
+   "head_sha256": "d8196e8c2cd079accbc254c78521ec69afc6075d2d4607dd5132c68fec204970",
+   "result_sha256": "0378109043c0c18b0fa1ae054812e72ed3eb9d3bae6a1e294d2a1d1bc4fe7cc4"
+  },
+  "CUB_s1b_orig_l2_a2_seed2": {
+   "clean": 77.83333333333333,
+   "aug": 55.83333333333333,
+   "ce": 2.1199494647979735,
+   "elapsed": 25.9,
+   "head_sha256": "c2b258009ae6c40ec057c535f117b1c0fc3b9454f1bd1653d4eebfe62030c38c",
+   "result_sha256": "14d0571670708772f97862187336f0888d8f607050ce1f4c39b2c8701f4503a2"
+  },
+  "CUB_s1b_orig_l2_a2_seed3": {
+   "clean": 78.16666666666667,
+   "aug": 56.107142857142854,
+   "ce": 2.1193427499135336,
+   "elapsed": 25.9,
+   "head_sha256": "057f6e2ca5be3a22d941df59a7390f205c176a9fecbee08962e896834c5e2013",
+   "result_sha256": "4cf7698e0a1b90b26d999356c6d3b617de715cf6051cc869c06fb355db6a6d47"
+  },
+  "CUB_s1b_orig_l2_a4_seed1": {
+   "clean": 76.41666666666667,
+   "aug": 55.33333333333333,
+   "ce": 2.5739585240681966,
+   "elapsed": 26.2,
+   "head_sha256": "d559a9338880120ff3c5a34ee02fb208c3e631c03356ef928f229eee4fc594a8",
+   "result_sha256": "085b2fc253df40e9950877f5899d297a3e77cdba2b490348c0524d509ea8b0c5"
+  },
+  "CUB_s1b_orig_l2_a4_seed2": {
+   "clean": 76.33333333333333,
+   "aug": 56.23809523809524,
+   "ce": 2.5733345635732015,
+   "elapsed": 26.0,
+   "head_sha256": "7a9cfe8ffaaede9c509f44b2f3f1990e1dcf3bfa39afef80115ceea7ea752cf4",
+   "result_sha256": "aa543286bc0d6ba0193a07a148dbd61d71e110cd28fe8d3fe8078e99dd1668ce"
+  },
+  "CUB_s1b_orig_l2_a4_seed3": {
+   "clean": 76.58333333333333,
+   "aug": 56.58333333333333,
+   "ce": 2.576764211654663,
+   "elapsed": 25.9,
+   "head_sha256": "30189b0c3d43931f3b15e547a5b916a782b654681ff4cafa4abf8b328f10240b",
+   "result_sha256": "712472e9c1996d304bc050cad424241dc6062643bb691ec755f8eea2c94e382b"
+  },
+  "CUB_s1b_bf_l2_a0p5_seed1": {
+   "clean": 77.41666666666667,
+   "aug": 53.22619047619048,
+   "ce": 1.5737341594696046,
+   "elapsed": 26.6,
+   "head_sha256": "aab24d28a62db9530d5119944f29fd301f1de79216b4be156293c535fc3d763b",
+   "result_sha256": "a4add2a45398827085b032687f7e8f6c4a768021e0caf3b81e3847e196b4026a"
+  },
+  "CUB_s1b_bf_l2_a0p5_seed2": {
+   "clean": 77.66666666666667,
+   "aug": 53.28571428571429,
+   "ce": 1.5738487974802653,
+   "elapsed": 26.7,
+   "head_sha256": "97d0179aa2f6b9294bd4dfd03baf5eb1e355fba4d0e36e1ab49f4033991c302d",
+   "result_sha256": "4daf60c1ea4f96321b32845a9b26aa6bd3e89d12474824bd814871e93c74b494"
+  },
+  "CUB_s1b_bf_l2_a0p5_seed3": {
+   "clean": 77.58333333333333,
+   "aug": 53.55952380952381,
+   "ce": 1.570083309809367,
+   "elapsed": 26.6,
+   "head_sha256": "5c5142586ec04d661e2df42e7fb64b8c3dc6597d4c65d4824476d702a1665ca3",
+   "result_sha256": "84668a7f3120a81c3da13f1984c93de4d91bed242c464c868f1f830485edcbe3"
+  },
+  "CUB_s1b_bf_l2_a1_seed1": {
+   "clean": 77.66666666666667,
+   "aug": 54.30952380952381,
+   "ce": 1.7962551148732504,
+   "elapsed": 26.3,
+   "head_sha256": "ea6990276734aafb398e24b7beb31431ee87f7367a87dab37be920e14e5b790a",
+   "result_sha256": "ddfacb68b209e4f6e96121931264539bb004bd39fab727a86db3de5f7ca9a882"
+  },
+  "CUB_s1b_bf_l2_a1_seed2": {
+   "clean": 77.91666666666667,
+   "aug": 54.607142857142854,
+   "ce": 1.796208880742391,
+   "elapsed": 24.7,
+   "head_sha256": "d84951518504f5fd9fc76f5b6b0a54eb2e0fd06e6e37432092d13d6d40156250",
+   "result_sha256": "292534c7f0b66dde1933b484b7f06c72c57e53b35806d91efadd355cb6a60ea8"
+  },
+  "CUB_s1b_bf_l2_a1_seed3": {
+   "clean": 78.0,
+   "aug": 55.107142857142854,
+   "ce": 1.7935207144419352,
+   "elapsed": 24.8,
+   "head_sha256": "2017f035aa9a22666b9899e058f361527db597fb9c0d0934431986a84fa530e0",
+   "result_sha256": "cec3217ef6812e7c286ee0ae602a47391481cda34d1e57e0ec6247bcbca7bfd9"
+  },
+  "CUB_s1b_bf_l2_a2_seed1": {
+   "clean": 77.41666666666667,
+   "aug": 55.404761904761905,
+   "ce": 2.1269004980723065,
+   "elapsed": 25.0,
+   "head_sha256": "fbdf773d01bc896580642c498d51b7c94889f59b0adfcc098b095c59ef2cbbb7",
+   "result_sha256": "92c99c2531445eaae9e3d57f827594b8aa2929d7e335ae8a65d8652b738294ac"
+  },
+  "CUB_s1b_bf_l2_a2_seed2": {
+   "clean": 77.66666666666667,
+   "aug": 55.6904761904762,
+   "ce": 2.1263086287180584,
+   "elapsed": 24.8,
+   "head_sha256": "1f88c0c046a20f1c9791bb5926e394597383367e01b7253b75f12bf7dbd9105a",
+   "result_sha256": "c2cd791b3e5484c45aed4cd7f9bc713a5a6653fe787216ad32d27376d02f1e51"
+  },
+  "CUB_s1b_bf_l2_a2_seed3": {
+   "clean": 77.91666666666667,
+   "aug": 56.15476190476191,
+   "ce": 2.126109329859416,
+   "elapsed": 24.7,
+   "head_sha256": "c01432bf448d4a8675f572c3a8ef58354d5d2d402c205088bf0b1bb52381badb",
+   "result_sha256": "518c3b83d506e23ce171890a4f10d0e3bb6267a946e87c16acb351e7e96d77b5"
+  },
+  "CUB_s1b_bf_l2_a4_seed1": {
+   "clean": 76.16666666666667,
+   "aug": 55.38095238095237,
+   "ce": 2.582173875172933,
+   "elapsed": 24.7,
+   "head_sha256": "cd8a5262be0fe446b7d38755386686a37dbb6c0a08f1a1490b3db65e3e75038d",
+   "result_sha256": "94dc0d84637729a6d0f73b5f22a638491070d50b809826aa38de3edae44287e0"
+  },
+  "CUB_s1b_bf_l2_a4_seed2": {
+   "clean": 76.16666666666667,
+   "aug": 56.14285714285713,
+   "ce": 2.581038258870443,
+   "elapsed": 24.9,
+   "head_sha256": "1d59652062f79400d4444d055272ee0bc6ba225414d5c75b6892e399ea757d5f",
+   "result_sha256": "04094ffd4c0b3703d36040253697076cbdf079ff1c8ccc73075d109ba748944c"
+  },
+  "CUB_s1b_bf_l2_a4_seed3": {
+   "clean": 76.41666666666667,
+   "aug": 56.51190476190476,
+   "ce": 2.5849782276153563,
+   "elapsed": 24.8,
+   "head_sha256": "027285f3d969b664d6df96fc627488bc4e3d1d0e8531442a6deb66935456140b",
+   "result_sha256": "87a5f14709cb137d2f2cbf246594e43595bab2d15b75fef09f1f19e785ca1683"
+  },
+  "CUB_p1_dose_a0p5_seed1": {
+   "clean": 77.25,
+   "aug": 51.52380952380952,
+   "ce": 1.3987003819147745,
+   "elapsed": null,
+   "head_sha256": "8037b7089dfd7bc9a16e0ec980579251afeb465a1153150851db04a1ef9743f2",
+   "result_sha256": "43366097e246f4eabbc2d0a4387ef78f6a03c91486cb000ca7aca2028eb19605"
+  },
+  "CUB_p1_dose_a0p5_seed2": {
+   "clean": 77.25,
+   "aug": 51.71428571428572,
+   "ce": 1.3990528186162312,
+   "elapsed": null,
+   "head_sha256": "499dc612c9b54283bd2488317cab5bf458d798d2697bfc6f835c2e180431daaf",
+   "result_sha256": "43e3159d927e08b6d963b487bdad6375452b6715636613ac032be51b44e80316"
+  },
+  "CUB_p1_dose_a0p5_seed3": {
+   "clean": 76.83333333333333,
+   "aug": 51.80952380952381,
+   "ce": 1.3951121505101522,
+   "elapsed": null,
+   "head_sha256": "7530e09b7b12629ace63a007f27aa8218dff69e7efc4f292cca01fb1d5aa3dd6",
+   "result_sha256": "c5b0d4439952f4f512f6cd7b99596939359abc0a8ce26a31a17af48c88e64067"
+  },
+  "CUB_p1_dose_a1_seed1": {
+   "clean": 77.41666666666667,
+   "aug": 52.916666666666664,
+   "ce": 1.5724456739425658,
+   "elapsed": null,
+   "head_sha256": "06c520691d6fad6ee52cd153a89f463bfead0472c655f9881b4d30b4ec0df832",
+   "result_sha256": "86f67d6f4544447d00e72132ada56ac6181d9adbd08351da5c706665088a2e36"
+  },
+  "CUB_p1_dose_a1_seed2": {
+   "clean": 77.66666666666667,
+   "aug": 53.166666666666664,
+   "ce": 1.573580525716146,
+   "elapsed": null,
+   "head_sha256": "a8ffd87d4a2a342b8c5fc5719c1ee9eaf0528f4617b9d34b5ae0cccaa970ea1d",
+   "result_sha256": "16757282a26593c8cc72cdac7e450d3391275ca9c6f0f6fbbc8112d5b67624f6"
+  },
+  "CUB_p1_dose_a1_seed3": {
+   "clean": 77.16666666666667,
+   "aug": 53.214285714285715,
+   "ce": 1.5694939152399698,
+   "elapsed": null,
+   "head_sha256": "5522dc48d394b23411e020deb1d2bd126106deafb195f8de605fb61d105bd0a6",
+   "result_sha256": "20aea012872e4e9b677bf302aa08362fea8bb13af3ad64f0658447cd07151a6f"
+  },
+  "CUB_p1_dose_a2_seed1": {
+   "clean": 76.66666666666667,
+   "aug": 54.404761904761905,
+   "ce": 1.9525252596537273,
+   "elapsed": null,
+   "head_sha256": "7b1e0855bf469c4d8c0d6e9db715d57709e37fa94d71dfd48c936ca85da2f2e0",
+   "result_sha256": "5dd7f032a1c5e1726d4b7a78b90807f75662a42fbbeb41ca6dd3f9dd8ad379a2"
+  },
+  "CUB_p1_dose_a2_seed2": {
+   "clean": 76.41666666666667,
+   "aug": 54.32142857142857,
+   "ce": 1.95431583404541,
+   "elapsed": null,
+   "head_sha256": "1e3b85276120adfe858f50c8745f44ecb0b31af190e7b681eafae00b6b017894",
+   "result_sha256": "25466a76dedd32c0f3ddadf6218794eaa690b75affc8b50a06e3b931583987cf"
+  },
+  "CUB_p1_dose_a2_seed3": {
+   "clean": 77.0,
+   "aug": 54.67857142857143,
+   "ce": 1.9516708469390869,
+   "elapsed": null,
+   "head_sha256": "79d11217ec497158b23aef688bf8ee81fb926c52c80da66f5f71741a6c1ef7bf",
+   "result_sha256": "925719e4ea3dd41f852c995274d76c0ee74b374e73e79d8c2ff2f98f4f90baf0"
+  },
+  "CUB_p1_dose_a4_seed1": {
+   "clean": 69.25,
+   "aug": 51.452380952380956,
+   "ce": 2.775089635848999,
+   "elapsed": null,
+   "head_sha256": "534a63e42d7eec1e638d3e15d5c1b5ea11f6616a559c36bfa78e9fac23d436eb",
+   "result_sha256": "d110f4d2cd764a712d0a1ef44d34ab66f412beba8c61009eef8885b276a635ff"
+  },
+  "CUB_p1_dose_a4_seed2": {
+   "clean": 69.33333333333333,
+   "aug": 51.654761904761905,
+   "ce": 2.775811144510905,
+   "elapsed": null,
+   "head_sha256": "e09da87354fb41b17ee7e31f6f9b469da32e118a56e9fce45d1e26019a33c040",
+   "result_sha256": "2c6c52f67260de84aa8263ca7d521fd58ba8d47b2393f7b0d69cce690cf3de50"
+  },
+  "CUB_p1_dose_a4_seed3": {
+   "clean": 70.66666666666667,
+   "aug": 52.357142857142854,
+   "ce": 2.7807400957743327,
+   "elapsed": null,
+   "head_sha256": "b5ab67753a27d19a75721219d8f47cb2ed391a1e4e044e1d331d57f5def92248",
+   "result_sha256": "e321cd41cfe129a0eb4b32522c9805039b606809f09f92e956b39d997c0516f8"
+  }
+ }
+}

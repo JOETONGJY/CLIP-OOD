@@ -123,6 +123,16 @@ class TrainingSession:
         A, _ = effective_response(self.model.classifier)
         return A @ self.ld_L
 
+    def _ddo_norm_loss(self, reg_loss):
+        """DDO 正则的范数（第十三轮 Stage 1B，预注册 §3ao）。
+        l1 = mean|h|（默认，与历史逐位一致）；l2 = mean(h²)。
+        统一评价指标 ddo_loss_equal_weight() 始终用 L1，不随本开关改变（跨方法可比）。"""
+        if reg_loss is None:
+            return 0.0
+        if getattr(self.args, "ddo_norm", "l1") == "l2":
+            return (reg_loss ** 2).mean()
+        return torch.abs(reg_loss).mean()
+
     def _prepare_datasets(self):
         """CUB, AWA2, LADA, LADV"""
         self.train_dataset, self.train_loader, self.source_test_dataset, self.source_test_loader, self.target_test_dataset, self.target_test_loader = get_dataset_classes(self.args)
@@ -435,7 +445,7 @@ class TrainingSession:
             else:
                 concept_loss = torch.tensor(0.0, device=images.device)
 
-            orth_loss = torch.abs(reg_loss).mean() if reg_loss is not None else 0.0
+            orth_loss = self._ddo_norm_loss(reg_loss)
 
             # KL 正则: 约束 residual 的 softmax 不偏离 uniform 太远 (防退化, 替代 clamp)
             # D_KL(q || U) = log(N) - H(q), 其中 q = softmax(residual), U = uniform
@@ -566,7 +576,7 @@ class TrainingSession:
                     concept_loss = self.loss_fns['concept'](concept_preds, attr_labels.float())
                 else:
                     concept_loss = torch.tensor(0.0, device=images.device)
-                orth_loss = torch.abs(reg_loss).mean() if reg_loss is not None else 0.0
+                orth_loss = self._ddo_norm_loss(reg_loss)
 
                 # KL 正则 (与 train 一致, 评估时也记录): D_KL(softmax(residual) || uniform)
                 kl_loss = torch.tensor(0.0, device=images.device)
