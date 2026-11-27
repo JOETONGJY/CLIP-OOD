@@ -1,0 +1,385 @@
+{
+ "created": "2026-11-27 17:17:05",
+ "dataset": "CUB",
+ "note": "决策层概念保真度。激活层保真度与臂无关（词典冻结），只算一次。",
+ "activation_fidelity": {
+  "pearson_mean": 0.1025134028656827,
+  "auroc_mean": 0.5312960855794597,
+  "n_valid": 312
+ },
+ "per_arm": {
+  "CE-Only (α=0)": {
+   "fid_pearson": 0.13903225752072054,
+   "top10_overlap": 0.078,
+   "concentration": 0.9534348585204634,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0014920982175924311
+  },
+  "DDO α=1": {
+   "fid_pearson": 0.1294223726297351,
+   "top10_overlap": 0.0775,
+   "concentration": 0.9513317691109835,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0005143349099792739
+  },
+  "DDO α=2": {
+   "fid_pearson": 0.11431586480736368,
+   "top10_overlap": 0.06883333333333334,
+   "concentration": 0.9505668467897016,
+   "n_seeds": 3,
+   "std_fid_pearson": 8.22352897015119e-05
+  },
+  "DDO α=4": {
+   "fid_pearson": 0.08659323395176705,
+   "top10_overlap": 0.056666666666666664,
+   "concentration": 0.9508824677560149,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.000586411001838539
+  },
+  "Language-ISDA 2×": {
+   "fid_pearson": 0.13778437638951513,
+   "top10_overlap": 0.08749999999999998,
+   "concentration": 0.9510262213897772,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0012896132467679065
+  },
+  "Language-ISDA 4×": {
+   "fid_pearson": 0.125184352992305,
+   "top10_overlap": 0.0815,
+   "concentration": 0.9501892140558087,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.001188582414920464
+  },
+  "Language-ISDA 8×": {
+   "fid_pearson": 0.10338839048215498,
+   "top10_overlap": 0.0645,
+   "concentration": 0.9498037256492792,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0011327821375130393
+  },
+  "Language-ISDA 4× + warmup": {
+   "fid_pearson": 0.1252408064628099,
+   "top10_overlap": 0.08049999999999999,
+   "concentration": 0.9503261071223092,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0010665265829574427
+  },
+  "Random-SpecMatched 4×": {
+   "fid_pearson": 0.14184204460832764,
+   "top10_overlap": 0.08433333333333333,
+   "concentration": 0.9524188595304807,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0012372848477720509
+  },
+  "Identity-H 4×": {
+   "fid_pearson": 0.20013232005460257,
+   "top10_overlap": 0.132,
+   "concentration": 0.949935400881922,
+   "n_seeds": 3,
+   "std_fid_pearson": 0.0018198567745138297
+  }
+ },
+ "runs": [
+  {
+   "arm": "CE-Only (α=0)",
+   "run": "CUB_p1_dose_a0_seed1",
+   "seed": 1,
+   "fid_pearson": 0.13953523792906744,
+   "top10_overlap": 0.078,
+   "concentration": 0.9536830531060542,
+   "n_class_valid": 200,
+   "head_sha256": "fbd897b4961c5e29"
+  },
+  {
+   "arm": "CE-Only (α=0)",
+   "run": "CUB_p1_dose_a0_seed2",
+   "seed": 2,
+   "fid_pearson": 0.14055553312307711,
+   "top10_overlap": 0.079,
+   "concentration": 0.9532756772246458,
+   "n_class_valid": 200,
+   "head_sha256": "634da57b929c2283"
+  },
+  {
+   "arm": "CE-Only (α=0)",
+   "run": "CUB_p1_dose_a0_seed3",
+   "seed": 3,
+   "fid_pearson": 0.13700600151001707,
+   "top10_overlap": 0.077,
+   "concentration": 0.9533458452306905,
+   "n_class_valid": 200,
+   "head_sha256": "4e0c35aa7dd50a99"
+  },
+  {
+   "arm": "DDO α=1",
+   "run": "CUB_p1_dose_a1_seed1",
+   "seed": 1,
+   "fid_pearson": 0.12959468239932315,
+   "top10_overlap": 0.07799999999999999,
+   "concentration": 0.9513630618607783,
+   "n_class_valid": 200,
+   "head_sha256": "06c520691d6fad6e"
+  },
+  {
+   "arm": "DDO α=1",
+   "run": "CUB_p1_dose_a1_seed2",
+   "seed": 2,
+   "fid_pearson": 0.12994821660679745,
+   "top10_overlap": 0.077,
+   "concentration": 0.951220693293029,
+   "n_class_valid": 200,
+   "head_sha256": "a8ffd87d4a2a342b"
+  },
+  {
+   "arm": "DDO α=1",
+   "run": "CUB_p1_dose_a1_seed3",
+   "seed": 3,
+   "fid_pearson": 0.12872421888308475,
+   "top10_overlap": 0.0775,
+   "concentration": 0.9514115521791433,
+   "n_class_valid": 200,
+   "head_sha256": "5522dc48d394b234"
+  },
+  {
+   "arm": "DDO α=2",
+   "run": "CUB_p1_dose_a2_seed1",
+   "seed": 1,
+   "fid_pearson": 0.11442965753626051,
+   "top10_overlap": 0.07,
+   "concentration": 0.9506458574092167,
+   "n_class_valid": 200,
+   "head_sha256": "7b1e0855bf469c4d"
+  },
+  {
+   "arm": "DDO α=2",
+   "run": "CUB_p1_dose_a2_seed2",
+   "seed": 2,
+   "fid_pearson": 0.11423817480335656,
+   "top10_overlap": 0.06849999999999999,
+   "concentration": 0.950409643803777,
+   "n_class_valid": 200,
+   "head_sha256": "1e3b85276120adfe"
+  },
+  {
+   "arm": "DDO α=2",
+   "run": "CUB_p1_dose_a2_seed3",
+   "seed": 3,
+   "fid_pearson": 0.11427976208247399,
+   "top10_overlap": 0.068,
+   "concentration": 0.9506450391561111,
+   "n_class_valid": 200,
+   "head_sha256": "79d11217ec497158"
+  },
+  {
+   "arm": "DDO α=4",
+   "run": "CUB_p1_dose_a4_seed1",
+   "seed": 1,
+   "fid_pearson": 0.08625686769486726,
+   "top10_overlap": 0.056999999999999995,
+   "concentration": 0.9509323111741377,
+   "n_class_valid": 200,
+   "head_sha256": "534a63e42d7eec1e"
+  },
+  {
+   "arm": "DDO α=4",
+   "run": "CUB_p1_dose_a4_seed2",
+   "seed": 2,
+   "fid_pearson": 0.08610494156617979,
+   "top10_overlap": 0.06,
+   "concentration": 0.9507735663353291,
+   "n_class_valid": 200,
+   "head_sha256": "e09da87354fb41b1"
+  },
+  {
+   "arm": "DDO α=4",
+   "run": "CUB_p1_dose_a4_seed3",
+   "seed": 3,
+   "fid_pearson": 0.08741789259425409,
+   "top10_overlap": 0.053,
+   "concentration": 0.9509415257585784,
+   "n_class_valid": 200,
+   "head_sha256": "b5ab67753a27d19a"
+  },
+  {
+   "arm": "Language-ISDA 2×",
+   "run": "CUB_s1c_isda_x2_seed1",
+   "seed": 1,
+   "fid_pearson": 0.13787264567605706,
+   "top10_overlap": 0.09,
+   "concentration": 0.951187354149369,
+   "n_class_valid": 200,
+   "head_sha256": "1a550227f830b658"
+  },
+  {
+   "arm": "Language-ISDA 2×",
+   "run": "CUB_s1c_isda_x2_seed2",
+   "seed": 2,
+   "fid_pearson": 0.13931783798392633,
+   "top10_overlap": 0.0855,
+   "concentration": 0.9510847661332895,
+   "n_class_valid": 200,
+   "head_sha256": "edad129d4230de8f"
+  },
+  {
+   "arm": "Language-ISDA 2×",
+   "run": "CUB_s1c_isda_x2_seed3",
+   "seed": 3,
+   "fid_pearson": 0.136162645508562,
+   "top10_overlap": 0.087,
+   "concentration": 0.9508065438866731,
+   "n_class_valid": 200,
+   "head_sha256": "c6979c8b94dce1b6"
+  },
+  {
+   "arm": "Language-ISDA 4×",
+   "run": "CUB_s1c_isda_x4_seed1",
+   "seed": 1,
+   "fid_pearson": 0.1250316587156424,
+   "top10_overlap": 0.0825,
+   "concentration": 0.9502873633290138,
+   "n_class_valid": 200,
+   "head_sha256": "c4e9a435c40c3e1a"
+  },
+  {
+   "arm": "Language-ISDA 4×",
+   "run": "CUB_s1c_isda_x4_seed2",
+   "seed": 2,
+   "fid_pearson": 0.1267103916767912,
+   "top10_overlap": 0.08199999999999999,
+   "concentration": 0.9501404916707332,
+   "n_class_valid": 200,
+   "head_sha256": "0ed40617f0b6089d"
+  },
+  {
+   "arm": "Language-ISDA 4×",
+   "run": "CUB_s1c_isda_x4_seed3",
+   "seed": 3,
+   "fid_pearson": 0.12381100858448132,
+   "top10_overlap": 0.08,
+   "concentration": 0.950139787167679,
+   "n_class_valid": 200,
+   "head_sha256": "72b8e40a0683217b"
+  },
+  {
+   "arm": "Language-ISDA 8×",
+   "run": "CUB_s1c_isda_x8_seed1",
+   "seed": 1,
+   "fid_pearson": 0.10249836886285674,
+   "top10_overlap": 0.0635,
+   "concentration": 0.9499589511556029,
+   "n_class_valid": 200,
+   "head_sha256": "097da957c083f88b"
+  },
+  {
+   "arm": "Language-ISDA 8×",
+   "run": "CUB_s1c_isda_x8_seed2",
+   "seed": 2,
+   "fid_pearson": 0.10498695631627811,
+   "top10_overlap": 0.0665,
+   "concentration": 0.9496030749871626,
+   "n_class_valid": 200,
+   "head_sha256": "09197bca93a6fd97"
+  },
+  {
+   "arm": "Language-ISDA 8×",
+   "run": "CUB_s1c_isda_x8_seed3",
+   "seed": 3,
+   "fid_pearson": 0.10267984626733011,
+   "top10_overlap": 0.0635,
+   "concentration": 0.9498491508050719,
+   "n_class_valid": 200,
+   "head_sha256": "bedf4b8464ab0009"
+  },
+  {
+   "arm": "Language-ISDA 4× + warmup",
+   "run": "CUB_s12_isda_lang_x4_warm20_seed1",
+   "seed": 1,
+   "fid_pearson": 0.12539564781079576,
+   "top10_overlap": 0.0785,
+   "concentration": 0.950410138242868,
+   "n_class_valid": 200,
+   "head_sha256": "ea66a6dc8c57f487"
+  },
+  {
+   "arm": "Language-ISDA 4× + warmup",
+   "run": "CUB_s12_isda_lang_x4_warm20_seed2",
+   "seed": 2,
+   "fid_pearson": 0.12646270736023332,
+   "top10_overlap": 0.08349999999999999,
+   "concentration": 0.9502814292296268,
+   "n_class_valid": 200,
+   "head_sha256": "832d1e613694f9aa"
+  },
+  {
+   "arm": "Language-ISDA 4× + warmup",
+   "run": "CUB_s12_isda_lang_x4_warm20_seed3",
+   "seed": 3,
+   "fid_pearson": 0.12386406421740069,
+   "top10_overlap": 0.07949999999999999,
+   "concentration": 0.9502867538944328,
+   "n_class_valid": 200,
+   "head_sha256": "045b0dcfd6d748a7"
+  },
+  {
+   "arm": "Random-SpecMatched 4×",
+   "run": "CUB_s12_isda_rand_x4_seed1",
+   "seed": 1,
+   "fid_pearson": 0.14078059484160407,
+   "top10_overlap": 0.0825,
+   "concentration": 0.9526750321184467,
+   "n_class_valid": 200,
+   "head_sha256": "d4e27ec8f042b89d"
+  },
+  {
+   "arm": "Random-SpecMatched 4×",
+   "run": "CUB_s12_isda_rand_x4_seed2",
+   "seed": 2,
+   "fid_pearson": 0.14357747027874457,
+   "top10_overlap": 0.083,
+   "concentration": 0.9521418897798662,
+   "n_class_valid": 200,
+   "head_sha256": "246dbe5e3245b330"
+  },
+  {
+   "arm": "Random-SpecMatched 4×",
+   "run": "CUB_s12_isda_rand_x4_seed3",
+   "seed": 3,
+   "fid_pearson": 0.14116806870463422,
+   "top10_overlap": 0.0875,
+   "concentration": 0.9524396566931288,
+   "n_class_valid": 200,
+   "head_sha256": "79aab8f3d22d9071"
+  },
+  {
+   "arm": "Identity-H 4×",
+   "run": "CUB_s12_isda_ident_x4_seed1",
+   "seed": 1,
+   "fid_pearson": 0.20085643199288106,
+   "top10_overlap": 0.1315,
+   "concentration": 0.9499971844574886,
+   "n_class_valid": 200,
+   "head_sha256": "d0a11681416df8e0"
+  },
+  {
+   "arm": "Identity-H 4×",
+   "run": "CUB_s12_isda_ident_x4_seed2",
+   "seed": 2,
+   "fid_pearson": 0.20190908723038387,
+   "top10_overlap": 0.13,
+   "concentration": 0.9499964243248471,
+   "n_class_valid": 200,
+   "head_sha256": "0158eb8f61a6ce9e"
+  },
+  {
+   "arm": "Identity-H 4×",
+   "run": "CUB_s12_isda_ident_x4_seed3",
+   "seed": 3,
+   "fid_pearson": 0.1976314409405428,
+   "top10_overlap": 0.1345,
+   "concentration": 0.9498125938634301,
+   "n_class_valid": 200,
+   "head_sha256": "d1d8ef875e34b198"
+  }
+ ],
+ "elapsed_seconds": 13.0
+}
