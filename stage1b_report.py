@@ -125,8 +125,15 @@ def stage_final():
         print("拒绝运行: 源域文件尚未锁定 —— " + why)
         return 2
     assert os.path.exists(TGT_JSON), f"缺少 {TGT_JSON}"
-    with open(TGT_JSON, encoding="utf-8") as f:
-        t = {k: v["target_acc"] for k, v in json.load(f)["heads"].items()}
+    t = {}
+    for p in (TGT_JSON,
+              os.path.join("experiment_results", "Stage0D-Independent", "p1_target_eval.json"),
+              os.path.join("experiment_results", "Stage1C-Training", "s1c_target_eval.json"),
+              os.path.join("experiment_results", "Stage1C-Training", "s11_target_eval.json")):
+        with open(p, encoding="utf-8") as f:
+            for k, v in json.load(f)["heads"].items():
+                if v.get("target_acc") is not None:
+                    t[k] = v["target_acc"]
 
     def vec(prefix, m, s_is=None):
         return [t[target_of(prefix, m, s)] for s in SEEDS]

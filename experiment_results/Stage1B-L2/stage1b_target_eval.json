@@ -1,0 +1,520 @@
+{
+ "created": "2026-11-27 20:38:27",
+ "code": {
+  "commit": "a480b0ad1a0db0839d31bda251b846efc1a53f55",
+  "dirty": false
+ },
+ "selection_lock_commit": "a480b0ad1a0db0839d31bda251b846efc1a53f55",
+ "selection_sha256": "b5451f148655a93443a25203a6ae22261914ad6c0eb0d227af57f1847aeee7c6",
+ "target_cache": {
+  "path": "cache\\CUB_target_test.pt",
+  "sha256": "3caa3a29f54cd67e555bbc1130c8bddb6ab2fe223ac0d0d3fd32b5fde900320d",
+  "n": 3047
+ },
+ "heads": {
+  "CUB_s1b_orig_l2_a0p5_seed1": {
+   "run_name": "CUB_s1b_orig_l2_a0p5_seed1",
+   "alpha": 0.35959611833191446,
+   "seed": 1,
+   "head_sha256": "3eb92e7f194eeb6bd6fd6da56605249030535b9a1829451fc6ae41fbdb7c2d78",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.80800787659994,
+   "target_ce": 2.196918824010886,
+   "source_test_acc": 78.41105354058722,
+   "source_test_ce": 1.5699146913535031,
+   "result_sha256": "9042cfe51250992d4f1652e8bd8f237a0ca9c2f4cbf839a7ed2253785ce1dfbd",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.41105354058722,
+    "source_ce": 1.5699146913535031
+   }
+  },
+  "CUB_s1b_orig_l2_a0p5_seed2": {
+   "run_name": "CUB_s1b_orig_l2_a0p5_seed2",
+   "alpha": 0.35959611833191446,
+   "seed": 2,
+   "head_sha256": "85856346c0a3700771e60e5cdc5b6f2a7705f8493532b26c4673197fba7d68a3",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.21726288152281,
+   "target_ce": 2.197657544533855,
+   "source_test_acc": 77.87564766839378,
+   "source_test_ce": 1.5698669465712316,
+   "result_sha256": "e71923fa7c6855ff42428465ee80da142935d0dbfa3aa926a7764a4a02eb1981",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.87564766839378,
+    "source_ce": 1.5698669465712316
+   }
+  },
+  "CUB_s1b_orig_l2_a0p5_seed3": {
+   "run_name": "CUB_s1b_orig_l2_a0p5_seed3",
+   "alpha": 0.35959611833191446,
+   "seed": 3,
+   "head_sha256": "4bcbd664a807384c42f0cfd7f8dd0c3055d3b76944ef9f7decfe8d30c2e2d1c8",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.80800787659994,
+   "target_ce": 2.1985151384320463,
+   "source_test_acc": 78.42832469775475,
+   "source_test_ce": 1.5681284140222842,
+   "result_sha256": "ff9c371a67be08b3a4d50e6b38e9758c90e6a1d5f281101554735339435519d9",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.42832469775475,
+    "source_ce": 1.5681284140222842
+   }
+  },
+  "CUB_s1b_orig_l2_a1_seed1": {
+   "run_name": "CUB_s1b_orig_l2_a1_seed1",
+   "alpha": 0.7191922366638289,
+   "seed": 1,
+   "head_sha256": "b1236a7adf01b983712a32e2372abfe11e4f357a334f1d6a19f2bf7c3a690858",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.661306202822445,
+   "target_ce": 2.3617896012568185,
+   "source_test_acc": 78.42832469775475,
+   "source_test_ce": 1.790901148010412,
+   "result_sha256": "a917f34664f60fb7d14f5626f112e7f4b1e2e82c06d6ae8d300926acaa825061",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.42832469775475,
+    "source_ce": 1.790901148010412
+   }
+  },
+  "CUB_s1b_orig_l2_a1_seed2": {
+   "run_name": "CUB_s1b_orig_l2_a1_seed2",
+   "alpha": 0.7191922366638289,
+   "seed": 2,
+   "head_sha256": "b46d822d8e4e78c95cf4206269cc0c6f540d6666d87a4412a60faa9cb6cf5349",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.234657039711195,
+   "target_ce": 2.3625869906688073,
+   "source_test_acc": 77.91018998272884,
+   "source_test_ce": 1.7912378790465044,
+   "result_sha256": "da1cccb55162bbcf2eb1906a9b2d3b0a5c9a547e251c8fbc2f3dabeb31dc69a5",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.91018998272884,
+    "source_ce": 1.7912378790465044
+   }
+  },
+  "CUB_s1b_orig_l2_a1_seed3": {
+   "run_name": "CUB_s1b_orig_l2_a1_seed3",
+   "alpha": 0.7191922366638289,
+   "seed": 3,
+   "head_sha256": "73c46d987883515de2a14c20ae7b228305d97b793b04e42115d261443fae3bcc",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 56.02231703314736,
+   "target_ce": 2.361626052684302,
+   "source_test_acc": 78.34196891191709,
+   "source_test_ce": 1.7903083297255125,
+   "result_sha256": "26c1838ca165d67879103988540e106d1ac6bc2261fe9503ca5c6843b1224eb0",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.34196891191709,
+    "source_ce": 1.7903083297255125
+   }
+  },
+  "CUB_s1b_orig_l2_a2_seed1": {
+   "run_name": "CUB_s1b_orig_l2_a2_seed1",
+   "alpha": 1.4383844733276578,
+   "seed": 1,
+   "head_sha256": "d8196e8c2cd079accbc254c78521ec69afc6075d2d4607dd5132c68fec204970",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 56.48178536265179,
+   "target_ce": 2.618353626788308,
+   "source_test_acc": 78.06563039723662,
+   "source_test_ce": 2.1194478380865385,
+   "result_sha256": "0378109043c0c18b0fa1ae054812e72ed3eb9d3bae6a1e294d2a1d1bc4fe7cc4",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.06563039723662,
+    "source_ce": 2.1194478380865385
+   }
+  },
+  "CUB_s1b_orig_l2_a2_seed2": {
+   "run_name": "CUB_s1b_orig_l2_a2_seed2",
+   "alpha": 1.4383844733276578,
+   "seed": 2,
+   "head_sha256": "c2b258009ae6c40ec057c535f117b1c0fc3b9454f1bd1653d4eebfe62030c38c",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.4643912044634,
+   "target_ce": 2.6195071298331953,
+   "source_test_acc": 77.59930915371329,
+   "source_test_ce": 2.1198523905199016,
+   "result_sha256": "14d0571670708772f97862187336f0888d8f607050ce1f4c39b2c8701f4503a2",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.59930915371329,
+    "source_ce": 2.1198523905199016
+   }
+  },
+  "CUB_s1b_orig_l2_a2_seed3": {
+   "run_name": "CUB_s1b_orig_l2_a2_seed3",
+   "alpha": 1.4383844733276578,
+   "seed": 3,
+   "head_sha256": "057f6e2ca5be3a22d941df59a7390f205c176a9fecbee08962e896834c5e2013",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 57.17098785690843,
+   "target_ce": 2.6176174681500446,
+   "source_test_acc": 78.30742659758204,
+   "source_test_ce": 2.1207178290437954,
+   "result_sha256": "4cf7698e0a1b90b26d999356c6d3b617de715cf6051cc869c06fb355db6a6d47",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.30742659758204,
+    "source_ce": 2.1207178290437954
+   }
+  },
+  "CUB_s1b_orig_l2_a4_seed1": {
+   "run_name": "CUB_s1b_orig_l2_a4_seed1",
+   "alpha": 2.8767689466553157,
+   "seed": 1,
+   "head_sha256": "d559a9338880120ff3c5a34ee02fb208c3e631c03356ef928f229eee4fc594a8",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.661306202822445,
+   "target_ce": 2.9858510499709467,
+   "source_test_acc": 77.13298791018998,
+   "source_test_ce": 2.5727781720729688,
+   "result_sha256": "085b2fc253df40e9950877f5899d297a3e77cdba2b490348c0524d509ea8b0c5",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.13298791018998,
+    "source_ce": 2.5727781720729688
+   }
+  },
+  "CUB_s1b_orig_l2_a4_seed2": {
+   "run_name": "CUB_s1b_orig_l2_a4_seed2",
+   "alpha": 2.8767689466553157,
+   "seed": 2,
+   "head_sha256": "7a9cfe8ffaaede9c509f44b2f3f1990e1dcf3bfa39afef80115ceea7ea752cf4",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.4643912044634,
+   "target_ce": 2.987603781064456,
+   "source_test_acc": 76.85664939550949,
+   "source_test_ce": 2.5730749387197545,
+   "result_sha256": "aa543286bc0d6ba0193a07a148dbd61d71e110cd28fe8d3fe8078e99dd1668ce",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 76.85664939550949,
+    "source_ce": 2.5730749387197545
+   }
+  },
+  "CUB_s1b_orig_l2_a4_seed3": {
+   "run_name": "CUB_s1b_orig_l2_a4_seed3",
+   "alpha": 2.8767689466553157,
+   "seed": 3,
+   "head_sha256": "30189b0c3d43931f3b15e547a5b916a782b654681ff4cafa4abf8b328f10240b",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 56.35050869707909,
+   "target_ce": 2.9871180207759855,
+   "source_test_acc": 77.40932642487047,
+   "source_test_ce": 2.577079271076051,
+   "result_sha256": "712472e9c1996d304bc050cad424241dc6062643bb691ec755f8eea2c94e382b",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.40932642487047,
+    "source_ce": 2.577079271076051
+   }
+  },
+  "CUB_s1b_bf_l2_a0p5_seed1": {
+   "run_name": "CUB_s1b_bf_l2_a0p5_seed1",
+   "alpha": 0.3608835985309302,
+   "seed": 1,
+   "head_sha256": "aab24d28a62db9530d5119944f29fd301f1de79216b4be156293c535fc3d763b",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.611092878240896,
+   "target_ce": 2.196378790201576,
+   "source_test_acc": 78.34196891191709,
+   "source_test_ce": 1.5736746116005695,
+   "result_sha256": "a4add2a45398827085b032687f7e8f6c4a768021e0caf3b81e3847e196b4026a",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.34196891191709,
+    "source_ce": 1.5736746116005695
+   }
+  },
+  "CUB_s1b_bf_l2_a0p5_seed2": {
+   "run_name": "CUB_s1b_bf_l2_a0p5_seed2",
+   "alpha": 0.3608835985309302,
+   "seed": 2,
+   "head_sha256": "97d0179aa2f6b9294bd4dfd03baf5eb1e355fba4d0e36e1ab49f4033991c302d",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.38135871348868,
+   "target_ce": 2.1972219202218777,
+   "source_test_acc": 77.91018998272884,
+   "source_test_ce": 1.573540994005088,
+   "result_sha256": "4daf60c1ea4f96321b32845a9b26aa6bd3e89d12474824bd814871e93c74b494",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.91018998272884,
+    "source_ce": 1.573540994005088
+   }
+  },
+  "CUB_s1b_bf_l2_a0p5_seed3": {
+   "run_name": "CUB_s1b_bf_l2_a0p5_seed3",
+   "alpha": 0.3608835985309302,
+   "seed": 3,
+   "head_sha256": "5c5142586ec04d661e2df42e7fb64b8c3dc6597d4c65d4824476d702a1665ca3",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 54.80800787659994,
+   "target_ce": 2.1994770800906944,
+   "source_test_acc": 78.39378238341969,
+   "source_test_ce": 1.5718894704018231,
+   "result_sha256": "84668a7f3120a81c3da13f1984c93de4d91bed242c464c868f1f830485edcbe3",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.39378238341969,
+    "source_ce": 1.5718894704018231
+   }
+  },
+  "CUB_s1b_bf_l2_a1_seed1": {
+   "run_name": "CUB_s1b_bf_l2_a1_seed1",
+   "alpha": 0.7217671970618604,
+   "seed": 1,
+   "head_sha256": "ea6990276734aafb398e24b7beb31431ee87f7367a87dab37be920e14e5b790a",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.89104036757466,
+   "target_ce": 2.361600391036141,
+   "source_test_acc": 78.44559585492227,
+   "source_test_ce": 1.7961486426042153,
+   "result_sha256": "ddfacb68b209e4f6e96121931264539bb004bd39fab727a86db3de5f7ca9a882",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.44559585492227,
+    "source_ce": 1.7961486426042153
+   }
+  },
+  "CUB_s1b_bf_l2_a1_seed2": {
+   "run_name": "CUB_s1b_bf_l2_a1_seed2",
+   "alpha": 0.7217671970618604,
+   "seed": 2,
+   "head_sha256": "d84951518504f5fd9fc76f5b6b0a54eb2e0fd06e6e37432092d13d6d40156250",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.234657039711195,
+   "target_ce": 2.362261173566287,
+   "source_test_acc": 77.8238341968912,
+   "source_test_ce": 1.7963793567631117,
+   "result_sha256": "292534c7f0b66dde1933b484b7f06c72c57e53b35806d91efadd355cb6a60ea8",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.8238341968912,
+    "source_ce": 1.7963793567631117
+   }
+  },
+  "CUB_s1b_bf_l2_a1_seed3": {
+   "run_name": "CUB_s1b_bf_l2_a1_seed3",
+   "alpha": 0.7217671970618604,
+   "seed": 3,
+   "head_sha256": "2017f035aa9a22666b9899e058f361527db597fb9c0d0934431986a84fa530e0",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.95667870036101,
+   "target_ce": 2.362677509525701,
+   "source_test_acc": 78.37651122625216,
+   "source_test_ce": 1.7955302618122266,
+   "result_sha256": "cec3217ef6812e7c286ee0ae602a47391481cda34d1e57e0ec6247bcbca7bfd9",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.37651122625216,
+    "source_ce": 1.7955302618122266
+   }
+  },
+  "CUB_s1b_bf_l2_a2_seed1": {
+   "run_name": "CUB_s1b_bf_l2_a2_seed1",
+   "alpha": 1.4435343941237209,
+   "seed": 1,
+   "head_sha256": "fbdf773d01bc896580642c498d51b7c94889f59b0adfcc098b095c59ef2cbbb7",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 56.252051197899576,
+   "target_ce": 2.618541235684331,
+   "source_test_acc": 78.1692573402418,
+   "source_test_ce": 2.126302033343669,
+   "result_sha256": "92c99c2531445eaae9e3d57f827594b8aa2929d7e335ae8a65d8652b738294ac",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.1692573402418,
+    "source_ce": 2.126302033343669
+   }
+  },
+  "CUB_s1b_bf_l2_a2_seed2": {
+   "run_name": "CUB_s1b_bf_l2_a2_seed2",
+   "alpha": 1.4435343941237209,
+   "seed": 2,
+   "head_sha256": "1f88c0c046a20f1c9791bb5926e394597383367e01b7253b75f12bf7dbd9105a",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.989497866754185,
+   "target_ce": 2.619077886485021,
+   "source_test_acc": 77.66839378238342,
+   "source_test_ce": 2.126513660921746,
+   "result_sha256": "c2cd791b3e5484c45aed4cd7f9bc713a5a6653fe787216ad32d27376d02f1e51",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.66839378238342,
+    "source_ce": 2.126513660921746
+   }
+  },
+  "CUB_s1b_bf_l2_a2_seed3": {
+   "run_name": "CUB_s1b_bf_l2_a2_seed3",
+   "alpha": 1.4435343941237209,
+   "seed": 3,
+   "head_sha256": "c01432bf448d4a8675f572c3a8ef58354d5d2d402c205088bf0b1bb52381badb",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 57.17098785690843,
+   "target_ce": 2.6186443596618623,
+   "source_test_acc": 78.32469775474956,
+   "source_test_ce": 2.127503170497677,
+   "result_sha256": "518c3b83d506e23ce171890a4f10d0e3bb6267a946e87c16acb351e7e96d77b5",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 78.32469775474956,
+    "source_ce": 2.127503170497677
+   }
+  },
+  "CUB_s1b_bf_l2_a4_seed1": {
+   "run_name": "CUB_s1b_bf_l2_a4_seed1",
+   "alpha": 2.8870687882474417,
+   "seed": 1,
+   "head_sha256": "cd8a5262be0fe446b7d38755386686a37dbb6c0a08f1a1490b3db65e3e75038d",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.792582868395144,
+   "target_ce": 2.9868599580552564,
+   "source_test_acc": 76.96027633851467,
+   "source_test_ce": 2.5811505649579827,
+   "result_sha256": "94dc0d84637729a6d0f73b5f22a638491070d50b809826aa38de3edae44287e0",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 76.96027633851467,
+    "source_ce": 2.5811505649579827
+   }
+  },
+  "CUB_s1b_bf_l2_a4_seed2": {
+   "run_name": "CUB_s1b_bf_l2_a4_seed2",
+   "alpha": 2.8870687882474417,
+   "seed": 2,
+   "head_sha256": "1d59652062f79400d4444d055272ee0bc6ba225414d5c75b6892e399ea757d5f",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 55.53002953724975,
+   "target_ce": 2.987415479839063,
+   "source_test_acc": 76.78756476683938,
+   "source_test_ce": 2.5810795101271187,
+   "result_sha256": "04094ffd4c0b3703d36040253697076cbdf079ff1c8ccc73075d109ba748944c",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 76.78756476683938,
+    "source_ce": 2.5810795101271187
+   }
+  },
+  "CUB_s1b_bf_l2_a4_seed3": {
+   "run_name": "CUB_s1b_bf_l2_a4_seed3",
+   "alpha": 2.8870687882474417,
+   "seed": 3,
+   "head_sha256": "027285f3d969b664d6df96fc627488bc4e3d1d0e8531442a6deb66935456140b",
+   "head_git": {
+    "commit": "dab9d6dfd295cfafdf64f3b6389cca165b124dec",
+    "dirty": true
+   },
+   "target_acc": 56.15359369872005,
+   "target_ce": 2.9884634787112248,
+   "source_test_acc": 77.35751295336787,
+   "source_test_ce": 2.5852907552208513,
+   "result_sha256": "87a5f14709cb137d2f2cbf246594e43595bab2d15b75fef09f1f19e785ca1683",
+   "recorded": {
+    "target_acc": null,
+    "target_ce": null,
+    "source_acc": 77.35751295336787,
+    "source_ce": 2.5852907552208513
+   }
+  }
+ }
+}
