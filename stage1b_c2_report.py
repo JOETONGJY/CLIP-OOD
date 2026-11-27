@@ -130,8 +130,8 @@ def stage_final():
     anc = __import__("subprocess").run(["git", "merge-base", "--is-ancestor", tgt["selection_lock_commit"], "HEAD"],
                                        capture_output=True)
     assert anc.returncode == 0, "事后评估记录的锁定提交不是当前 HEAD 的祖先"
-    T = {tag: [tgt["heads"][f"CUB_s1b_bf_l1_a{MTAG[m]}_seed{s}"]["target_acc"] for s in SEEDS]
-         for m, tag in MTAG.items()}
+    T = {m: [tgt["heads"][f"CUB_s1b_bf_l1_a{MTAG[m]}_seed{s}"]["target_acc"] for s in SEEDS]
+         for m in STRENGTHS}
     with open(os.path.join("experiment_results", "Stage1B-L2", "stage1b_target_eval.json"), encoding="utf-8") as f:
         t1b = json.load(f)
     with open("experiment_results/Stage1C-Training/s1c_target_eval.json", encoding="utf-8") as f:
@@ -144,7 +144,7 @@ def stage_final():
          "l1_4": [p1t["heads"][f"CUB_p1_dose_a4_seed{s}"]["target_acc"] for s in SEEDS]}
     pairs = {}
     for m in STRENGTHS:
-        pairs[f"bfl1_vs_l1@{m}"] = _paired(T[m], B[f"l1_{m}"])          # 偏置效应 (同 α 同范数)
+        pairs[f"bfl1_vs_l1@{m}"] = _paired(T[m], B["l1_" + MTAG[m]])   # 偏置效应 (同 α 同范数)
         bf_l2 = [t1b["heads"][f"CUB_s1b_bf_l2_a{MTAG[m]}_seed{s}"]["target_acc"] for s in SEEDS]
         pairs[f"bfl1_vs_bfl2@{m}"] = _paired(T[m], bf_l2)               # 范数效应 (同偏置状态同 α)
     # 修正后的等压 C3 (外审第十五轮): L2@1× (梯度配平 0.1050) 对 ISDA@λ_grad=97.38 (0.1049)
@@ -166,9 +166,9 @@ def stage_final():
          "|---|---|---|---|"]
     for m in STRENGTHS:
         p1, p2 = pairs[f"bfl1_vs_l1@{m}"], pairs[f"bfl1_vs_bfl2@{m}"]
-        L.append(f"| {m} | **{_f(float(np.mean(T[m])))}**（{' / '.join(_f(x) for x in T[m])}） | "
+        M.append(f"| {m} | **{_f(float(np.mean(T[m])))}**（{' / '.join(_f(x) for x in T[m])}） | "
                  f"{_f(p1['mean'])}（{p1['n_positive']}/3） | {_f(p2['mean'])}（{p2['n_positive']}/3） |")
-    L += ["", f"修正后的等压 C3：L2@1×（{_f(float(np.mean(l2_1)))}）对 ISDA@λ_grad（{_f(float(np.mean(isda_grad)))}）"
+    M += ["", f"修正后的等压 C3：L2@1×（{_f(float(np.mean(l2_1)))}）对 ISDA@λ_grad（{_f(float(np.mean(isda_grad)))}）"
           f"= **{_f(c3['mean'])} pp**（逐 seed {' / '.join(_f(x) for x in c3['diff_per_seed'])}，"
           f"{c3['n_positive']}/3 正向，过门槛={gate(c3)}）——严格等初始梯度压力（0.1050 vs 0.1049）。", ""]
     with open(FIN_MD, "w", encoding="utf-8") as f:
