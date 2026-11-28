@@ -698,6 +698,7 @@ class TrainingSession:
         rec = {'tag': tag, 'ce': float(ce), 'grad_ce_norm': float(g_ce.norm())}
         # (a) 本模型训练时实际优化的正则项 (含其加权方式 / 方向集变体; 不含 alpha) —— 强度匹配用。
         # LD 臂训练优化的不是 DDO 正则 (见 (c)), 这里跳过以免误读。
+        # 闭式路径 (§3av): forward 不返回响应, reg_loss=None —— 实际正则 = 闭式损失, 在下方 (a2) 记录。
         if reg_loss is not None and self.ld_mode == "none":
             alpha = float(self.args.alpha)
             rt = reg_loss.abs().mean()
@@ -726,7 +727,17 @@ class TrainingSession:
                 rec.update({'reg_train_actual': float(rt_actual), 'grad_reg_actual_norm': float(g_actual.norm()),
                             'grad_norm_ratio_actual_over_ce': float(g_actual.norm() / g_ce.norm().clamp_min(1e-12)),
                             'grad_cos_ce_actual': float((g_ce @ g_actual) / (g_ce.norm() * g_actual.norm()).clamp_min(1e-12))})
-        # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用
+        # (a2) 闭式路径 (外审第十六轮 P1): 实际训练正则 = 闭式损失, 记录它的值与梯度
+        if getattr(self.model, "l2_closed_skip_forward", False):
+            rt_actual = self._ddo_norm_loss(None)
+            raw_actual = torch.autograd.grad(rt_actual, params, retain_graph=True, allow_unused=True)
+            g_actual = torch.cat([(t if t is not None else torch.zeros_like(pp)).reshape(-1)
+                                  for t, pp in zip(raw_actual, params)])
+            rec.update({'reg_train_actual': float(rt_actual), 'grad_reg_actual_norm': float(g_actual.norm()),
+                        'grad_norm_ratio_actual_over_ce': float(g_actual.norm() / g_ce.norm().clamp_min(1e-12)),
+                        'grad_cos_ce_actual': float((g_ce @ g_actual) / (g_ce.norm() * g_actual.norm()).clamp_min(1e-12)),
+                        'l2_closed': True})
+        # (b) 统一评价口径: 原始完整方向集上的等权 DDO 损失 —— 横向比较用 (闭式路径仍是显式 L1 诊断)
         ddo = self._ddo_loss_equal_weight()
         if ddo is not None:
             g_dd = torch.autograd.grad(ddo, params)

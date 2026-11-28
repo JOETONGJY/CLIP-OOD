@@ -5,8 +5,9 @@
   E1  DDO-L2（类无关方向集，无偏置）≡ (1/C) Σ_c A_cᵀ G A_c，G = (1/N) Σ_i u_i u_iᵀ
   E2  等权全类别对的平方响应 ≡ (2/(C−1)) Σ_c Ã_cᵀ G Ã_c，Ã_c = A_c − Ā（类别中心化）
   E3  迹归一化只改变 α 的尺度：G → G/tr(G) 与把 α 乘 tr(G) 等价
-  E4  类条件方向集（训练里真正用的 full 方向集）≡ (1/C) Σ_c A_cᵀ G_c A_c，G_c 逐类不同
-      —— 此时不存在单一的 G，E1 的等式不成立；这是“类平均方向”与“完整方向集”的差别
+  E4  类条件方向集（每类只约束自己方向输出的假想形式）≡ (1/C) Σ_c A_cᵀ G_c A_c，G_c 逐类不同
+      —— 外审第十六轮更正：这是假想形式，不是当前 full 路径（当前 forward 对全部方向输出全部类别，
+      单一 G 即成立，见 E1）；保留本项是为了把两种形式分开
   E5  偏置：DDO-L2 的损失含 b_c；原始类别间隔含 (b_y − b_k)（不消去）；只有"域扰动造成的间隔变化量"
       （乘 (A_k − A_y) 的项）与 ISDA/LD 的惩罚 r_yk 中 b 严格消去 —— 外审第十五轮的表述更正
 
@@ -129,6 +130,37 @@ def main():
                 abs(lam / 2 * r2_quad - lam / 2 * r2_direct) < 1e-5,
                 f"{lam / 2 * r2_quad:.6f} vs {lam / 2 * r2_direct:.6f}")
 
+    # E7 (外审第十六轮): 同尺度分解 R_L2 = R_Cent + ĀᵀGĀ（R_Cent 含 1/C；类中心化 = 左乘 H_C）
+    Abar = A.mean(0, keepdim=True)
+    At7 = A - Abar                                  # Ã = H_C·A (不是右乘特征投影!)
+    R_cent = ((At7 @ G) * At7).sum() / C
+    R_bar = float(Abar @ G @ Abar.T)
+    ok &= check("E7a R_L2 = R_Cent + ĀᵀGĀ（精确分解）",
+                abs(float(l2) - (float(R_cent) + R_bar)) < TOL,
+                f"{float(l2):.6f} vs {float(R_cent) + R_bar:.6f}")
+    pair_mean7 = pair_mean if "pair_mean" in dir() else None
+    ok &= check("E7b R_Pairwise = 2C/(C−1) × R_Cent（R_Cent 已含 1/C）",
+                abs(pair_mean - (2.0 * C / (C - 1.0)) * float(R_cent)) < TOL,
+                f"{pair_mean:.6f} vs {(2.0 * C / (C - 1.0)) * float(R_cent):.6f}")
+    # E7c 两种公共分量不得混淆: 类中心化 (左乘 H_C) 改变损失; 特征零均值 (右乘 H_K, LN0 不可辨识方向) 不改变
+    Ak = A - A.mean(-1, keepdim=True)
+    l2_hk = float(((Ak @ G) * Ak).sum() / C)
+    ok &= check("E7c 特征投影 (右乘 H_K) 不改变 R_L2 (G·1=0), 与类中心化 (左乘 H_C) 是两种不同的投影",
+                abs(l2_hk - float(l2)) < TOL and abs(float(R_cent) - float(l2)) > 1e-3,
+                f"H_K 后 {l2_hk:.6f} = 原 {float(l2):.6f}; R_Cent {float(R_cent):.6f} ≠ R_L2")
+    # E8 (外审第十六轮 P2 预注册的不变性核对): Centered-L2 对公共 logit 平移与特征维 1_K 偏移都不变
+    Gd = G.double()
+    v_shift = torch.randn(K, dtype=torch.float64)                    # 每类行加同一向量 = 公共 logit 分量
+    Av = A + v_shift[None, :]                                        # 平移原权重 A (每类 +v)
+    At_v = Av - Av.mean(0, keepdim=True)                             # 重新中心化: H_C·(A + v·1ᵀ) = H_C·A
+    R_shift = float(((At_v @ Gd) * At_v).sum() / C)
+    ok &= check("E8a Centered-L2 对公共 logit 平移不变 (A 每行 +v 后 R_Cent 不变)",
+                abs(R_shift - float(R_cent)) < TOL,
+                f"{R_shift:.6f} vs {float(R_cent):.6f}")
+    At_k = At + torch.randn(1, K, dtype=torch.float64) * 0 + torch.ones(1, K, dtype=torch.float64) * 0.7
+    R_k = float(((At_k @ Gd) * At_k).sum() / C)                      # 沿 1_K 的公共偏移 (LN 不可辨识方向)
+    ok &= check("E8b Centered-L2 对特征维 1_K 偏移不变 (G·1 = 0)",
+                abs(R_k - float(R_cent)) < TOL, f"{R_k:.6f}")
     print("SELFTEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

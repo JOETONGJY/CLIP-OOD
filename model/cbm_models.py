@@ -343,12 +343,25 @@ class clip_cbm_orth(nn.Module):
                 self.class_embeddings = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
                 self.classifier[2].weight = nn.Parameter(class_embeddings @ self.concept_embeddings.T)
 
-        # DDO-L2 闭式 (外审第十五轮 P1): 只在显式开启时预计算 (默认关闭, 行为不变)
-        if getattr(args, "ddo_norm", "l1") == "l2" and getattr(args, "ddo_l2_closed", False):
+        # DDO-L2 闭式 (外审第十五轮 P1) 与 Centered-L2 (外审第十六轮 P2): 只在显式开启时预计算。
+        # 守卫 (外审第十六轮 P1): 闭式二阶矩公式只对等权、冻结 E、支持的方向集成立 —— 其余配置拒绝启动。
+        _l2c_on = getattr(args, "ddo_norm", "l1") == "l2" and getattr(args, "ddo_l2_closed", False)
+        _l2cen_on = getattr(args, "ddo_norm", "l1") == "l2c"
+        if _l2c_on or _l2cen_on:
+            if weight_mode != "none":
+                raise ValueError("闭式路径只支持等权 (weight_mode='none'); 加权方向集的闭式未定义, 不静默忽略")
             if ddo_dirs not in ("full", "full_bf"):
-                raise ValueError("--ddo_l2_closed 目前支持 --ddo_dirs full / full_bf")
+                raise ValueError("闭式路径目前支持 --ddo_dirs full / full_bf")
+            if float(getattr(args, "beta", 0.0) or 0.0) != 0.0 or int(getattr(args, "cal_rank", 0) or 0) != 0:
+                raise ValueError("闭式路径要求 beta=0 (属性损失) 与 cal_rank=0 (冻结 E)")
+            if getattr(args, "use_redundancy", False) or getattr(args, "grouped_weights", False):
+                raise ValueError("闭式路径不支持 redundancy / grouped 加权")
+            if getattr(args, "ld_mode", "none") != "none":
+                raise ValueError("闭式路径与 ld_mode 互斥")
             self._build_l2_closed_buffers()
-            print(f"[DDO-L2 closed] G {tuple(self.l2_G.shape)}, mu {tuple(self.l2_mu.shape)} (buffers, 不参与梯度)")
+            self.l2_closed_skip_forward = True     # forward 不再逐方向计算显式响应 (§3av)
+            print(f"[DDO-L2 {'closed' if _l2c_on else 'Centered'}] G {tuple(self.l2_G.shape)}, "
+                  f"mu {tuple(self.l2_mu.shape)} (buffers, 不参与梯度); forward 跳过显式响应")
 
     def get_domain_weights(self):
         """
@@ -446,15 +459,15 @@ class clip_cbm_orth(nn.Module):
         self._l2_closed_ready = True
 
     def ddo_l2_closed_loss(self):
-        """(1/C_cls)·[tr(Â G Âᵀ) + 2 cᵀÂμ + ‖c‖²]，Â = A·H = A − 行均值（超平面投影）。
-        G·1 = 0 (方向已 LN0) ⇒ tr(AGAᵀ) = tr(ÂGÂᵀ) 严格成立；先投影并在 float64 下计算，
-        否则 A 沿 1_K 的大分量在 float32 双线性求和里造成灾难性消去 (实测相对误差 ~4e-3,
-        梯度 ~1e-1 —— 本实现的第一次数值核对就抓到了)。Bias-Free (c=0) 时 = tr(ÂGÂᵀ)/C_cls,
-        与显式 mean(h²) 精确等价 (§3ar); 含偏置时与显式 mean((A·ū+c)²) 等价。"""
+        """(1/C_cls)·[tr(A G Aᵀ) + 2 cᵀAμ + ‖c‖²]（Bias-Free 时 c=0 → tr(AGAᵀ)/C_cls）。
+        数值细节：先把 A 右乘 H_K（每个权重行减去其在特征维上的均值 —— LN0 的不可辨识方向，
+        G·1=0 使该投影成为恒等变换），再在 float64 下计算；不投影会有 float32 灾难性消去
+        (§3ar 实测 4e-3/1.2e-1)。**注意（外审第十六轮 P0）：这是特征维投影，不是类别中心化**；
+        类别中心化是左乘 H_C（Ã_c = A_c − Ā），见 ddo_l2c_closed_loss。"""
         assert getattr(self, "_l2_closed_ready", False), "--ddo_l2_closed 需要先 _build_l2_closed_buffers"
         ln, lin = self.classifier[1], self.classifier[2]
         A = (lin.weight * ln.weight[None, :]).double()
-        A = A - A.mean(-1, keepdim=True)                         # Â = A·H (G·1=0 ⇒ 恒等变换, 数值去消去)
+        A = A - A.mean(-1, keepdim=True)                    # 右乘 H_K: LN0 不可辨识方向 (恒等投影, 去消去)
         G = self.l2_G.double()
         C_cls = A.size(0)
         if getattr(self, "_ddo_dirs_ln_free", False):
@@ -464,6 +477,19 @@ class clip_cbm_orth(nn.Module):
         mu = self.l2_mu.double()
         out = ((A @ G) * A).sum() / C_cls + 2 * (c @ (A @ mu)) / C_cls + (c * c).sum() / C_cls
         return out.float()
+
+    def ddo_l2c_closed_loss(self):
+        """Centered-L2 (外审第十六轮 P2; §3aw): R_Cent = (1/C_cls)·tr(Ã G Ãᵀ)，
+        Ã = H_C·A（类别中心化：Ã_c = A_c − Ā，左乘 H_C —— 与上面的特征维投影是两种不同投影）。
+        性质：对公共 logit 平移（每类行加同一向量）不变；对特征维 1_K 偏移不变（G·1=0）；
+        与 Pairwise-L2 关系 R_Pairwise = (2C/(C−1))·R_Cent；与 DDO-L2 分解 R_L2 = R_Cent + ĀᵀGĀ（E7）。"""
+        assert getattr(self, "_l2_closed_ready", False), "Centered-L2 需要先 _build_l2_closed_buffers"
+        ln, lin = self.classifier[1], self.classifier[2]
+        A = (lin.weight * ln.weight[None, :]).double()
+        A = A - A.mean(-1, keepdim=True)                    # 右乘 H_K: 数值稳定化 (恒等投影)
+        At = A - A.mean(0, keepdim=True)                    # 左乘 H_C: 类别中心化 (定义)
+        G = self.l2_G.double()
+        return (((At @ G) * At).sum() / At.size(0)).float()
 
     def ddo_loss_equal_weight(self):
         """统一的等权 DDO 评价指标 (2026-11-25): 在原始完整方向集上不加权地计算 |h(P)| 的均值。
@@ -640,6 +666,13 @@ class clip_cbm_orth(nn.Module):
         visual_features = visual_features / visual_features.norm(dim=-1, keepdim=True)
 
         concept_activations = visual_features @ self.concept_embeddings.T
+
+        if getattr(self, "l2_closed_skip_forward", False):
+            # 闭式路径 (外审第十六轮 P1; §3av): 不逐方向计算显式响应 —— 训练损失由 _ddo_norm_loss 的
+            # 闭式分支给出 (reg_loss=None 不等于跳过损失); 统一 L1 评价 (ddo_full_eval / ddo_eq) 仍在
+            # 诊断阶段显式计算。前向省掉 (40800×312)@(312×200) 的响应矩阵。
+            self._reg_unweighted = None
+            return concept_activations, self.classifier(concept_activations), None
 
         if getattr(self, '_ddo_dirs_ln_free', False):
             # projected / residual / split / bias-free full: 方向已 LN0, 绕过分类头的 LayerNorm (保留投影幅值)
