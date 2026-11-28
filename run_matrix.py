@@ -207,6 +207,30 @@ with open(L2C_CALIB, encoding="utf-8") as _f:
 assert abs(_L2C["rho_bar_target"] - 0.10492240885893504) < 1e-12     and abs(_L2C["anchor_alpha_1x"] - 0.7222368616165578) < 1e-9 and _L2C["all_checks_passed"],     "Centered-L2 标定与 §3aw 不一致或未通过自检"
 
 
+# ---- 第十七轮 P1 (预注册 §3ay): DDO-L2 的跨数据集验证, 3 数据集 × 4 强度 × 3 seeds = 36 run ----
+# Original-L2 (full 方向集, 含原始偏置处理) + 闭式实现 (--ddo_l2_closed); α 从逐数据集等压标定取;
+# 协议复用第十二轮 p4 (划分/缓存/初始化; PACS batch 128)。
+P4_L2_MULT = {"0.5": "0p5", "1": "1", "2": "2", "4": "4"}
+
+
+def _p4_l2_entries(ds):
+    p = os.path.join(ROOT, "experiment_results", "Stage1B-L2", f"stage1b_l2_calibration_{ds}.json")
+    with open(p, encoding="utf-8") as f:
+        cal = json.load(f)
+    assert cal["dataset"] == ds and cal["all_checks_passed"] is True, f"{ds}: L2 标定不符或未过自检"
+    cache = os.path.join("cache", f"{ds}_train_aug.pt")
+    p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", cache, "--source_val_cache", cache]
+    if ds == "PACS":
+        p1 = ["--batch_size", "128"] + p1
+    out = []
+    for m, tag in P4_L2_MULT.items():
+        a = float(cal["scan"][m])
+        out.append((ds, f"p4_l2_a{tag}",
+                    EQUAL + ["--alpha", repr(a), "--ddo_dirs", "full", "--ddo_norm", "l2",
+                             "--ddo_l2_closed"] + p1))
+    return out
+
+
 def _s1b_c3_entries():
     out = []
     p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE]
@@ -391,12 +415,16 @@ MATRICES = {
     "stage1b_c2": ("Stage1B-L2", _s1b_c2_entries()),
     # 第十六轮 P2: Centered-L2 (§3aw), 4 强度 × 3 seeds = 12 run; 闭式路径 (forward 跳过显式响应)
     "stage1b_c3": ("Stage1B-L2", _s1b_c3_entries()),
+    # 第十七轮 P1: DDO-L2 跨数据集 (§3ay), 3 数据集 × 4 强度 × 3 seeds = 36 run
+    "p4_l2_awa2": ("P4-L2", _p4_l2_entries("AWA2")),
+    "p4_l2_ladv": ("P4-L2", _p4_l2_entries("LADV")),
+    "p4_l2_pacs": ("P4-L2", _p4_l2_entries("PACS")),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
 # 新增任何 store_true/store_false 参数都必须在这里登记, 否则 expected() 会把它当成"缺值的参数"而报错 (导入时自检)
 STORE_TRUE = {"--grad_diag": "grad_diag", "--overwrite_run": "overwrite_run", "--grouped_weights": "grouped_weights",
-              "--save_head": "save_head"}
+              "--save_head": "save_head", "--ddo_l2_closed": "ddo_l2_closed"}
 STORE_FALSE = {"--no_save_model": "save_model"}
 
 
@@ -497,6 +525,18 @@ def _self_test_expected():
             and float(e["alpha"]) == float(repr(float(_L2C["scan"]["0.5"])))
             and e["target_eval"] == "none" and e["save_head"] is True), e
     assert float(expected(COMMON + MATRICES["stage1b_c3"][1][2][2], "CUB", 1, "s1b_cen_a2")["alpha"])         == float(repr(float(_L2C["scan"]["2"])))
+    # 第十七轮: p4_l2 = 每数据集 4 配置; Original-L2 (full + 偏置) + 闭式 + 逐数据集 alpha; PACS batch 128
+    for ds, mtx in (("AWA2", "p4_l2_awa2"), ("LADV", "p4_l2_ladv"), ("PACS", "p4_l2_pacs")):
+        assert len(MATRICES[mtx][1]) == 4, (mtx, len(MATRICES[mtx][1]))
+        with open(os.path.join(ROOT, "experiment_results", "Stage1B-L2",
+                               f"stage1b_l2_calibration_{ds}.json"), encoding="utf-8") as f:
+            cal = json.load(f)
+        e = expected(COMMON + MATRICES[mtx][1][0][2], ds, 1, MATRICES[mtx][1][0][1])
+        assert (e["ddo_dirs"] == "full" and e["ddo_norm"] == "l2" and e["ddo_l2_closed"] is True
+                and float(e["alpha"]) == float(repr(float(cal["scan"]["0.5"])))
+                and e["target_eval"] == "none" and e["save_head"] is True), e
+        if ds == "PACS":
+            assert int(e["batch_size"]) == 128, e
     # P3: warmup 矩阵 1 配置 × 3 seeds; λ 与 Original-ISDA 的 x8 逐位相同 (配对对象), warmup=20
     assert len(MATRICES["s11_warmup"][1]) == 1
     e = expected(COMMON + MATRICES["s11_warmup"][1][0][2], "CUB", 1, "isda_warm_x8")

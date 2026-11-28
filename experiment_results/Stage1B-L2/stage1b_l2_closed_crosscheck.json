@@ -1,0 +1,36 @@
+{
+ "created": "2026-11-28 18:49:29",
+ "code": {
+  "commit": "c5ec3edd998671045d2a096a3a07c809bbee2816",
+  "dirty": true
+ },
+ "device": "cuda",
+ "note": "外审第十七轮 P1: 三数据集的闭式等价核对 (零训练, 初始化会话)。容差: 损失 1e-4 / 梯度 1e-3 (float32)。",
+ "results": [
+  {
+   "dataset": "PACS",
+   "explicit": 0.25330206751823425,
+   "closed": 0.25330206751823425,
+   "rel_loss_diff": 0.0,
+   "grad_rel_diff": 3.8648491340609326e-07,
+   "passed": true
+  },
+  {
+   "dataset": "LADV",
+   "explicit": 0.3739570081233978,
+   "closed": 0.3739570081233978,
+   "rel_loss_diff": 0.0,
+   "grad_rel_diff": 1.1738713823206126e-07,
+   "passed": true
+  },
+  {
+   "dataset": "AWA2",
+   "explicit": 0.36102190613746643,
+   "closed": 0.36102187633514404,
+   "rel_loss_diff": 8.254990038290772e-08,
+   "grad_rel_diff": 9.005272261219943e-08,
+   "passed": true
+  }
+ ],
+ "all_passed": true
+}

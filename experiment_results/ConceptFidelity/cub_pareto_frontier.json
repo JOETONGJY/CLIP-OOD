@@ -1,43 +1,569 @@
 {
+ "note": "CUB 已测 42 配置的精度—F_rel 散点 (均值) 与支配关系; F_rel 是描述性代理, 本前沿限于 CUB 已测配置, 不宣称统计优越性, 不可外推到其他数据集或配置 (外审第十七轮 P0)。",
+ "n_arms": 42,
+ "n_arms_with_acc": 42,
+ "n_frontier": 7,
  "frontier": [
   {
-   "arm": "ISDA-Identity 8× + warmup",
-   "acc": 46.77825183240346,
-   "f_rel": 0.29371490197299716
-  },
-  {
-   "arm": "ISDA-Identity 4×",
-   "acc": 48.61612515042119,
-   "f_rel": 0.27753401848637255
-  },
-  {
-   "arm": "ISDA-Identity 2×",
-   "acc": 49.44754403238158,
-   "f_rel": 0.2524584224098851
-  },
-  {
    "arm": "ISDA-Language 0.5×",
-   "acc": 53.06859205776173,
-   "f_rel": 0.19432233812344046
+   "acc": 53.0686,
+   "f_rel": 0.194322,
+   "on_frontier": true,
+   "dominated_by": []
   },
   {
    "arm": "ISDA-Language 1×",
-   "acc": 54.38135871348868,
-   "f_rel": 0.19321658359782132
+   "acc": 54.3814,
+   "f_rel": 0.193217,
+   "on_frontier": true,
+   "dominated_by": []
   },
   {
    "arm": "ISDA-Language 2×",
-   "acc": 56.011377311016304,
-   "f_rel": 0.1862784992689428
+   "acc": 56.0114,
+   "f_rel": 0.186278,
+   "on_frontier": true,
+   "dominated_by": []
   },
   {
    "arm": "ISDA-Language 4×",
-   "acc": 56.733398971666126,
-   "f_rel": 0.16823902479872221
+   "acc": 56.7334,
+   "f_rel": 0.168239,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Identity 2×",
+   "acc": 49.4475,
+   "f_rel": 0.252458,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Identity 4×",
+   "acc": 48.6161,
+   "f_rel": 0.277534,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Identity 8× + warmup",
+   "acc": 46.7783,
+   "f_rel": 0.293715,
+   "on_frontier": true,
+   "dominated_by": []
   }
  ],
- "n_arms_with_acc": 38,
- "missing": [],
- "n_arms": 42,
- "note": " | 含 Centered-L2 4 臂 (全部被 ISDA@2×/4× 严格支配)"
+ "points": [
+  {
+   "arm": "CE-Only (α=0)",
+   "acc": 48.463,
+   "f_rel": 0.189365,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "DDO α=0.125",
+   "acc": 50.8478,
+   "f_rel": 0.188869,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×"
+   ]
+  },
+  {
+   "arm": "DDO α=0.25",
+   "acc": 51.909,
+   "f_rel": 0.187082,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×"
+   ]
+  },
+  {
+   "arm": "DDO α=0.5",
+   "acc": 52.992,
+   "f_rel": 0.182175,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Language 2×"
+   ]
+  },
+  {
+   "arm": "DDO α=1",
+   "acc": 54.7314,
+   "f_rel": 0.170972,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 2×"
+   ]
+  },
+  {
+   "arm": "DDO α=2",
+   "acc": 56.1974,
+   "f_rel": 0.149557,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "DDO-L1 (Bias-Free) 2×"
+   ]
+  },
+  {
+   "arm": "DDO α=4",
+   "acc": 52.9592,
+   "f_rel": 0.111921,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=0.5",
+    "DDO α=1",
+    "DDO α=2",
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 8×",
+    "ISDA-Language 4× + warmup",
+    "ISDA-Language 8× + warmup",
+    "DDO-L2 (Original) 0.5×",
+    "DDO-L2 (Original) 1×",
+    "DDO-L2 (Original) 2×",
+    "DDO-L2 (Original) 4×",
+    "DDO-L2 (Bias-Free) 0.5×",
+    "DDO-L2 (Bias-Free) 1×",
+    "DDO-L2 (Bias-Free) 2×",
+    "DDO-L2 (Bias-Free) 4×",
+    "DDO-L1 (Bias-Free) 1×",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 0.5×",
+    "Centered-L2 1×",
+    "Centered-L2 2×",
+    "Centered-L2 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Language 0.5×",
+   "acc": 53.0686,
+   "f_rel": 0.194322,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Language 1×",
+   "acc": 54.3814,
+   "f_rel": 0.193217,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Language 2×",
+   "acc": 56.0114,
+   "f_rel": 0.186278,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Language 4×",
+   "acc": 56.7334,
+   "f_rel": 0.168239,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Language 8×",
+   "acc": 55.8363,
+   "f_rel": 0.138197,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=2",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 2×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 0.5×",
+   "acc": 48.4411,
+   "f_rel": 0.190716,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Random 2×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 1×",
+   "acc": 48.3864,
+   "f_rel": 0.191487,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Random 2×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 2×",
+   "acc": 48.4411,
+   "f_rel": 0.192518,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 4×",
+   "acc": 48.3426,
+   "f_rel": 0.193829,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 8×",
+   "acc": 48.2879,
+   "f_rel": 0.195208,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Identity 0.5×",
+   "acc": 49.1194,
+   "f_rel": 0.210545,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×"
+   ]
+  },
+  {
+   "arm": "ISDA-Identity 1×",
+   "acc": 49.3163,
+   "f_rel": 0.227884,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Identity 2×"
+   ]
+  },
+  {
+   "arm": "ISDA-Identity 2×",
+   "acc": 49.4475,
+   "f_rel": 0.252458,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Identity 4×",
+   "acc": 48.6161,
+   "f_rel": 0.277534,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "ISDA-Identity 8×",
+   "acc": 46.636,
+   "f_rel": 0.293375,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Identity 8× + warmup"
+   ]
+  },
+  {
+   "arm": "ISDA-Language 4× + warmup",
+   "acc": 56.5474,
+   "f_rel": 0.167859,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Language 8× + warmup",
+   "acc": 56.6678,
+   "f_rel": 0.137525,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Random 8× + warmup",
+   "acc": 48.1895,
+   "f_rel": 0.19363,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Random 4×",
+    "ISDA-Random 8×",
+    "ISDA-Identity 0.5×",
+    "ISDA-Identity 1×",
+    "ISDA-Identity 2×",
+    "ISDA-Identity 4×"
+   ]
+  },
+  {
+   "arm": "ISDA-Identity 8× + warmup",
+   "acc": 46.7783,
+   "f_rel": 0.293715,
+   "on_frontier": true,
+   "dominated_by": []
+  },
+  {
+   "arm": "DDO-L2 (Original) 0.5×",
+   "acc": 54.6111,
+   "f_rel": 0.169439,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=1",
+    "ISDA-Language 2×",
+    "DDO-L1 (Bias-Free) 1×",
+    "Centered-L2 0.5×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Original) 1×",
+   "acc": 55.6394,
+   "f_rel": 0.155473,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "DDO-L2 (Bias-Free) 1×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Original) 2×",
+   "acc": 56.3724,
+   "f_rel": 0.137627,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "DDO-L2 (Bias-Free) 2×",
+    "Centered-L2 2×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Original) 4×",
+   "acc": 55.8254,
+   "f_rel": 0.116717,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=2",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 8×",
+    "ISDA-Language 4× + warmup",
+    "ISDA-Language 8× + warmup",
+    "DDO-L2 (Original) 2×",
+    "DDO-L2 (Bias-Free) 2×",
+    "DDO-L2 (Bias-Free) 4×",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 2×",
+    "Centered-L2 4×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Bias-Free) 0.5×",
+   "acc": 54.6002,
+   "f_rel": 0.169465,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=1",
+    "ISDA-Language 2×",
+    "DDO-L1 (Bias-Free) 1×",
+    "Centered-L2 0.5×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Bias-Free) 1×",
+   "acc": 55.6941,
+   "f_rel": 0.155545,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Bias-Free) 2×",
+   "acc": 56.4708,
+   "f_rel": 0.137724,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "Centered-L2 2×"
+   ]
+  },
+  {
+   "arm": "DDO-L2 (Bias-Free) 4×",
+   "acc": 55.8254,
+   "f_rel": 0.116781,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=2",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 8×",
+    "ISDA-Language 4× + warmup",
+    "ISDA-Language 8× + warmup",
+    "DDO-L2 (Original) 2×",
+    "DDO-L2 (Bias-Free) 2×",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 2×",
+    "Centered-L2 4×"
+   ]
+  },
+  {
+   "arm": "DDO-L1 (Bias-Free) 0.5×",
+   "acc": 52.9045,
+   "f_rel": 0.182217,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Language 2×"
+   ]
+  },
+  {
+   "arm": "DDO-L1 (Bias-Free) 1×",
+   "acc": 54.6439,
+   "f_rel": 0.171082,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 2×"
+   ]
+  },
+  {
+   "arm": "DDO-L1 (Bias-Free) 2×",
+   "acc": 56.3286,
+   "f_rel": 0.149731,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup"
+   ]
+  },
+  {
+   "arm": "DDO-L1 (Bias-Free) 4×",
+   "acc": 52.806,
+   "f_rel": 0.111994,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=0.5",
+    "DDO α=1",
+    "DDO α=2",
+    "ISDA-Language 0.5×",
+    "ISDA-Language 1×",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 8×",
+    "ISDA-Language 4× + warmup",
+    "ISDA-Language 8× + warmup",
+    "DDO-L2 (Original) 0.5×",
+    "DDO-L2 (Original) 1×",
+    "DDO-L2 (Original) 2×",
+    "DDO-L2 (Original) 4×",
+    "DDO-L2 (Bias-Free) 0.5×",
+    "DDO-L2 (Bias-Free) 1×",
+    "DDO-L2 (Bias-Free) 2×",
+    "DDO-L2 (Bias-Free) 4×",
+    "DDO-L1 (Bias-Free) 0.5×",
+    "DDO-L1 (Bias-Free) 1×",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 0.5×",
+    "Centered-L2 1×",
+    "Centered-L2 2×",
+    "Centered-L2 4×"
+   ]
+  },
+  {
+   "arm": "Centered-L2 0.5×",
+   "acc": 54.6549,
+   "f_rel": 0.170683,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=1",
+    "ISDA-Language 2×"
+   ]
+  },
+  {
+   "arm": "Centered-L2 1×",
+   "acc": 55.6175,
+   "f_rel": 0.156517,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup"
+   ]
+  },
+  {
+   "arm": "Centered-L2 2×",
+   "acc": 56.5037,
+   "f_rel": 0.138432,
+   "on_frontier": false,
+   "dominated_by": [
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup"
+   ]
+  },
+  {
+   "arm": "Centered-L2 4×",
+   "acc": 55.891,
+   "f_rel": 0.117292,
+   "on_frontier": false,
+   "dominated_by": [
+    "DDO α=2",
+    "ISDA-Language 2×",
+    "ISDA-Language 4×",
+    "ISDA-Language 4× + warmup",
+    "ISDA-Language 8× + warmup",
+    "DDO-L2 (Original) 2×",
+    "DDO-L2 (Bias-Free) 2×",
+    "DDO-L1 (Bias-Free) 2×",
+    "Centered-L2 2×"
+   ]
+  }
+ ]
 }
