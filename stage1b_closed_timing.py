@@ -60,10 +60,13 @@ def build_sess(closed, seed, device, run_tag):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--steps", type=int, default=50)
     ap.add_argument("--warmup", type=int, default=10)
     ap.add_argument("--repeats", type=int, default=3)
     a = ap.parse_args()
+    if a.selftest:
+        return self_test()
     ok = True
 
     def check(name, cond, detail=""):
