@@ -1,0 +1,133 @@
+{
+ "created": "2026-11-28 12:05:26",
+ "code": {
+  "commit": "a385f8fcd73f22565c76c11ca801a0998c379b0d",
+  "dirty": false
+ },
+ "prereg": "RESULTS.md §3aw",
+ "target_info_present": false,
+ "curve": {
+  "0.5": {
+   "mean": 53.35317460317461,
+   "per_seed": [
+    53.20238095238096,
+    53.26190476190476,
+    53.595238095238095
+   ],
+   "clean": 77.6111111111111
+  },
+  "1": {
+   "mean": 54.714285714285715,
+   "per_seed": [
+    54.345238095238095,
+    54.67857142857142,
+    55.11904761904763
+   ],
+   "clean": 77.88888888888887
+  },
+  "2": {
+   "mean": 55.81746031746032,
+   "per_seed": [
+    55.48809523809524,
+    55.726190476190474,
+    56.23809523809524
+   ],
+   "clean": 77.75
+  },
+  "4": {
+   "mean": 56.00396825396825,
+   "per_seed": [
+    55.357142857142854,
+    56.13095238095239,
+    56.52380952380952
+   ],
+   "clean": 76.3888888888889
+  }
+ },
+ "runs": {
+  "CUB_s1b_cen_a0p5_seed1": {
+   "tag": "s1b_cen_a0p5",
+   "seed": 1,
+   "alpha": 0.3611184308082789,
+   "head_sha256": "f52fc2b75b37744b8b6ebd45287814acd15f99488606cc1fc2254af524774443",
+   "result_sha256": "d7d6cb55d34479b848015eb39b5c42f0d9dd8ce416fd473a43f9f5cba46ec36f"
+  },
+  "CUB_s1b_cen_a0p5_seed2": {
+   "tag": "s1b_cen_a0p5",
+   "seed": 2,
+   "alpha": 0.3611184308082789,
+   "head_sha256": "ae5772504b8a3de114cc75ca22578b09970174ccfdfe57d22e3a54bf3cbcf3e3",
+   "result_sha256": "15936bfd70d32881f4b047c94d7de8816b39c01592f973d3a834f1be7d9ad33a"
+  },
+  "CUB_s1b_cen_a0p5_seed3": {
+   "tag": "s1b_cen_a0p5",
+   "seed": 3,
+   "alpha": 0.3611184308082789,
+   "head_sha256": "ccb2b4092338a9621c7af308daf5837d3cdebea6eb39d8271fa36367dd285993",
+   "result_sha256": "0ec08271ff132e2e686389547539b3bd9d8efc43fbd38453d827d7aac8220a45"
+  },
+  "CUB_s1b_cen_a1_seed1": {
+   "tag": "s1b_cen_a1",
+   "seed": 1,
+   "alpha": 0.7222368616165578,
+   "head_sha256": "eb851471a366bd4e67afc03b1ef78234cdf6f27856a7ba2b05a752c258c73ae3",
+   "result_sha256": "f61c5b64c528f36bbed35bcb6fdc051960ea4d923e0f32c8b8a4cbed1cbaf44d"
+  },
+  "CUB_s1b_cen_a1_seed2": {
+   "tag": "s1b_cen_a1",
+   "seed": 2,
+   "alpha": 0.7222368616165578,
+   "head_sha256": "8375c88799b6d2431c9eb1dfa2e870b79490a04fa0f04a24f4b1130379fc0e8d",
+   "result_sha256": "8b1e1d9073e57eecaea7460d380b68aa4e9aff9565b4bf620704af510fe05ab0"
+  },
+  "CUB_s1b_cen_a1_seed3": {
+   "tag": "s1b_cen_a1",
+   "seed": 3,
+   "alpha": 0.7222368616165578,
+   "head_sha256": "ffb1aba9194995e7eafd3be2001854b5afa1738b1126002c5309db57a0f40e1d",
+   "result_sha256": "7ab9218794a9b9aef33684b8370aa6ed6df947123e246a1710a93437d58bbe6b"
+  },
+  "CUB_s1b_cen_a2_seed1": {
+   "tag": "s1b_cen_a2",
+   "seed": 1,
+   "alpha": 1.4444737232331155,
+   "head_sha256": "764e128e9a1adcfe4ee10f8383d8eb6885fb435d91645935d07a79732e38f768",
+   "result_sha256": "f1fe17a804007866e2538b845ec73bf7678694fc37dae6cd23d4f879f5cd3550"
+  },
+  "CUB_s1b_cen_a2_seed2": {
+   "tag": "s1b_cen_a2",
+   "seed": 2,
+   "alpha": 1.4444737232331155,
+   "head_sha256": "d99c5de2284cbb579f173ef41a695164eb5914309a4e26fac1d490f1c6345cc7",
+   "result_sha256": "5cb92d71483410aaaf25c6ac80b70105050e164336f538d079cfd970e9527712"
+  },
+  "CUB_s1b_cen_a2_seed3": {
+   "tag": "s1b_cen_a2",
+   "seed": 3,
+   "alpha": 1.4444737232331155,
+   "head_sha256": "776a1cc16ae05f9c4cc0c65caf3e210fe586de77d99e2c384011c1dc1a7b7cce",
+   "result_sha256": "20250d1a2a81a94515da30197b08dd83c29b7d5c4f077a0d78d8a2f11891022f"
+  },
+  "CUB_s1b_cen_a4_seed1": {
+   "tag": "s1b_cen_a4",
+   "seed": 1,
+   "alpha": 2.888947446466231,
+   "head_sha256": "bc4b7379022ef7012c4750e624cf6b2970827177cbb10456b3a89ecdc6ae2346",
+   "result_sha256": "534d9073ba8b46c82bfc1e9d6bc691cf4f2ab9819da1d4abe06af20a57b021a0"
+  },
+  "CUB_s1b_cen_a4_seed2": {
+   "tag": "s1b_cen_a4",
+   "seed": 2,
+   "alpha": 2.888947446466231,
+   "head_sha256": "ccf8c23fe50480337e245a22039607449731c0353fcf910579937a1f9097919e",
+   "result_sha256": "f7fa77d7dd3fcad100706748d32bf733c6ef34f352b989d141b9e6f328acf53a"
+  },
+  "CUB_s1b_cen_a4_seed3": {
+   "tag": "s1b_cen_a4",
+   "seed": 3,
+   "alpha": 2.888947446466231,
+   "head_sha256": "58b46b2957a66026c5d7276434e0a4e125c4e43293274ac5bd59e8bcdeae9b33",
+   "result_sha256": "779bea4d21d286c734682c58f58f07c6845f860e068c6c865400837330755e8b"
+  }
+ }
+}
