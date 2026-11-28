@@ -383,6 +383,45 @@ def eval_stage1b_c2(seeds):
     return 0
 
 
+def eval_stage1b_c3(seeds):
+    """第十六轮 P2（预注册 §3aw）：Centered-L2 的 12 个 run。门 = stage1b_c3_source.json。"""
+    from run_matrix import MATRICES
+    out_dir = os.path.join("experiment_results", "Stage1B-L2")
+    sel_json = os.path.join(out_dir, "stage1b_c3_source.json")
+    locked, why = selection_is_locked(sel_json)
+    if not locked:
+        print("拒绝运行: stage1b_c3 的源域文件尚未锁定 —— " + why)
+        return 2
+    ev = HeadEvaluator()
+    heads = {}
+    for _, tag, _ex in MATRICES["stage1b_c3"][1]:
+        for s in seeds:
+            run = f"CUB_{tag}_seed{s}"
+            heads[run] = ev.evaluate(f"logs/heads/{run}.pt", f"logs/results/{run}.json")
+    with open(sel_json, encoding="utf-8") as f:
+        sel = json.load(f)
+
+    def same(r):
+        v, w = heads.get(r), sel["runs"].get(r, {})
+        return bool(w) and v is not None and w.get("head_sha256") == v["head_sha256"]             and w.get("result_sha256") == v["result_sha256"]
+
+    missing = [r for r in sorted(heads) if not same(r)]
+    if missing:
+        print("拒绝: 已评估 run 与锁定不一致: " + ", ".join(missing[:8]))
+        return 3
+    out = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "code": git_info(), "selection_lock_commit": why,
+           "selection_sha256": sha256_file(sel_json), "target_cache": ev.target_meta, "heads": heads}
+    out_path = os.path.join(out_dir, "stage1b_c3_target_eval.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1, allow_nan=False)
+    print(f"选择锁定于 {why[:7]}; 评估 {len(heads)} 个分类头; 目标域 {ev.target_meta['n']} 个样本")
+    for _, tag, _ex in MATRICES["stage1b_c3"][1]:
+        accs = [heads[f"CUB_{tag}_seed{s}"]["target_acc"] for s in seeds]
+        print(f"  {tag:18s} " + " / ".join(f"{x:.2f}" for x in accs))
+    print(f"[saved] {out_path}")
+    return 0
+
+
 def eval_stage1b(seeds):
     """第十三轮 Stage 1B（预注册 §3ao）：24 个 L2 run 的事后目标域评估。门 = stage1b_source.json。"""
     from run_matrix import MATRICES
@@ -431,6 +470,7 @@ def main():
     ap.add_argument("--s12", action="store_true")
     ap.add_argument("--stage1b", action="store_true")
     ap.add_argument("--stage1b_c2", action="store_true")
+    ap.add_argument("--stage1b_c3", action="store_true")
     ap.add_argument("--p4", choices=["AWA2", "LADV", "PACS"])
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     a = ap.parse_args()
@@ -446,6 +486,8 @@ def main():
         return eval_stage1b(a.seeds)
     if a.stage1b_c2:
         return eval_stage1b_c2(a.seeds)
+    if a.stage1b_c3:
+        return eval_stage1b_c3(a.seeds)
     if a.p4:
         return eval_p4(a.p4, a.seeds)
 
