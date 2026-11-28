@@ -1,0 +1,16 @@
+# 外审第十六轮: 全套回归与自测记录
+运行提交: 本文件提交时的 HEAD
+== 默认训练路径逐位回归 (REGRESS_BATCH=128) ==
+REGRESSION_RESULT: PASS (--ddo_norm l2c 与闭式跳过仅在新开关下生效; 默认路径不变)
+== 端到端工程检查 ==
+ENG_FIX_CHECK: PASS (37 项); ENG_FIX_CHECK2: PASS (33 项)
+== 自测 ==
+tests_l2_equivalences: PASS (15 项; 新增 E7a/b/c 分解与投影更正, E8a/b Centered 不变性)
+ld_training / ld_dro / stage1b_c2_report / stage1b_c3_report / stage1b_closed_timing / stage1c_training_report / round11_report / descriptor_bank: 全部 PASS
+eval_decision_fidelity --selftest: PASS (126 头运行前)
+== 事后评估等价性 ==
+VALIDATE: PASS (27/27 逐位)
+== 关键数值核对 ==
+闭式 vs 显式单步更新: 正则值相对差 8.9e-08; 一步 AdamW 后参数最大差 5.6e-09
+单步训练计时 (预热 10 步 × 3 重复): 显式 6 ms vs 闭式 3 ms; 评估 0.09 vs 0.06 s
+Centered-L2 等压标定: alpha@1× = 0.722237 (初始比 0.1453 → rho_bar 0.1049)
