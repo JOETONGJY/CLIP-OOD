@@ -1,0 +1,40 @@
+{
+ "created": "2026-11-28 11:55:48",
+ "code": {
+  "commit": "1f8c579086feb18ac9c221247bb950ca1d6e6edc",
+  "dirty": true
+ },
+ "device": "cuda",
+ "steps": 20,
+ "warmup": 10,
+ "repeats": 2,
+ "update_equality": {
+  "explicit_reg_loss": 0.3347572386264801,
+  "closed_reg_loss": 0.3347572088241577,
+  "rel_loss_diff": 8.902667052092799e-08,
+  "max_param_diff_after_step": 5.587935447692871e-09
+ },
+ "timing": {
+  "explicit": {
+   "build_seconds": 11.55841588973999,
+   "step_seconds": [
+    0.0057517409324645994,
+    0.005878484249114991
+   ],
+   "step_seconds_mean": 0.005815112590789795,
+   "step_seconds_std": 6.337165832519557e-05,
+   "eval_seconds": 0.08908939361572266
+  },
+  "closed": {
+   "build_seconds": 11.496955394744873,
+   "step_seconds": [
+    0.002899789810180664,
+    0.0026518702507019043
+   ],
+   "step_seconds_mean": 0.002775830030441284,
+   "step_seconds_std": 0.00012395977973937993,
+   "eval_seconds": 0.05751681327819824
+  },
+  "note": "所有计时为本机单卡当前负载下的测量值；构建时间含数据集缓存加载；只用于实现选择，不宣称正式加速倍数或显存下降 (外审第十五轮措辞约束)"
+ }
+}

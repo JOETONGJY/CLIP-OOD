@@ -125,14 +125,21 @@ class TrainingSession:
 
     def _ddo_norm_loss(self, reg_loss):
         """DDO 正则的范数（第十三轮 Stage 1B，预注册 §3ao）。
-        l1 = mean|h|（默认，与历史逐位一致）；l2 = mean(h²)。
+        l1 = mean|h|（默认，与历史逐位一致）；l2 = mean(h²)；l2c = Centered-L2（外审第十六轮 P2，
+        (1/C)tr(ÃGÃᵀ)，Ã = H_C·A，闭式实现）。
+        闭式路径（--ddo_l2_closed / l2c）下 forward 不再计算显式响应（reg_loss=None）——此时必须返回
+        闭式损失而不是 0（外审第十六轮 P1：None 不得导致闭式损失被跳过；stage1b_closed_timing 的首次
+        核对正是抓到了这个实现缺口）。
         统一评价指标 ddo_loss_equal_weight() 始终用 L1，不随本开关改变（跨方法可比）。"""
-        if reg_loss is None:
-            return 0.0
+        if getattr(self.args, "ddo_norm", "l1") == "l2c":
+            return self.model.ddo_l2c_closed_loss()
         if getattr(self.args, "ddo_norm", "l1") == "l2":
             if getattr(self.args, "ddo_l2_closed", False) and hasattr(self.model, "ddo_l2_closed_loss"):
                 return self.model.ddo_l2_closed_loss()      # 二阶矩闭式 (§3ar; 数学等价)
+            assert reg_loss is not None, "l2 显式路径需要 forward 的响应"
             return (reg_loss ** 2).mean()
+        if reg_loss is None:
+            return 0.0
         return torch.abs(reg_loss).mean()
 
     def _prepare_datasets(self):

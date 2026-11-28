@@ -199,6 +199,24 @@ with open(BFL1_CALIB, encoding="utf-8") as _f:
 assert abs(_BFL1["cells"]["biasfree_l1"]["anchor_alpha_1x"] - 1.0) < 1e-12     and abs(_BFL1["rho_bar_target"] - 0.10492240885893504) < 1e-12, "BF-L1 标定与 §3ao 的 rho_bar 不一致"
 
 
+# ---- 第十六轮 P2 (预注册 §3aw): Centered-L2 (ddo_norm=l2c, 闭式), 4 强度 × 3 seeds = 12 run ----
+# 等压标定 (stage1b_calibration_l2c.json): Centered-L2 在 alpha=1 的初始梯度比 0.145274 → 1× 的 alpha = 0.722237。
+L2C_CALIB = os.path.join(ROOT, "experiment_results", "Stage1B-L2", "stage1b_calibration_l2c.json")
+with open(L2C_CALIB, encoding="utf-8") as _f:
+    _L2C = json.load(_f)
+assert abs(_L2C["rho_bar_target"] - 0.10492240885893504) < 1e-12     and abs(_L2C["anchor_alpha_1x"] - 0.7222368616165578) < 1e-9 and _L2C["all_checks_passed"],     "Centered-L2 标定与 §3aw 不一致或未通过自检"
+
+
+def _s1b_c3_entries():
+    out = []
+    p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE]
+    for m, tag in S1B_MTAG.items():
+        a = float(_L2C["scan"][m])
+        out.append(("CUB", f"s1b_cen_a{tag}",
+                    EQUAL + ["--alpha", repr(a), "--ddo_dirs", "full", "--ddo_norm", "l2c"] + p1))
+    return out
+
+
 def _s1b_c2_entries():
     out = []
     p1 = ["--target_eval", "none", "--save_head", "--train_subset_cache", AUG_CACHE, "--source_val_cache", AUG_CACHE]
@@ -371,6 +389,8 @@ MATRICES = {
     "stage1b": ("Stage1B-L2", _s1b_entries()),
     # 第十五轮 P2: Bias-Free × L1 (§3ao 2×2 的最后一格), 4 强度 × 3 seeds = 12 run
     "stage1b_c2": ("Stage1B-L2", _s1b_c2_entries()),
+    # 第十六轮 P2: Centered-L2 (§3aw), 4 强度 × 3 seeds = 12 run; 闭式路径 (forward 跳过显式响应)
+    "stage1b_c3": ("Stage1B-L2", _s1b_c3_entries()),
 }
 
 # 不带取值的开关: store_true -> True, store_false -> 其 dest 为 False
@@ -470,6 +490,13 @@ def _self_test_expected():
     assert (e["ddo_dirs"] == "full_bf" and e["ddo_norm"] == "l1" and float(e["alpha"]) == 0.5
             and e["target_eval"] == "none" and e["save_head"] is True), e
     assert float(expected(COMMON + MATRICES["stage1b_c2"][1][1][2], "CUB", 1, "s1b_bf_l1_a1")["alpha"]) == 1.0
+    # 第十六轮: stage1b_c3 = 4 配置; Centered-L2 = ddo_norm l2c + 闭式 + full 方向集, alpha 从标定现算
+    assert len(MATRICES["stage1b_c3"][1]) == 4, len(MATRICES["stage1b_c3"][1])
+    e = expected(COMMON + MATRICES["stage1b_c3"][1][0][2], "CUB", 1, "s1b_cen_a0p5")
+    assert (e["ddo_dirs"] == "full" and e["ddo_norm"] == "l2c" and "ddo_l2_closed" not in e
+            and float(e["alpha"]) == float(repr(float(_L2C["scan"]["0.5"])))
+            and e["target_eval"] == "none" and e["save_head"] is True), e
+    assert float(expected(COMMON + MATRICES["stage1b_c3"][1][2][2], "CUB", 1, "s1b_cen_a2")["alpha"])         == float(repr(float(_L2C["scan"]["2"])))
     # P3: warmup 矩阵 1 配置 × 3 seeds; λ 与 Original-ISDA 的 x8 逐位相同 (配对对象), warmup=20
     assert len(MATRICES["s11_warmup"][1]) == 1
     e = expected(COMMON + MATRICES["s11_warmup"][1][0][2], "CUB", 1, "isda_warm_x8")
