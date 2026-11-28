@@ -37,5 +37,7 @@
   }
  ],
  "n_arms_with_acc": 38,
- "missing": []
+ "missing": [],
+ "n_arms": 42,
+ "note": " | 含 Centered-L2 4 臂 (全部被 ISDA@2×/4× 严格支配)"
 }

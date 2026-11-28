@@ -93,6 +93,11 @@ ARMS = [
     ("CUB_s1b_bf_l1_a1", "DDO-L1 (Bias-Free) 1×", "DDO-L1-BF", "1"),
     ("CUB_s1b_bf_l1_a2", "DDO-L1 (Bias-Free) 2×", "DDO-L1-BF", "2"),
     ("CUB_s1b_bf_l1_a4", "DDO-L1 (Bias-Free) 4×", "DDO-L1-BF", "4"),
+    # 第十六轮 P2 (§3aw/§3ax): Centered-L2 的 12 个头
+    ("CUB_s1b_cen_a0p5", "Centered-L2 0.5×", "Centered-L2", "0.5"),
+    ("CUB_s1b_cen_a1", "Centered-L2 1×", "Centered-L2", "1"),
+    ("CUB_s1b_cen_a2", "Centered-L2 2×", "Centered-L2", "2"),
+    ("CUB_s1b_cen_a4", "Centered-L2 4×", "Centered-L2", "4"),
 ]
 
 
